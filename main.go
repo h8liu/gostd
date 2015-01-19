@@ -3,7 +3,7 @@ package main
 import (
 	"fmt"
 	"go/build"
-	"go/token"
+	// "go/token"
 	"log"
 	"path/filepath"
 	"strings"
@@ -59,25 +59,16 @@ func main() {
 
 	fset := prog.Fset
 
-	var fnames []string
-	prog.Fset.Iterate(func(f *token.File) bool {
-		fnames = append(fnames, f.Name())
-		return true
-	})
-	for _, f := range fnames {
-		fmt.Println(f)
-	}
-
 	for _, pinfo := range prog.AllPackages {
 		if len(pinfo.Files) == 0 {
 			continue
 		}
-		fmt.Printf("[%s]\n", pinfo.Pkg.Name())
+		fmt.Printf("[%s]\n", pinfo.Pkg.Path())
 		for _, f := range pinfo.Files {
 			pos := fset.Position(f.Package)
 			base := filepath.Base(pos.Filename)
 			if !strings.HasSuffix(base, ".go") {
-				panic(base)
+				continue
 			}
 
 			fmt.Printf("   %s\n", base)

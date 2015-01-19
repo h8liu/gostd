@@ -59,19 +59,43 @@ func main() {
 
 	fset := prog.Fset
 
+	var ps []*pkg
+
 	for _, pinfo := range prog.AllPackages {
 		if len(pinfo.Files) == 0 {
 			continue
 		}
-		fmt.Printf("[%s]\n", pinfo.Pkg.Path())
+
+		p := new(pkg)
+		p.path = pinfo.Pkg.Path()
+
 		for _, f := range pinfo.Files {
 			pos := fset.Position(f.Package)
+			pfile := fset.File(f.Package)
+			fname := pos.Filename
 			base := filepath.Base(pos.Filename)
 			if !strings.HasSuffix(base, ".go") {
 				continue
 			}
 
-			fmt.Printf("   %s\n", base)
+			p.files = append(p.files, &file{
+				file: pfile,
+				name: base,
+				path: fname,
+			})
+		}
+
+		if len(p.files) == 0 {
+			continue
+		}
+
+		ps = append(ps, p)
+	}
+
+	for _, p := range ps {
+		fmt.Printf("[%s]\n", p.path)
+		for _, f := range p.files {
+			fmt.Printf("   %s (%s)\n", f.name, f.path)
 		}
 	}
 }

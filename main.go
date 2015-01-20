@@ -3,6 +3,8 @@ package main
 import (
 	"fmt"
 	"go/build"
+	"io/ioutil"
+	"os"
 	"path/filepath"
 	"strings"
 
@@ -92,9 +94,18 @@ func main() {
 	ps := makePkgs()
 	for _, p := range ps {
 		fmt.Printf("[%s]\n", p.path)
+		outPath := filepath.Join("www", p.path)
+		e := os.MkdirAll(outPath, 0700)
+		ne(e)
+
 		for _, f := range p.files {
 			fmt.Printf("   %s (%s)\n", f.name, f.path)
 			f.parseToks()
+
+			bs := f.html()
+			pout := filepath.Join(outPath, f.name+".html")
+			e := ioutil.WriteFile(pout, bs, 0700)
+			ne(e)
 		}
 	}
 }

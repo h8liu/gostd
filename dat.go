@@ -8,6 +8,7 @@ import (
 	"html"
 	"io"
 	"io/ioutil"
+	"log"
 )
 
 type tok struct {
@@ -83,6 +84,8 @@ func tokClass(t token.Token) string {
 func (f *file) html() []byte {
 	out := new(bytes.Buffer)
 	base := f.file.Base()
+	size := f.file.Size()
+
 	bs, e := ioutil.ReadFile(f.path)
 	ne(e)
 
@@ -97,8 +100,16 @@ func (f *file) html() []byte {
 		if t.tok == token.EOF {
 			break
 		}
+		if t.lit == "\n" && t.tok == token.SEMICOLON {
+			// implicit semicolon
+			continue
+		}
 
-		toff := int(t.tok) - base
+		toff := int(t.pos) - base
+		if toff < 0 || toff >= size {
+			log.Printf("invalid toff=%d", toff)
+			panic("invalid toff")
+		}
 
 		for off < toff {
 			ch, n, e := r.ReadRune()
@@ -112,8 +123,10 @@ func (f *file) html() []byte {
 		}
 
 		if off != toff {
+			log.Printf("off=%d toff=%d", off, toff)
 			panic("rune not aligned")
 		}
+
 
 		nb := len([]byte(t.lit))
 
@@ -124,7 +137,9 @@ func (f *file) html() []byte {
 		}
 
 		str := string(buf)
+
 		if t.lit != str {
+			log.Printf("t=%s lit=%q str=%q", t.tok.String(), t.lit, str)
 			panic("lit unmatch")
 		}
 
@@ -133,6 +148,8 @@ func (f *file) html() []byte {
 			fmt.Fprint(out, runeHtml(ch))
 		}
 		fmt.Fprintf(out, `</span>`)
+
+		off += nb
 	}
 
 	fmt.Fprint(out, `\n</div>\n`)

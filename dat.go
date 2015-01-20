@@ -34,7 +34,8 @@ func (f *file) parseToks() {
 		fmt.Printf("%s: %s\n", pos, msg)
 	}
 	s := new(scanner.Scanner)
-	s.Init(f.file, bs, onError, scanner.ScanComments)
+	// s.Init(f.file, bs, onError, scanner.ScanComments)
+	s.Init(f.file, bs, onError, 0)
 
 	f.toks = nil
 

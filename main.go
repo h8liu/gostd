@@ -12,6 +12,8 @@ import (
 
 func listPackages() []string {
 	c := &build.Default
+	c.CgoEnabled = false
+
 	hold := c.GOPATH
 	c.GOPATH = ""
 	pkgs := buildutil.AllPackages(c)
@@ -22,10 +24,6 @@ func listPackages() []string {
 		if strings.HasPrefix(p, "cmd/") || p == "cmd" {
 			continue
 		}
-		if p == "runtime/cgo" {
-			continue
-		}
-
 		ret = append(ret, p)
 	}
 	return ret

@@ -95,6 +95,7 @@ func main() {
 	for _, p := range ps {
 		fmt.Printf("[%s]\n", p.path)
 		outPath := filepath.Join("www", p.path)
+		outPath = strings.TrimSuffix(outPath, "_test")
 		e := os.MkdirAll(outPath, 0700)
 		ne(e)
 

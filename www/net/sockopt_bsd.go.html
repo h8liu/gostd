@@ -1,0 +1,69 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2011&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="comment">//&nbsp;+build&nbsp;darwin&nbsp;dragonfly&nbsp;freebsd&nbsp;netbsd&nbsp;openbsd</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">package</span>&nbsp;<span class="ident">net</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;os&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;runtime&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;syscall&#34;</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">15</span><span class="keyword">func</span>&nbsp;<span class="ident">setDefaultSockopts</span><span class="op">(</span><span class="ident">s</span><span class="op">,</span>&nbsp;<span class="ident">family</span><span class="op">,</span>&nbsp;<span class="ident">sotype</span>&nbsp;<span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">ipv6only</span>&nbsp;<span class="builtintype">bool</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">runtime</span><span class="op">.</span><span class="ident">GOOS</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#34;dragonfly&#34;</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">sotype</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">syscall</span><span class="op">.</span><span class="ident">SOCK_RAW</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;On&nbsp;DragonFly&nbsp;BSD,&nbsp;we&nbsp;adjust&nbsp;the&nbsp;ephemeral&nbsp;port</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;range&nbsp;because&nbsp;unlike&nbsp;other&nbsp;BSD&nbsp;systems&nbsp;its&nbsp;default</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;port&nbsp;range&nbsp;doesn&#39;t&nbsp;conform&nbsp;to&nbsp;IANA&nbsp;recommendation</span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;as&nbsp;described&nbsp;in&nbsp;RFC&nbsp;6056&nbsp;and&nbsp;is&nbsp;pretty&nbsp;narrow.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="ident">family</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">syscall</span><span class="op">.</span><span class="ident">AF_INET</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">syscall</span><span class="op">.</span><span class="ident">SetsockoptInt</span><span class="op">(</span><span class="ident">s</span><span class="op">,</span>&nbsp;<span class="ident">syscall</span><span class="op">.</span><span class="ident">IPPROTO_IP</span><span class="op">,</span>&nbsp;<span class="ident">syscall</span><span class="op">.</span><span class="ident">IP_PORTRANGE</span><span class="op">,</span>&nbsp;<span class="ident">syscall</span><span class="op">.</span><span class="ident">IP_PORTRANGE_HIGH</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">syscall</span><span class="op">.</span><span class="ident">AF_INET6</span><span class="op">:</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">syscall</span><span class="op">.</span><span class="ident">SetsockoptInt</span><span class="op">(</span><span class="ident">s</span><span class="op">,</span>&nbsp;<span class="ident">syscall</span><span class="op">.</span><span class="ident">IPPROTO_IPV6</span><span class="op">,</span>&nbsp;<span class="ident">syscall</span><span class="op">.</span><span class="ident">IPV6_PORTRANGE</span><span class="op">,</span>&nbsp;<span class="ident">syscall</span><span class="op">.</span><span class="ident">IPV6_PORTRANGE_HIGH</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">family</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">syscall</span><span class="op">.</span><span class="ident">AF_INET6</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">sotype</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">syscall</span><span class="op">.</span><span class="ident">SOCK_RAW</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Allow&nbsp;both&nbsp;IP&nbsp;versions&nbsp;even&nbsp;if&nbsp;the&nbsp;OS&nbsp;default</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;is&nbsp;otherwise.&nbsp;&nbsp;Note&nbsp;that&nbsp;some&nbsp;operating&nbsp;systems</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;never&nbsp;admit&nbsp;this&nbsp;option.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">syscall</span><span class="op">.</span><span class="ident">SetsockoptInt</span><span class="op">(</span><span class="ident">s</span><span class="op">,</span>&nbsp;<span class="ident">syscall</span><span class="op">.</span><span class="ident">IPPROTO_IPV6</span><span class="op">,</span>&nbsp;<span class="ident">syscall</span><span class="op">.</span><span class="ident">IPV6_V6ONLY</span><span class="op">,</span>&nbsp;<span class="ident">boolint</span><span class="op">(</span><span class="ident">ipv6only</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Allow&nbsp;broadcast.</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">os</span><span class="op">.</span><span class="ident">NewSyscallError</span><span class="op">(</span><span class="string">&#34;setsockopt&#34;</span><span class="op">,</span>&nbsp;<span class="ident">syscall</span><span class="op">.</span><span class="ident">SetsockoptInt</span><span class="op">(</span><span class="ident">s</span><span class="op">,</span>&nbsp;<span class="ident">syscall</span><span class="op">.</span><span class="ident">SOL_SOCKET</span><span class="op">,</span>&nbsp;<span class="ident">syscall</span><span class="op">.</span><span class="ident">SO_BROADCAST</span><span class="op">,</span>&nbsp;<span class="num">1</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">setDefaultListenerSockopts</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Allow&nbsp;reuse&nbsp;of&nbsp;recently-used&nbsp;addresses.</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">os</span><span class="op">.</span><span class="ident">NewSyscallError</span><span class="op">(</span><span class="string">&#34;setsockopt&#34;</span><span class="op">,</span>&nbsp;<span class="ident">syscall</span><span class="op">.</span><span class="ident">SetsockoptInt</span><span class="op">(</span><span class="ident">s</span><span class="op">,</span>&nbsp;<span class="ident">syscall</span><span class="op">.</span><span class="ident">SOL_SOCKET</span><span class="op">,</span>&nbsp;<span class="ident">syscall</span><span class="op">.</span><span class="ident">SO_REUSEADDR</span><span class="op">,</span>&nbsp;<span class="num">1</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">setDefaultMulticastSockopts</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Allow&nbsp;multicast&nbsp;UDP&nbsp;and&nbsp;raw&nbsp;IP&nbsp;datagram&nbsp;sockets&nbsp;to&nbsp;listen</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;concurrently&nbsp;across&nbsp;multiple&nbsp;listeners.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">syscall</span><span class="op">.</span><span class="ident">SetsockoptInt</span><span class="op">(</span><span class="ident">s</span><span class="op">,</span>&nbsp;<span class="ident">syscall</span><span class="op">.</span><span class="ident">SOL_SOCKET</span><span class="op">,</span>&nbsp;<span class="ident">syscall</span><span class="op">.</span><span class="ident">SO_REUSEADDR</span><span class="op">,</span>&nbsp;<span class="num">1</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">os</span><span class="op">.</span><span class="ident">NewSyscallError</span><span class="op">(</span><span class="string">&#34;setsockopt&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Allow&nbsp;reuse&nbsp;of&nbsp;recently-used&nbsp;ports.</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;This&nbsp;option&nbsp;is&nbsp;supported&nbsp;only&nbsp;in&nbsp;descendants&nbsp;of&nbsp;4.4BSD,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;to&nbsp;make&nbsp;an&nbsp;effective&nbsp;multicast&nbsp;application&nbsp;that&nbsp;requires</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;quick&nbsp;draw&nbsp;possible.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">os</span><span class="op">.</span><span class="ident">NewSyscallError</span><span class="op">(</span><span class="string">&#34;setsockopt&#34;</span><span class="op">,</span>&nbsp;<span class="ident">syscall</span><span class="op">.</span><span class="ident">SetsockoptInt</span><span class="op">(</span><span class="ident">s</span><span class="op">,</span>&nbsp;<span class="ident">syscall</span><span class="op">.</span><span class="ident">SOL_SOCKET</span><span class="op">,</span>&nbsp;<span class="ident">syscall</span><span class="op">.</span><span class="ident">SO_REUSEPORT</span><span class="op">,</span>&nbsp;<span class="num">1</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

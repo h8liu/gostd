@@ -1,0 +1,62 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="keyword">package</span>&nbsp;<span class="ident">asm8</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;lonnie.io/e8vm/link8&#34;</span><br>
+<span class="lineno">5</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">varSize</span><span class="op">(</span><span class="ident">v</span>&nbsp;<span class="op">*</span><span class="ident">varDecl</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">stmt</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">v</span><span class="op">.</span><span class="ident">stmts</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">stmt</span><span class="op">.</span><span class="ident">data</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">ret</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">15</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">varAlign</span><span class="op">(</span><span class="ident">v</span>&nbsp;<span class="op">*</span><span class="ident">varDecl</span><span class="op">)</span>&nbsp;<span class="builtintype">uint32</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">stmt</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">v</span><span class="op">.</span><span class="ident">stmts</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">stmt</span><span class="op">.</span><span class="ident">align</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">4</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">4</span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">25</span><span class="keyword">func</span>&nbsp;<span class="ident">buildVar</span><span class="op">(</span><span class="ident">b</span>&nbsp;<span class="op">*</span><span class="ident">builder</span><span class="op">,</span>&nbsp;<span class="ident">v</span>&nbsp;<span class="op">*</span><span class="ident">varDecl</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">link8</span><span class="op">.</span><span class="ident">Var</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">varSize</span><span class="op">(</span><span class="ident">v</span><span class="op">)</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span><span class="op">.</span><span class="ident">err</span><span class="op">(</span><span class="ident">v</span><span class="op">.</span><span class="ident">name</span><span class="op">.</span><span class="ident">Pos</span><span class="op">,</span>&nbsp;<span class="string">&#34;var&nbsp;%q&nbsp;has&nbsp;no&nbsp;data&#34;</span><span class="op">,</span>&nbsp;<span class="ident">v</span><span class="op">.</span><span class="ident">name</span><span class="op">.</span><span class="ident">Lit</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">30</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">link8</span><span class="op">.</span><span class="ident">NewVar</span><span class="op">(</span><span class="ident">varAlign</span><span class="op">(</span><span class="ident">v</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">stmt</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">v</span><span class="op">.</span><span class="ident">stmts</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">ret</span><span class="op">.</span><span class="ident">Size</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">stmt</span><span class="op">.</span><span class="ident">align</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">4</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">n</span><span class="op">%</span><span class="num">4</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span><span class="op">.</span><span class="ident">Pad</span><span class="op">(</span><span class="num">4</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">n</span><span class="op">%</span><span class="num">4</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span><span class="op">.</span><span class="ident">Write</span><span class="op">(</span><span class="ident">stmt</span><span class="op">.</span><span class="ident">data</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">40</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">ret</span><span class="op">.</span><span class="ident">TooLarge</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span><span class="op">.</span><span class="ident">err</span><span class="op">(</span><span class="ident">v</span><span class="op">.</span><span class="ident">name</span><span class="op">.</span><span class="ident">Pos</span><span class="op">,</span>&nbsp;<span class="string">&#34;var&nbsp;%q&nbsp;too&nbsp;large&#34;</span><span class="op">,</span>&nbsp;<span class="ident">v</span><span class="op">.</span><span class="ident">name</span><span class="op">.</span><span class="ident">Lit</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">45</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">ret</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

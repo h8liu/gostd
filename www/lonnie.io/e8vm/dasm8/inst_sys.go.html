@@ -1,0 +1,50 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="keyword">package</span>&nbsp;<span class="ident">dasm8</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;fmt&#34;</span><br>
+<span class="lineno">5</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">opSysMap</span>&nbsp;<span class="op">=</span>&nbsp;<span class="keyword">map</span><span class="op">[</span><span class="builtintype">uint32</span><span class="op">]</span><span class="builtintype">string</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="num">64</span><span class="op">:</span>&nbsp;<span class="string">&#34;halt&#34;</span><span class="op">,</span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="num">65</span><span class="op">:</span>&nbsp;<span class="string">&#34;syscall&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="num">66</span><span class="op">:</span>&nbsp;<span class="string">&#34;usermod&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="num">68</span><span class="op">:</span>&nbsp;<span class="string">&#34;iret&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">15</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">opSys1Map</span>&nbsp;<span class="op">=</span>&nbsp;<span class="keyword">map</span><span class="op">[</span><span class="builtintype">uint32</span><span class="op">]</span><span class="builtintype">string</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="num">67</span><span class="op">:</span>&nbsp;<span class="string">&#34;vtable&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="num">69</span><span class="op">:</span>&nbsp;<span class="string">&#34;cpuid&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno">20</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">instSys</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="builtintype">uint32</span><span class="op">,</span>&nbsp;<span class="ident">in</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">Line</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">op</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">(</span><span class="ident">in</span>&nbsp;<span class="op">&gt;&gt;</span>&nbsp;<span class="num">24</span><span class="op">)</span>&nbsp;<span class="op">&amp;</span>&nbsp;<span class="num">0xff</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">src</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">regStr</span><span class="op">(</span><span class="op">(</span><span class="ident">in</span>&nbsp;<span class="op">&gt;&gt;</span>&nbsp;<span class="num">21</span><span class="op">)</span>&nbsp;<span class="op">&amp;</span>&nbsp;<span class="num">0x7</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">s</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">opStr</span><span class="op">,</span>&nbsp;<span class="ident">found</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">opSysMap</span><span class="op">[</span><span class="ident">op</span><span class="op">]</span><span class="op">;</span>&nbsp;<span class="ident">found</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">opStr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="keyword">if</span>&nbsp;<span class="ident">opStr</span><span class="op">,</span>&nbsp;<span class="ident">found</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">opSys1Map</span><span class="op">[</span><span class="ident">op</span><span class="op">]</span><span class="op">;</span>&nbsp;<span class="ident">found</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">fmt</span><span class="op">.</span><span class="ident">Sprintf</span><span class="op">(</span><span class="string">&#34;%s&nbsp;%s&#34;</span><span class="op">,</span>&nbsp;<span class="ident">opStr</span><span class="op">,</span>&nbsp;<span class="ident">src</span><span class="op">)</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">newLine</span><span class="op">(</span><span class="ident">addr</span><span class="op">,</span>&nbsp;<span class="ident">in</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span><span class="op">.</span><span class="ident">Str</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">s</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">ret</span><br>
+<span class="lineno">35</span><span class="op">}</span>
+</div>
+</body>
+</html>

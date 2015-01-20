@@ -1,0 +1,175 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="keyword">package</span>&nbsp;<span class="ident">arch8</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;PageTable&nbsp;describes&nbsp;a&nbsp;page&nbsp;table&nbsp;in&nbsp;a&nbsp;physical&nbsp;memory.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;It&nbsp;can&nbsp;be&nbsp;used&nbsp;to&nbsp;translate&nbsp;a&nbsp;virtual&nbsp;memory&nbsp;address&nbsp;into&nbsp;a&nbsp;physical</span><br>
+<span class="lineno">5</span><span class="comment">//&nbsp;memory&nbsp;address.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">pageTable</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mem</span>&nbsp;&nbsp;<span class="op">*</span><span class="ident">phyMemory</span>&nbsp;<span class="comment">//&nbsp;the&nbsp;physical&nbsp;memory</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">root</span>&nbsp;<span class="builtintype">uint32</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;root&nbsp;address</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;last&nbsp;translation</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pte1</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">ptEntry</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pte2</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">ptEntry</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pte1Addr</span>&nbsp;<span class="builtintype">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pte2Addr</span>&nbsp;<span class="builtintype">uint32</span><br>
+<span class="lineno">15</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;NewPageTable&nbsp;creates&nbsp;a&nbsp;new&nbsp;page&nbsp;table&nbsp;pointer.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;page&nbsp;table&nbsp;is&nbsp;saved&nbsp;at&nbsp;addr.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;If&nbsp;addr&nbsp;is&nbsp;not&nbsp;page&nbsp;size&nbsp;aligned,&nbsp;it&nbsp;is&nbsp;aligned&nbsp;down.</span><br>
+<span class="lineno">20</span><span class="keyword">func</span>&nbsp;<span class="ident">newPageTable</span><span class="op">(</span><span class="ident">m</span>&nbsp;<span class="op">*</span><span class="ident">phyMemory</span><span class="op">,</span>&nbsp;<span class="ident">addr</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">pageTable</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">addr</span>&nbsp;<span class="op">-=</span>&nbsp;<span class="ident">addr</span>&nbsp;<span class="op">%</span>&nbsp;<span class="ident">PageSize</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">new</span><span class="op">(</span><span class="ident">pageTable</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span><span class="op">.</span><span class="ident">mem</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">m</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span><span class="op">.</span><span class="ident">root</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">addr</span><br>
+<span class="lineno">25</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">ret</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;bit&nbsp;[31:12]&nbsp;-&gt;&nbsp;a&nbsp;page&nbsp;pointer</span><br>
+<span class="lineno">30</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;bit&nbsp;3:&nbsp;dirty&nbsp;bit</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;bit&nbsp;2:&nbsp;use&nbsp;bit</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;bit&nbsp;1:&nbsp;readonly&nbsp;bit</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;bit&nbsp;0:&nbsp;valid&nbsp;bit</span><br>
+<span class="lineno">35</span><span class="keyword">type</span>&nbsp;<span class="ident">ptEntry</span>&nbsp;<span class="builtintype">uint32</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pteValid</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pteReadonly</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pteUse</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">2</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pteDirty</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">3</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pteUser</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">4</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">45</span><span class="keyword">const</span>&nbsp;<span class="ident">u32one</span>&nbsp;<span class="builtintype">uint32</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0x1</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">pte</span>&nbsp;<span class="ident">ptEntry</span><span class="op">)</span>&nbsp;<span class="ident">testBit</span><span class="op">(</span><span class="ident">n</span>&nbsp;<span class="builtintype">uint</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="op">(</span><span class="builtintype">uint32</span><span class="op">(</span><span class="ident">pte</span><span class="op">)</span>&nbsp;<span class="op">&amp;</span>&nbsp;<span class="op">(</span><span class="ident">u32one</span>&nbsp;<span class="op">&lt;&lt;</span>&nbsp;<span class="ident">n</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">50</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">pte</span>&nbsp;<span class="op">*</span><span class="ident">ptEntry</span><span class="op">)</span>&nbsp;<span class="ident">setBit</span><span class="op">(</span><span class="ident">n</span>&nbsp;<span class="builtintype">uint</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">pte</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">ptEntry</span><span class="op">(</span><span class="builtintype">uint32</span><span class="op">(</span><span class="op">*</span><span class="ident">pte</span><span class="op">)</span>&nbsp;<span class="op">|</span>&nbsp;<span class="op">(</span><span class="ident">u32one</span>&nbsp;<span class="op">&lt;&lt;</span>&nbsp;<span class="ident">n</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">pte</span>&nbsp;<span class="ident">ptEntry</span><span class="op">)</span>&nbsp;<span class="ident">pn</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">uint32</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="builtintype">uint32</span><span class="op">(</span><span class="ident">pte</span>&nbsp;<span class="op">/</span>&nbsp;<span class="ident">PageSize</span><span class="op">)</span><br>
+<span class="lineno">55</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">pte</span>&nbsp;<span class="ident">ptEntry</span><span class="op">)</span>&nbsp;<span class="ident">test</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="builtintype">uint32</span><span class="op">,</span>&nbsp;<span class="ident">ring</span>&nbsp;<span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">Excep</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">pte</span><span class="op">.</span><span class="ident">testBit</span><span class="op">(</span><span class="ident">pteValid</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">newPageFault</span><span class="op">(</span><span class="ident">addr</span><span class="op">)</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">ring</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="op">!</span><span class="ident">pte</span><span class="op">.</span><span class="ident">testBit</span><span class="op">(</span><span class="ident">pteUser</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">newPageFault</span><span class="op">(</span><span class="ident">addr</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno">65</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Translate&nbsp;transalate&nbsp;a&nbsp;virutal&nbsp;address&nbsp;into&nbsp;physical&nbsp;address.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;It&nbsp;returns&nbsp;an&nbsp;error&nbsp;if&nbsp;the&nbsp;translation&nbsp;fails</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">pt</span>&nbsp;<span class="op">*</span><span class="ident">pageTable</span><span class="op">)</span>&nbsp;<span class="ident">Translate</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="builtintype">uint32</span><span class="op">,</span>&nbsp;<span class="ident">ring</span>&nbsp;<span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="builtintype">uint32</span><span class="op">,</span>&nbsp;<span class="op">*</span><span class="ident">Excep</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">vpn</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">addr</span>&nbsp;<span class="op">/</span>&nbsp;<span class="ident">PageSize</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">off</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">addr</span>&nbsp;<span class="op">%</span>&nbsp;<span class="ident">PageSize</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">index1</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">vpn</span>&nbsp;<span class="op">/</span>&nbsp;<span class="num">1024</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">index2</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">vpn</span>&nbsp;<span class="op">%</span>&nbsp;<span class="num">1024</span><br>
+<span class="lineno">75</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;first&nbsp;level&nbsp;page&nbsp;table&nbsp;entry</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pt</span><span class="op">.</span><span class="ident">pte1Addr</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">pt</span><span class="op">.</span><span class="ident">root</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">index1</span><span class="op">*</span><span class="num">4</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">w</span><span class="op">,</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">pt</span><span class="op">.</span><span class="ident">mem</span><span class="op">.</span><span class="ident">ReadWord</span><span class="op">(</span><span class="ident">pt</span><span class="op">.</span><span class="ident">pte1Addr</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">e</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pt</span><span class="op">.</span><span class="ident">pte1</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">ptEntry</span><span class="op">(</span><span class="ident">w</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">e</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">pt</span><span class="op">.</span><span class="ident">pte1</span><span class="op">.</span><span class="ident">test</span><span class="op">(</span><span class="ident">addr</span><span class="op">,</span>&nbsp;<span class="ident">ring</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">e</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pn1</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">pt</span><span class="op">.</span><span class="ident">pte1</span><span class="op">.</span><span class="ident">pn</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pt</span><span class="op">.</span><span class="ident">pte2Addr</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">pn1</span><span class="op">*</span><span class="ident">PageSize</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">index2</span><span class="op">*</span><span class="num">4</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">w</span><span class="op">,</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">pt</span><span class="op">.</span><span class="ident">mem</span><span class="op">.</span><span class="ident">ReadWord</span><span class="op">(</span><span class="ident">pt</span><span class="op">.</span><span class="ident">pte2Addr</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">e</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pt</span><span class="op">.</span><span class="ident">pte2</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">ptEntry</span><span class="op">(</span><span class="ident">w</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">e</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">pt</span><span class="op">.</span><span class="ident">pte2</span><span class="op">.</span><span class="ident">test</span><span class="op">(</span><span class="ident">addr</span><span class="op">,</span>&nbsp;<span class="ident">ring</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">e</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">100</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ppn</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">pt</span><span class="op">.</span><span class="ident">pte2</span><span class="op">.</span><span class="ident">pn</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">ppn</span><span class="op">*</span><span class="ident">PageSize</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">off</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">105</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">pt</span>&nbsp;<span class="op">*</span><span class="ident">pageTable</span><span class="op">)</span>&nbsp;<span class="ident">updatePte</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">Excep</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">e</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">pt</span><span class="op">.</span><span class="ident">mem</span><span class="op">.</span><span class="ident">WriteWord</span><span class="op">(</span><span class="ident">pt</span><span class="op">.</span><span class="ident">pte1Addr</span><span class="op">,</span>&nbsp;<span class="builtintype">uint32</span><span class="op">(</span><span class="ident">pt</span><span class="op">.</span><span class="ident">pte1</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">e</span><br>
+<span class="lineno">110</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">e</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">pt</span><span class="op">.</span><span class="ident">mem</span><span class="op">.</span><span class="ident">WriteWord</span><span class="op">(</span><span class="ident">pt</span><span class="op">.</span><span class="ident">pte2Addr</span><span class="op">,</span>&nbsp;<span class="builtintype">uint32</span><span class="op">(</span><span class="ident">pt</span><span class="op">.</span><span class="ident">pte2</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">e</span><br>
+<span class="lineno">115</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">120</span><span class="comment">//&nbsp;TranslateRead&nbsp;translates&nbsp;the&nbsp;address&nbsp;and&nbsp;sets&nbsp;the&nbsp;use&nbsp;bit.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">pt</span>&nbsp;<span class="op">*</span><span class="ident">pageTable</span><span class="op">)</span>&nbsp;<span class="ident">TranslateRead</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="builtintype">uint32</span><span class="op">,</span>&nbsp;<span class="ident">ring</span>&nbsp;<span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="builtintype">uint32</span><span class="op">,</span>&nbsp;<span class="op">*</span><span class="ident">Excep</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span><span class="op">,</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">pt</span><span class="op">.</span><span class="ident">Translate</span><span class="op">(</span><span class="ident">addr</span><span class="op">,</span>&nbsp;<span class="ident">ring</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">e</span><br>
+<span class="lineno">125</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pt</span><span class="op">.</span><span class="ident">pte1</span><span class="op">.</span><span class="ident">setBit</span><span class="op">(</span><span class="ident">pteUse</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pt</span><span class="op">.</span><span class="ident">pte2</span><span class="op">.</span><span class="ident">setBit</span><span class="op">(</span><span class="ident">pteUse</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">130</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">e</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">pt</span><span class="op">.</span><span class="ident">updatePte</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">e</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">135</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">ret</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;TranslateWrite&nbsp;translates&nbsp;the&nbsp;address&nbsp;and&nbsp;sets&nbsp;the&nbsp;use&nbsp;and&nbsp;dirty&nbsp;bit</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">pt</span>&nbsp;<span class="op">*</span><span class="ident">pageTable</span><span class="op">)</span>&nbsp;<span class="ident">TranslateWrite</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="builtintype">uint32</span><span class="op">,</span>&nbsp;<span class="ident">ring</span>&nbsp;<span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="builtintype">uint32</span><span class="op">,</span>&nbsp;<span class="op">*</span><span class="ident">Excep</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">140</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span><span class="op">,</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">pt</span><span class="op">.</span><span class="ident">Translate</span><span class="op">(</span><span class="ident">addr</span><span class="op">,</span>&nbsp;<span class="ident">ring</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">e</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">145</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">pt</span><span class="op">.</span><span class="ident">pte1</span><span class="op">.</span><span class="ident">testBit</span><span class="op">(</span><span class="ident">pteReadonly</span><span class="op">)</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">pt</span><span class="op">.</span><span class="ident">pte2</span><span class="op">.</span><span class="ident">testBit</span><span class="op">(</span><span class="ident">pteReadonly</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">newPageReadonly</span><span class="op">(</span><span class="ident">addr</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pt</span><span class="op">.</span><span class="ident">pte1</span><span class="op">.</span><span class="ident">setBit</span><span class="op">(</span><span class="ident">pteUse</span><span class="op">)</span><br>
+<span class="lineno">150</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pt</span><span class="op">.</span><span class="ident">pte1</span><span class="op">.</span><span class="ident">setBit</span><span class="op">(</span><span class="ident">pteDirty</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pt</span><span class="op">.</span><span class="ident">pte2</span><span class="op">.</span><span class="ident">setBit</span><span class="op">(</span><span class="ident">pteUse</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pt</span><span class="op">.</span><span class="ident">pte2</span><span class="op">.</span><span class="ident">setBit</span><span class="op">(</span><span class="ident">pteDirty</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">e</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">pt</span><span class="op">.</span><span class="ident">updatePte</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">155</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">e</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">ret</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno">160</span><span class="op">}</span>
+</div>
+</body>
+</html>

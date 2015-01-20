@@ -1,0 +1,72 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="keyword">package</span>&nbsp;<span class="ident">dasm8</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;fmt&#34;</span><br>
+<span class="lineno">5</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">opImsMap</span>&nbsp;<span class="op">=</span>&nbsp;<span class="keyword">map</span><span class="op">[</span><span class="builtintype">uint32</span><span class="op">]</span><span class="builtintype">string</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="num">1</span><span class="op">:</span>&nbsp;<span class="string">&#34;addi&#34;</span><span class="op">,</span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="num">2</span><span class="op">:</span>&nbsp;<span class="string">&#34;slti&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">opMemMap</span>&nbsp;<span class="op">=</span>&nbsp;<span class="keyword">map</span><span class="op">[</span><span class="builtintype">uint32</span><span class="op">]</span><span class="builtintype">string</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="num">6</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">&#34;lw&#34;</span><span class="op">,</span><br>
+<span class="lineno">15</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="num">7</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">&#34;lb&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="num">8</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">&#34;lbu&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="num">9</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">&#34;sw&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="num">10</span><span class="op">:</span>&nbsp;<span class="string">&#34;sb&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">20</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">opImuMap</span>&nbsp;<span class="op">=</span>&nbsp;<span class="keyword">map</span><span class="op">[</span><span class="builtintype">uint32</span><span class="op">]</span><span class="builtintype">string</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="num">3</span><span class="op">:</span>&nbsp;<span class="string">&#34;andi&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="num">4</span><span class="op">:</span>&nbsp;<span class="string">&#34;ori&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">25</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">opImu2Map</span>&nbsp;<span class="op">=</span>&nbsp;<span class="keyword">map</span><span class="op">[</span><span class="builtintype">uint32</span><span class="op">]</span><span class="builtintype">string</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="num">5</span><span class="op">:</span>&nbsp;<span class="string">&#34;lui&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno">30</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">instImm</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="builtintype">uint32</span><span class="op">,</span>&nbsp;<span class="ident">in</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">Line</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">op</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">(</span><span class="ident">in</span>&nbsp;<span class="op">&gt;&gt;</span>&nbsp;<span class="num">24</span><span class="op">)</span>&nbsp;<span class="op">&amp;</span>&nbsp;<span class="num">0xff</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dest</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">regStr</span><span class="op">(</span><span class="op">(</span><span class="ident">in</span>&nbsp;<span class="op">&gt;&gt;</span>&nbsp;<span class="num">21</span><span class="op">)</span>&nbsp;<span class="op">&amp;</span>&nbsp;<span class="num">0x7</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">src</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">regStr</span><span class="op">(</span><span class="op">(</span><span class="ident">in</span>&nbsp;<span class="op">&gt;&gt;</span>&nbsp;<span class="num">18</span><span class="op">)</span>&nbsp;<span class="op">&amp;</span>&nbsp;<span class="num">0x7</span><span class="op">)</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">imu</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">in</span>&nbsp;<span class="op">&amp;</span>&nbsp;<span class="num">0xffff</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ims</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtintype">int32</span><span class="op">(</span><span class="ident">imu</span><span class="op">&lt;&lt;</span><span class="num">16</span><span class="op">)</span>&nbsp;<span class="op">&gt;&gt;</span>&nbsp;<span class="num">16</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">s</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">opStr</span><span class="op">,</span>&nbsp;<span class="ident">found</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">opImsMap</span><span class="op">[</span><span class="ident">op</span><span class="op">]</span><span class="op">;</span>&nbsp;<span class="ident">found</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">fmt</span><span class="op">.</span><span class="ident">Sprintf</span><span class="op">(</span><span class="string">&#34;%s&nbsp;%s&nbsp;%s&nbsp;%d&#34;</span><span class="op">,</span>&nbsp;<span class="ident">opStr</span><span class="op">,</span>&nbsp;<span class="ident">dest</span><span class="op">,</span>&nbsp;<span class="ident">src</span><span class="op">,</span>&nbsp;<span class="ident">ims</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="keyword">if</span>&nbsp;<span class="ident">opStr</span><span class="op">,</span>&nbsp;<span class="ident">found</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">opMemMap</span><span class="op">[</span><span class="ident">op</span><span class="op">]</span><span class="op">;</span>&nbsp;<span class="ident">found</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">ims</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">fmt</span><span class="op">.</span><span class="ident">Sprintf</span><span class="op">(</span><span class="string">&#34;%s&nbsp;%s&nbsp;%s&#34;</span><span class="op">,</span>&nbsp;<span class="ident">opStr</span><span class="op">,</span>&nbsp;<span class="ident">dest</span><span class="op">,</span>&nbsp;<span class="ident">src</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">fmt</span><span class="op">.</span><span class="ident">Sprintf</span><span class="op">(</span><span class="string">&#34;%s&nbsp;%s&nbsp;%s&nbsp;%d&#34;</span><span class="op">,</span>&nbsp;<span class="ident">opStr</span><span class="op">,</span>&nbsp;<span class="ident">dest</span><span class="op">,</span>&nbsp;<span class="ident">src</span><span class="op">,</span>&nbsp;<span class="ident">ims</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="keyword">if</span>&nbsp;<span class="ident">opStr</span><span class="op">,</span>&nbsp;<span class="ident">found</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">opImuMap</span><span class="op">[</span><span class="ident">op</span><span class="op">]</span><span class="op">;</span>&nbsp;<span class="ident">found</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">fmt</span><span class="op">.</span><span class="ident">Sprintf</span><span class="op">(</span><span class="string">&#34;%s&nbsp;%s&nbsp;%s&nbsp;0x%04x&#34;</span><span class="op">,</span>&nbsp;<span class="ident">opStr</span><span class="op">,</span>&nbsp;<span class="ident">dest</span><span class="op">,</span>&nbsp;<span class="ident">src</span><span class="op">,</span>&nbsp;<span class="ident">imu</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="keyword">if</span>&nbsp;<span class="ident">opStr</span><span class="op">,</span>&nbsp;<span class="ident">found</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">opImu2Map</span><span class="op">[</span><span class="ident">op</span><span class="op">]</span><span class="op">;</span>&nbsp;<span class="ident">found</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">fmt</span><span class="op">.</span><span class="ident">Sprintf</span><span class="op">(</span><span class="string">&#34;%s&nbsp;%s&nbsp;0x%04x&#34;</span><span class="op">,</span>&nbsp;<span class="ident">opStr</span><span class="op">,</span>&nbsp;<span class="ident">dest</span><span class="op">,</span>&nbsp;<span class="ident">imu</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">newLine</span><span class="op">(</span><span class="ident">addr</span><span class="op">,</span>&nbsp;<span class="ident">in</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span><span class="op">.</span><span class="ident">Str</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">s</span><br>
+<span class="lineno">55</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">ret</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

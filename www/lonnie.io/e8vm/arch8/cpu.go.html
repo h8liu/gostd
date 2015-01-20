@@ -1,0 +1,234 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="keyword">package</span>&nbsp;<span class="ident">arch8</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Inst&nbsp;is&nbsp;an&nbsp;interface&nbsp;for&nbsp;executing&nbsp;one&nbsp;single&nbsp;instruction</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">inst</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">5</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">I</span><span class="op">(</span><span class="ident">cpu</span>&nbsp;<span class="op">*</span><span class="ident">cpu</span><span class="op">,</span>&nbsp;<span class="ident">in</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">Excep</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;CPU&nbsp;defines&nbsp;the&nbsp;structure&nbsp;of&nbsp;a&nbsp;processing&nbsp;unit.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">cpu</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">regs</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ring</span>&nbsp;<span class="builtintype">byte</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">phyMem</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">*</span><span class="ident">phyMemory</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">virtMem</span>&nbsp;&nbsp;&nbsp;<span class="op">*</span><span class="ident">virtMemory</span><br>
+<span class="lineno">15</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">interrupt</span>&nbsp;<span class="op">*</span><span class="ident">interrupt</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">inst</span>&nbsp;&nbsp;<span class="ident">inst</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">index</span>&nbsp;<span class="builtintype">byte</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">20</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;InitPC&nbsp;points&nbsp;the&nbsp;default&nbsp;starting&nbsp;value&nbsp;of&nbsp;the&nbsp;program&nbsp;counter.</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">InitPC</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0x8000</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;NewCPU&nbsp;creates&nbsp;a&nbsp;CPU&nbsp;with&nbsp;memroy&nbsp;and&nbsp;instruction&nbsp;binding</span><br>
+<span class="lineno">25</span><span class="keyword">func</span>&nbsp;<span class="ident">newCPU</span><span class="op">(</span><span class="ident">mem</span>&nbsp;<span class="op">*</span><span class="ident">phyMemory</span><span class="op">,</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="ident">inst</span><span class="op">,</span>&nbsp;<span class="ident">index</span>&nbsp;<span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">cpu</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">index</span>&nbsp;<span class="op">&gt;=</span>&nbsp;<span class="num">32</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">panic</span><span class="op">(</span><span class="string">&#34;too&nbsp;many&nbsp;cores&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">new</span><span class="op">(</span><span class="ident">cpu</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span><span class="op">.</span><span class="ident">regs</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">makeRegs</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span><span class="op">.</span><span class="ident">phyMem</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">mem</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span><span class="op">.</span><span class="ident">virtMem</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">newVirtMemory</span><span class="op">(</span><span class="ident">ret</span><span class="op">.</span><span class="ident">phyMem</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span><span class="op">.</span><span class="ident">index</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">index</span><br>
+<span class="lineno">35</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">intPage</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">ret</span><span class="op">.</span><span class="ident">phyMem</span><span class="op">.</span><span class="ident">Page</span><span class="op">(</span><span class="ident">pageInterrupt</span><span class="op">)</span>&nbsp;<span class="comment">//&nbsp;page&nbsp;1&nbsp;is&nbsp;the&nbsp;interrupt&nbsp;page</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">intPage</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">panic</span><span class="op">(</span><span class="string">&#34;memory&nbsp;too&nbsp;small&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span><span class="op">.</span><span class="ident">interrupt</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">newInterrupt</span><span class="op">(</span><span class="ident">intPage</span><span class="op">,</span>&nbsp;<span class="ident">index</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span><span class="op">.</span><span class="ident">inst</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">i</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span><span class="op">.</span><span class="ident">regs</span><span class="op">[</span><span class="ident">PC</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">InitPC</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">ret</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;UserMode&nbsp;returns&nbsp;trun&nbsp;when&nbsp;the&nbsp;CPU&nbsp;is&nbsp;in&nbsp;user&nbsp;mode.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">cpu</span><span class="op">)</span>&nbsp;<span class="ident">UserMode</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">ring</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Reset&nbsp;resets&nbsp;the&nbsp;CPU&#39;s&nbsp;internal&nbsp;states,&nbsp;i.e.,&nbsp;registers,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;the&nbsp;page&nbsp;table,&nbsp;and&nbsp;disables&nbsp;interrupt</span><br>
+<span class="lineno">55</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">cpu</span><span class="op">)</span>&nbsp;<span class="ident">Reset</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="num">0</span><span class="op">;</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">Nreg</span><span class="op">;</span>&nbsp;<span class="ident">i</span><span class="op">++</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">regs</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">regs</span><span class="op">[</span><span class="ident">PC</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">InitPC</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">virtMem</span><span class="op">.</span><span class="ident">SetTable</span><span class="op">(</span><span class="num">0</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">ring</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">interrupt</span><span class="op">.</span><span class="ident">Disable</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">65</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">cpu</span><span class="op">)</span>&nbsp;<span class="ident">tick</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">Excep</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pc</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">regs</span><span class="op">[</span><span class="ident">PC</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">inst</span><span class="op">,</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">readWord</span><span class="op">(</span><span class="ident">pc</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">e</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">regs</span><span class="op">[</span><span class="ident">PC</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">pc</span>&nbsp;<span class="op">+</span>&nbsp;<span class="num">4</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">inst</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">e</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">inst</span><span class="op">.</span><span class="ident">I</span><span class="op">(</span><span class="ident">c</span><span class="op">,</span>&nbsp;<span class="ident">inst</span><span class="op">)</span><br>
+<span class="lineno">75</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">regs</span><span class="op">[</span><span class="ident">PC</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">pc</span>&nbsp;<span class="comment">//&nbsp;restore&nbsp;saved&nbsp;original&nbsp;PC</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">e</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">85</span><span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">intFrameSP</span>&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">intFrameRET</span>&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">4</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">intFrameArg</span>&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">8</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">intFrameCode</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">12</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">intFrameRing</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">13</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">intFrameSize</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">16</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">95</span><span class="comment">//&nbsp;Interrupt&nbsp;issues&nbsp;an&nbsp;interrupt&nbsp;to&nbsp;the&nbsp;core</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">cpu</span><span class="op">)</span>&nbsp;<span class="ident">Interrupt</span><span class="op">(</span><span class="ident">code</span>&nbsp;<span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">interrupt</span><span class="op">.</span><span class="ident">Issue</span><span class="op">(</span><span class="ident">code</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">100</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">cpu</span><span class="op">)</span>&nbsp;<span class="ident">readWord</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="builtintype">uint32</span><span class="op">,</span>&nbsp;<span class="op">*</span><span class="ident">Excep</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">virtMem</span><span class="op">.</span><span class="ident">ReadWord</span><span class="op">(</span><span class="ident">addr</span><span class="op">,</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">ring</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">cpu</span><span class="op">)</span>&nbsp;<span class="ident">readByte</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="builtintype">uint8</span><span class="op">,</span>&nbsp;<span class="op">*</span><span class="ident">Excep</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">virtMem</span><span class="op">.</span><span class="ident">ReadByte</span><span class="op">(</span><span class="ident">addr</span><span class="op">,</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">ring</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">cpu</span><span class="op">)</span>&nbsp;<span class="ident">writeWord</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="builtintype">uint32</span><span class="op">,</span>&nbsp;<span class="ident">v</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">Excep</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">virtMem</span><span class="op">.</span><span class="ident">WriteWord</span><span class="op">(</span><span class="ident">addr</span><span class="op">,</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">ring</span><span class="op">,</span>&nbsp;<span class="ident">v</span><span class="op">)</span><br>
+<span class="lineno">110</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">cpu</span><span class="op">)</span>&nbsp;<span class="ident">writeByte</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="builtintype">uint32</span><span class="op">,</span>&nbsp;<span class="ident">v</span>&nbsp;<span class="builtintype">uint8</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">Excep</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">virtMem</span><span class="op">.</span><span class="ident">WriteByte</span><span class="op">(</span><span class="ident">addr</span><span class="op">,</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">ring</span><span class="op">,</span>&nbsp;<span class="ident">v</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">115</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Ienter&nbsp;enters&nbsp;a&nbsp;interrupt&nbsp;routine.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">cpu</span><span class="op">)</span>&nbsp;<span class="ident">Ienter</span><span class="op">(</span><span class="ident">code</span>&nbsp;<span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="ident">arg</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">Excep</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ksp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">interrupt</span><span class="op">.</span><span class="ident">kernelSP</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">base</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">ksp</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">intFrameSize</span><br>
+<span class="lineno">120</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">writeWord</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="ident">off</span>&nbsp;<span class="builtintype">uint32</span><span class="op">,</span>&nbsp;<span class="ident">v</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">Excep</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">virtMem</span><span class="op">.</span><span class="ident">WriteWord</span><span class="op">(</span><span class="ident">base</span><span class="op">+</span><span class="ident">off</span><span class="op">,</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">v</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">writeByte</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="ident">off</span>&nbsp;<span class="builtintype">uint32</span><span class="op">,</span>&nbsp;<span class="ident">b</span>&nbsp;<span class="builtintype">uint8</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">Excep</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">125</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">virtMem</span><span class="op">.</span><span class="ident">WriteByte</span><span class="op">(</span><span class="ident">base</span><span class="op">+</span><span class="ident">off</span><span class="op">,</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">b</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">writeWord</span><span class="op">(</span><span class="ident">intFrameSP</span><span class="op">,</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">regs</span><span class="op">[</span><span class="ident">SP</span><span class="op">]</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">e</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">130</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">writeWord</span><span class="op">(</span><span class="ident">intFrameRET</span><span class="op">,</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">regs</span><span class="op">[</span><span class="ident">RET</span><span class="op">]</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">e</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">writeWord</span><span class="op">(</span><span class="ident">intFrameArg</span><span class="op">,</span>&nbsp;<span class="ident">arg</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">e</span><br>
+<span class="lineno">135</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">writeByte</span><span class="op">(</span><span class="ident">intFrameCode</span><span class="op">,</span>&nbsp;<span class="ident">code</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">e</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">writeByte</span><span class="op">(</span><span class="ident">intFrameRing</span><span class="op">,</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">ring</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">140</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">e</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">interrupt</span><span class="op">.</span><span class="ident">Disable</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">regs</span><span class="op">[</span><span class="ident">SP</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">ksp</span><br>
+<span class="lineno">145</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">regs</span><span class="op">[</span><span class="ident">RET</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">regs</span><span class="op">[</span><span class="ident">PC</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">regs</span><span class="op">[</span><span class="ident">PC</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">interrupt</span><span class="op">.</span><span class="ident">handlerPC</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">ring</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno">150</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Syscall&nbsp;jumps&nbsp;to&nbsp;the&nbsp;system&nbsp;call&nbsp;handler&nbsp;and&nbsp;switches&nbsp;to&nbsp;ring&nbsp;0.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">cpu</span><span class="op">)</span>&nbsp;<span class="ident">Syscall</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">Excep</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">regs</span><span class="op">[</span><span class="ident">PC</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">interrupt</span><span class="op">.</span><span class="ident">syscallPC</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">155</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">ring</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Iret&nbsp;restores&nbsp;from&nbsp;an&nbsp;interrupt.</span><br>
+<span class="lineno">160</span><span class="comment">//&nbsp;It&nbsp;restores&nbsp;the&nbsp;SP,&nbsp;RET,&nbsp;PC&nbsp;registers,&nbsp;restores&nbsp;the&nbsp;ring&nbsp;level,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;clears&nbsp;the&nbsp;served&nbsp;interrupt&nbsp;bit&nbsp;and&nbsp;enables&nbsp;interrupt&nbsp;again.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">cpu</span><span class="op">)</span>&nbsp;<span class="ident">Iret</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">Excep</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">ring</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">panic</span><span class="op">(</span><span class="string">&#34;iret&nbsp;in&nbsp;userland&#34;</span><span class="op">)</span><br>
+<span class="lineno">165</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ksp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">interrupt</span><span class="op">.</span><span class="ident">kernelSP</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">base</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">ksp</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">intFrameSize</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sp</span><span class="op">,</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">readWord</span><span class="op">(</span><span class="ident">base</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">intFrameSP</span><span class="op">)</span><br>
+<span class="lineno">170</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">e</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span><span class="op">,</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">readWord</span><span class="op">(</span><span class="ident">base</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">intFrameRET</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">175</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">e</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">code</span><span class="op">,</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">readByte</span><span class="op">(</span><span class="ident">base</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">intFrameCode</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">e</span><br>
+<span class="lineno">180</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ring</span><span class="op">,</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">readByte</span><span class="op">(</span><span class="ident">base</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">intFrameRing</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">e</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">185</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">regs</span><span class="op">[</span><span class="ident">PC</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">regs</span><span class="op">[</span><span class="ident">RET</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">regs</span><span class="op">[</span><span class="ident">RET</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">ret</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">regs</span><span class="op">[</span><span class="ident">SP</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">sp</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">ring</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">ring</span><br>
+<span class="lineno">190</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">interrupt</span><span class="op">.</span><span class="ident">Clear</span><span class="op">(</span><span class="ident">code</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">interrupt</span><span class="op">.</span><span class="ident">Enable</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">195</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Tick&nbsp;executes&nbsp;one&nbsp;instruction,&nbsp;and&nbsp;increases&nbsp;the&nbsp;program&nbsp;counter</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;by&nbsp;4&nbsp;by&nbsp;default.&nbsp;If&nbsp;an&nbsp;exception&nbsp;is&nbsp;met,&nbsp;it&nbsp;will&nbsp;handle&nbsp;it.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">cpu</span><span class="op">)</span>&nbsp;<span class="ident">Tick</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">Excep</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">poll</span><span class="op">,</span>&nbsp;<span class="ident">code</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">interrupt</span><span class="op">.</span><span class="ident">Poll</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">200</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">poll</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">Ienter</span><span class="op">(</span><span class="ident">code</span><span class="op">,</span>&nbsp;<span class="num">0</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;no&nbsp;interrupt&nbsp;to&nbsp;dispatch,&nbsp;let&#39;s&nbsp;proceed</span><br>
+<span class="lineno">205</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">e</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">tick</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;proceed&nbsp;attempt&nbsp;failed,&nbsp;handle&nbsp;the&nbsp;error</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">interrupt</span><span class="op">.</span><span class="ident">Issue</span><span class="op">(</span><span class="ident">e</span><span class="op">.</span><span class="ident">Code</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">poll</span><span class="op">,</span>&nbsp;<span class="ident">code</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">interrupt</span><span class="op">.</span><span class="ident">Poll</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">210</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">poll</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">code</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">e</span><span class="op">.</span><span class="ident">Code</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">panic</span><span class="op">(</span><span class="string">&#34;interrupt&nbsp;code&nbsp;is&nbsp;different&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">Ienter</span><span class="op">(</span><span class="ident">code</span><span class="op">,</span>&nbsp;<span class="ident">e</span><span class="op">.</span><span class="ident">Arg</span><span class="op">)</span><br>
+<span class="lineno">215</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">e</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

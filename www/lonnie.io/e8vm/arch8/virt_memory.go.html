@@ -1,0 +1,93 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="keyword">package</span>&nbsp;<span class="ident">arch8</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;VirtMemory&nbsp;defines&nbsp;an&nbsp;address&nbsp;space&nbsp;which&nbsp;page&nbsp;mapping</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;is&nbsp;defined&nbsp;by&nbsp;a&nbsp;page&nbsp;table.</span><br>
+<span class="lineno">5</span><span class="comment">//&nbsp;If&nbsp;no&nbsp;page&nbsp;table&nbsp;is&nbsp;defined,&nbsp;direct&nbsp;mapping&nbsp;is&nbsp;used</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">virtMemory</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">phyMem</span>&nbsp;<span class="op">*</span><span class="ident">phyMemory</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ptable</span>&nbsp;<span class="op">*</span><span class="ident">pageTable</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">10</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;NewVirtMemory&nbsp;creates&nbsp;a&nbsp;new&nbsp;virtual&nbsp;address&nbsp;space&nbsp;with&nbsp;no&nbsp;page&nbsp;table.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">newVirtMemory</span><span class="op">(</span><span class="ident">phy</span>&nbsp;<span class="op">*</span><span class="ident">phyMemory</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">virtMemory</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">new</span><span class="op">(</span><span class="ident">virtMemory</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span><span class="op">.</span><span class="ident">phyMem</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">phy</span><br>
+<span class="lineno">15</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">ret</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;SetTable&nbsp;applies&nbsp;a&nbsp;particular&nbsp;pagetable&nbsp;at&nbsp;a&nbsp;physical&nbsp;memory&nbsp;position.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;If&nbsp;the&nbsp;address&nbsp;is&nbsp;not&nbsp;page&nbsp;size&nbsp;aligned,&nbsp;it&nbsp;will&nbsp;be&nbsp;aligned&nbsp;down.</span><br>
+<span class="lineno">20</span><span class="comment">//&nbsp;If&nbsp;the&nbsp;address&nbsp;is&nbsp;0,&nbsp;it&nbsp;will&nbsp;use&nbsp;direct&nbsp;mapping.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">vm</span>&nbsp;<span class="op">*</span><span class="ident">virtMemory</span><span class="op">)</span>&nbsp;<span class="ident">SetTable</span><span class="op">(</span><span class="ident">root</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">root</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">vm</span><span class="op">.</span><span class="ident">ptable</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">vm</span><span class="op">.</span><span class="ident">ptable</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">newPageTable</span><span class="op">(</span><span class="ident">vm</span><span class="op">.</span><span class="ident">phyMem</span><span class="op">,</span>&nbsp;<span class="ident">root</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">vm</span>&nbsp;<span class="op">*</span><span class="ident">virtMemory</span><span class="op">)</span>&nbsp;<span class="ident">transRead</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="builtintype">uint32</span><span class="op">,</span>&nbsp;<span class="ident">ring</span>&nbsp;<span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="builtintype">uint32</span><span class="op">,</span>&nbsp;<span class="op">*</span><span class="ident">Excep</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">vm</span><span class="op">.</span><span class="ident">ptable</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">addr</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">vm</span><span class="op">.</span><span class="ident">ptable</span><span class="op">.</span><span class="ident">TranslateRead</span><span class="op">(</span><span class="ident">addr</span><span class="op">,</span>&nbsp;<span class="ident">ring</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">35</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">vm</span>&nbsp;<span class="op">*</span><span class="ident">virtMemory</span><span class="op">)</span>&nbsp;<span class="ident">transWrite</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="builtintype">uint32</span><span class="op">,</span>&nbsp;<span class="ident">ring</span>&nbsp;<span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="builtintype">uint32</span><span class="op">,</span>&nbsp;<span class="op">*</span><span class="ident">Excep</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">vm</span><span class="op">.</span><span class="ident">ptable</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">addr</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">vm</span><span class="op">.</span><span class="ident">ptable</span><span class="op">.</span><span class="ident">TranslateWrite</span><span class="op">(</span><span class="ident">addr</span><span class="op">,</span>&nbsp;<span class="ident">ring</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ReadWord&nbsp;reads&nbsp;the&nbsp;byte&nbsp;at&nbsp;the&nbsp;given&nbsp;virtual&nbsp;address.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">vm</span>&nbsp;<span class="op">*</span><span class="ident">virtMemory</span><span class="op">)</span>&nbsp;<span class="ident">ReadWord</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="builtintype">uint32</span><span class="op">,</span>&nbsp;<span class="ident">ring</span>&nbsp;<span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="builtintype">uint32</span><span class="op">,</span>&nbsp;<span class="op">*</span><span class="ident">Excep</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">addr</span><span class="op">,</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">vm</span><span class="op">.</span><span class="ident">transRead</span><span class="op">(</span><span class="ident">addr</span><span class="op">,</span>&nbsp;<span class="ident">ring</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">e</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">vm</span><span class="op">.</span><span class="ident">phyMem</span><span class="op">.</span><span class="ident">ReadWord</span><span class="op">(</span><span class="ident">addr</span><span class="op">)</span><br>
+<span class="lineno">50</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;WriteWord&nbsp;writes&nbsp;the&nbsp;byte&nbsp;at&nbsp;the&nbsp;given&nbsp;virtual&nbsp;address.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">vm</span>&nbsp;<span class="op">*</span><span class="ident">virtMemory</span><span class="op">)</span>&nbsp;<span class="ident">WriteWord</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="builtintype">uint32</span><span class="op">,</span>&nbsp;<span class="ident">ring</span>&nbsp;<span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="ident">v</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">Excep</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">addr</span><span class="op">,</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">vm</span><span class="op">.</span><span class="ident">transWrite</span><span class="op">(</span><span class="ident">addr</span><span class="op">,</span>&nbsp;<span class="ident">ring</span><span class="op">)</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">e</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">vm</span><span class="op">.</span><span class="ident">phyMem</span><span class="op">.</span><span class="ident">WriteWord</span><span class="op">(</span><span class="ident">addr</span><span class="op">,</span>&nbsp;<span class="ident">v</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">60</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ReadByte&nbsp;reads&nbsp;the&nbsp;byte&nbsp;at&nbsp;the&nbsp;given&nbsp;virtual&nbsp;address.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">vm</span>&nbsp;<span class="op">*</span><span class="ident">virtMemory</span><span class="op">)</span>&nbsp;<span class="ident">ReadByte</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="builtintype">uint32</span><span class="op">,</span>&nbsp;<span class="ident">ring</span>&nbsp;<span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="op">*</span><span class="ident">Excep</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">addr</span><span class="op">,</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">vm</span><span class="op">.</span><span class="ident">transRead</span><span class="op">(</span><span class="ident">addr</span><span class="op">,</span>&nbsp;<span class="ident">ring</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">e</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">vm</span><span class="op">.</span><span class="ident">phyMem</span><span class="op">.</span><span class="ident">ReadByte</span><span class="op">(</span><span class="ident">addr</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">70</span><span class="comment">//&nbsp;WriteByte&nbsp;writes&nbsp;a&nbsp;byte&nbsp;at&nbsp;the&nbsp;given&nbsp;virtual&nbsp;address&nbsp;under</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;a&nbsp;certain&nbsp;ring.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">vm</span>&nbsp;<span class="op">*</span><span class="ident">virtMemory</span><span class="op">)</span>&nbsp;<span class="ident">WriteByte</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="builtintype">uint32</span><span class="op">,</span>&nbsp;<span class="ident">ring</span>&nbsp;<span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="ident">v</span>&nbsp;<span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">Excep</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">addr</span><span class="op">,</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">vm</span><span class="op">.</span><span class="ident">transWrite</span><span class="op">(</span><span class="ident">addr</span><span class="op">,</span>&nbsp;<span class="ident">ring</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">e</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">vm</span><span class="op">.</span><span class="ident">phyMem</span><span class="op">.</span><span class="ident">WriteByte</span><span class="op">(</span><span class="ident">addr</span><span class="op">,</span>&nbsp;<span class="ident">v</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

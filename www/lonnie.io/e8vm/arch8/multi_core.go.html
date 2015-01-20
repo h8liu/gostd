@@ -1,0 +1,103 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="keyword">package</span>&nbsp;<span class="ident">arch8</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;fmt&#34;</span><br>
+<span class="lineno">5</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;MultiCore&nbsp;simulates&nbsp;a&nbsp;shared&nbsp;memory&nbsp;multicore&nbsp;processor.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">multiCore</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">cores</span>&nbsp;&nbsp;<span class="op">[</span><span class="op">]</span><span class="op">*</span><span class="ident">cpu</span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">phyMem</span>&nbsp;<span class="op">*</span><span class="ident">phyMemory</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;NewMultiCore&nbsp;creates&nbsp;a&nbsp;shared&nbsp;memory&nbsp;multicore&nbsp;processor.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">newMultiCore</span><span class="op">(</span><span class="ident">ncore</span>&nbsp;<span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">mem</span>&nbsp;<span class="op">*</span><span class="ident">phyMemory</span><span class="op">,</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="ident">inst</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">multiCore</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">15</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">ncore</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">32</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">panic</span><span class="op">(</span><span class="string">&#34;too&nbsp;many&nbsp;cores&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">new</span><span class="op">(</span><span class="ident">multiCore</span><span class="op">)</span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span><span class="op">.</span><span class="ident">cores</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">make</span><span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="op">*</span><span class="ident">cpu</span><span class="op">,</span>&nbsp;<span class="ident">ncore</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span><span class="op">.</span><span class="ident">phyMem</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">mem</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">ind</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">ret</span><span class="op">.</span><span class="ident">cores</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span><span class="op">.</span><span class="ident">cores</span><span class="op">[</span><span class="ident">ind</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">newCPU</span><span class="op">(</span><span class="ident">mem</span><span class="op">,</span>&nbsp;<span class="ident">i</span><span class="op">,</span>&nbsp;<span class="builtintype">byte</span><span class="op">(</span><span class="ident">ind</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">ret</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">30</span><span class="comment">//&nbsp;CoreExcep&nbsp;is&nbsp;an&nbsp;exception&nbsp;on&nbsp;a&nbsp;particular&nbsp;core.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">CoreExcep</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Core</span>&nbsp;<span class="builtintype">int</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">Excep</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">35</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Tick&nbsp;performs&nbsp;one&nbsp;tick&nbsp;on&nbsp;each&nbsp;core.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">multiCore</span><span class="op">)</span>&nbsp;<span class="ident">Tick</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">CoreExcep</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span><span class="op">,</span>&nbsp;<span class="ident">core</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">cores</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">e</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">core</span><span class="op">.</span><span class="ident">Tick</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="op">&amp;</span><span class="ident">CoreExcep</span><span class="op">{</span><span class="ident">i</span><span class="op">,</span>&nbsp;<span class="ident">e</span><span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Ncore&nbsp;returns&nbsp;the&nbsp;number&nbsp;of&nbsp;cores.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">multiCore</span><span class="op">)</span>&nbsp;<span class="ident">Ncore</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">byte</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="builtintype">byte</span><span class="op">(</span><span class="builtinfunc">len</span><span class="op">(</span><span class="ident">c</span><span class="op">.</span><span class="ident">cores</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Interrupt&nbsp;issues&nbsp;an&nbsp;interrupt&nbsp;to&nbsp;a&nbsp;particular&nbsp;core.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">multiCore</span><span class="op">)</span>&nbsp;<span class="ident">Interrupt</span><span class="op">(</span><span class="ident">code</span>&nbsp;<span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="ident">core</span>&nbsp;<span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtintype">int</span><span class="op">(</span><span class="ident">core</span><span class="op">)</span>&nbsp;<span class="op">&gt;=</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">c</span><span class="op">.</span><span class="ident">cores</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">panic</span><span class="op">(</span><span class="string">&#34;out&nbsp;of&nbsp;cores&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">cores</span><span class="op">[</span><span class="ident">core</span><span class="op">]</span><span class="op">.</span><span class="ident">Interrupt</span><span class="op">(</span><span class="ident">code</span><span class="op">)</span><br>
+<span class="lineno">60</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;PrintStatus&nbsp;prints&nbsp;out&nbsp;the&nbsp;core&nbsp;status&nbsp;of&nbsp;all&nbsp;the&nbsp;cores.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">multiCore</span><span class="op">)</span>&nbsp;<span class="ident">PrintStatus</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span><span class="op">,</span>&nbsp;<span class="ident">core</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">cores</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">c</span><span class="op">.</span><span class="ident">cores</span><span class="op">)</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">1</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fmt</span><span class="op">.</span><span class="ident">Printf</span><span class="op">(</span><span class="string">&#34;[core&nbsp;%d]\n&#34;</span><span class="op">,</span>&nbsp;<span class="ident">i</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">printCPUStatus</span><span class="op">(</span><span class="ident">core</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fmt</span><span class="op">.</span><span class="ident">Println</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">printCPUStatus</span><span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">cpu</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="ident">name</span>&nbsp;<span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">reg</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fmt</span><span class="op">.</span><span class="ident">Printf</span><span class="op">(</span><span class="string">&#34;&nbsp;%3s&nbsp;=&nbsp;0x%08x&nbsp;%-11d\n&#34;</span><span class="op">,</span>&nbsp;<span class="ident">name</span><span class="op">,</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">regs</span><span class="op">[</span><span class="ident">reg</span><span class="op">]</span><span class="op">,</span>&nbsp;<span class="builtintype">int32</span><span class="op">(</span><span class="ident">c</span><span class="op">.</span><span class="ident">regs</span><span class="op">[</span><span class="ident">reg</span><span class="op">]</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">(</span><span class="string">&#34;r0&#34;</span><span class="op">,</span>&nbsp;<span class="ident">R0</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">(</span><span class="string">&#34;r1&#34;</span><span class="op">,</span>&nbsp;<span class="ident">R1</span><span class="op">)</span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">(</span><span class="string">&#34;r2&#34;</span><span class="op">,</span>&nbsp;<span class="ident">R2</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">(</span><span class="string">&#34;r3&#34;</span><span class="op">,</span>&nbsp;<span class="ident">R3</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">(</span><span class="string">&#34;r4&#34;</span><span class="op">,</span>&nbsp;<span class="ident">R4</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">(</span><span class="string">&#34;sp&#34;</span><span class="op">,</span>&nbsp;<span class="ident">SP</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">(</span><span class="string">&#34;ret&#34;</span><span class="op">,</span>&nbsp;<span class="ident">RET</span><span class="op">)</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">(</span><span class="string">&#34;pc&#34;</span><span class="op">,</span>&nbsp;<span class="ident">PC</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fmt</span><span class="op">.</span><span class="ident">Printf</span><span class="op">(</span><span class="string">&#34;ring&nbsp;=&nbsp;%d\n&#34;</span><span class="op">,</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">ring</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

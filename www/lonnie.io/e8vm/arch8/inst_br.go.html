@@ -1,0 +1,49 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="keyword">package</span>&nbsp;<span class="ident">arch8</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;InstBr&nbsp;exectues&nbsp;branch&nbsp;instruction</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">instBr</span>&nbsp;<span class="keyword">struct</span><span class="op">{</span><span class="op">}</span><br>
+<span class="lineno">5</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;I&nbsp;executes&nbsp;the&nbsp;instruction.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Might&nbsp;return&nbsp;invalid&nbsp;instruction&nbsp;exception.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">i</span>&nbsp;<span class="op">*</span><span class="ident">instBr</span><span class="op">)</span>&nbsp;<span class="ident">I</span><span class="op">(</span><span class="ident">cpu</span>&nbsp;<span class="op">*</span><span class="ident">cpu</span><span class="op">,</span>&nbsp;<span class="ident">in</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">Excep</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">op</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">(</span><span class="ident">in</span>&nbsp;<span class="op">&gt;&gt;</span>&nbsp;<span class="num">24</span><span class="op">)</span>&nbsp;<span class="op">&amp;</span>&nbsp;<span class="num">0xff</span>&nbsp;&nbsp;<span class="comment">//&nbsp;(32:24]</span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">src1</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">(</span><span class="ident">in</span>&nbsp;<span class="op">&gt;&gt;</span>&nbsp;<span class="num">21</span><span class="op">)</span>&nbsp;<span class="op">&amp;</span>&nbsp;<span class="num">0x7</span>&nbsp;<span class="comment">//&nbsp;(24:21]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">src2</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">(</span><span class="ident">in</span>&nbsp;<span class="op">&gt;&gt;</span>&nbsp;<span class="num">18</span><span class="op">)</span>&nbsp;<span class="op">&amp;</span>&nbsp;<span class="num">0x7</span>&nbsp;<span class="comment">//&nbsp;(21:18]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">im</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">in</span>&nbsp;<span class="op">&amp;</span>&nbsp;<span class="num">0x3ffff</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;(18:0]</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s1</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">cpu</span><span class="op">.</span><span class="ident">regs</span><span class="op">[</span><span class="ident">src1</span><span class="op">]</span><br>
+<span class="lineno">15</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s2</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">cpu</span><span class="op">.</span><span class="ident">regs</span><span class="op">[</span><span class="ident">src2</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pc</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">cpu</span><span class="op">.</span><span class="ident">regs</span><span class="op">[</span><span class="ident">PC</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">br</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">pc</span>&nbsp;<span class="op">+</span>&nbsp;<span class="builtintype">uint32</span><span class="op">(</span><span class="builtintype">int32</span><span class="op">(</span><span class="ident">im</span><span class="op">&lt;&lt;</span><span class="num">14</span><span class="op">)</span><span class="op">&gt;&gt;</span><span class="num">12</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="ident">op</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="num">32</span><span class="op">:</span>&nbsp;<span class="comment">//&nbsp;bne</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">s1</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">s2</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pc</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">br</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="num">33</span><span class="op">:</span>&nbsp;<span class="comment">//&nbsp;beq</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">s1</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">s2</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pc</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">br</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">default</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">errInvalidInst</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">cpu</span><span class="op">.</span><span class="ident">regs</span><span class="op">[</span><span class="ident">PC</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">pc</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

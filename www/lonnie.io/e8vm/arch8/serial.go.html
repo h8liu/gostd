@@ -1,0 +1,203 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="keyword">package</span>&nbsp;<span class="ident">arch8</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;bytes&#34;</span><br>
+<span class="lineno">5</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;io&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;log&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;os&#34;</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">10</span><span class="comment">//&nbsp;Serial&nbsp;is&nbsp;a&nbsp;serial&nbsp;console&nbsp;device</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;It&nbsp;is&nbsp;basically&nbsp;two&nbsp;DMA&nbsp;pipes&nbsp;of&nbsp;ring&nbsp;buffered&nbsp;bytes:</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;one&nbsp;pipe&nbsp;for&nbsp;input,&nbsp;one&nbsp;pipe&nbsp;for&nbsp;output.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">serial</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">intBus</span>&nbsp;<span class="ident">intBus</span><br>
+<span class="lineno">15</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">*</span><span class="ident">page</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Core</span>&nbsp;&nbsp;&nbsp;<span class="builtintype">byte</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">IntIn</span>&nbsp;&nbsp;<span class="builtintype">byte</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">IntOut</span>&nbsp;<span class="builtintype">byte</span><br>
+<span class="lineno">20</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Output</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">Writer</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">_</span>&nbsp;<span class="ident">device</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">new</span><span class="op">(</span><span class="ident">serial</span><span class="op">)</span>&nbsp;<span class="comment">//&nbsp;Serial&nbsp;is&nbsp;a&nbsp;device</span><br>
+<span class="lineno">25</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">serialBase</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">128</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">serialInHead</span>&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="ident">serialBase</span>&nbsp;<span class="op">+</span>&nbsp;<span class="num">0</span>&nbsp;&nbsp;<span class="comment">//&nbsp;updated&nbsp;by&nbsp;hardware</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">serialInTail</span>&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="ident">serialBase</span>&nbsp;<span class="op">+</span>&nbsp;<span class="num">4</span>&nbsp;&nbsp;<span class="comment">//&nbsp;updated&nbsp;by&nbsp;cpu</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">serialInWait</span>&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="ident">serialBase</span>&nbsp;<span class="op">+</span>&nbsp;<span class="num">8</span>&nbsp;&nbsp;<span class="comment">//&nbsp;cycles&nbsp;to&nbsp;wait&nbsp;to&nbsp;raise&nbsp;an&nbsp;interrupt</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">serialInThresh</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">serialBase</span>&nbsp;<span class="op">+</span>&nbsp;<span class="num">12</span>&nbsp;<span class="comment">//&nbsp;threashold&nbsp;to&nbsp;raise&nbsp;an&nbsp;input&nbsp;interrupt</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">serialOutHead</span>&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="ident">serialBase</span>&nbsp;<span class="op">+</span>&nbsp;<span class="num">16</span>&nbsp;<span class="comment">//&nbsp;updated&nbsp;by&nbsp;cpu</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">serialOutTail</span>&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="ident">serialBase</span>&nbsp;<span class="op">+</span>&nbsp;<span class="num">20</span>&nbsp;<span class="comment">//&nbsp;updated&nbsp;by&nbsp;hardware</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">serialOutWait</span>&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="ident">serialBase</span>&nbsp;<span class="op">+</span>&nbsp;<span class="num">24</span>&nbsp;<span class="comment">//&nbsp;cycles&nbsp;to&nbsp;wait&nbsp;to&nbsp;raise&nbsp;an&nbsp;interrupt</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">serialOutThresh</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">serialBase</span>&nbsp;<span class="op">+</span>&nbsp;<span class="num">28</span>&nbsp;<span class="comment">//&nbsp;threashold&nbsp;to&nbsp;raise&nbsp;an&nbsp;output&nbsp;interrupt</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">serialInBuf</span>&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="ident">serialBase</span>&nbsp;<span class="op">+</span>&nbsp;<span class="num">64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">serialOutBuf</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">serialBase</span>&nbsp;<span class="op">+</span>&nbsp;<span class="num">96</span><br>
+<span class="lineno">40</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">serialCap</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">30</span>&nbsp;<span class="comment">//&nbsp;30&nbsp;bytes&nbsp;maximum&nbsp;in&nbsp;each&nbsp;pipe</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;NewSerial&nbsp;creates&nbsp;a&nbsp;new&nbsp;serial&nbsp;controller.</span><br>
+<span class="lineno">45</span><span class="keyword">func</span>&nbsp;<span class="ident">newSerial</span><span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">*</span><span class="ident">page</span><span class="op">,</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="ident">intBus</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">serial</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">new</span><span class="op">(</span><span class="ident">serial</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span><span class="op">.</span><span class="ident">intBus</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">i</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span><span class="op">.</span><span class="ident">p</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">p</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;default&nbsp;interrupts</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span><span class="op">.</span><span class="ident">Core</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="comment">//&nbsp;to&nbsp;core&nbsp;0&nbsp;only</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span><span class="op">.</span><span class="ident">IntIn</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">8</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span><span class="op">.</span><span class="ident">IntOut</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">9</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span><span class="op">.</span><span class="ident">Output</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">os</span><span class="op">.</span><span class="ident">Stdout</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">ret</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">60</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">serial</span><span class="op">)</span>&nbsp;<span class="ident">interrupt</span><span class="op">(</span><span class="ident">code</span>&nbsp;<span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">intBus</span><span class="op">.</span><span class="ident">Interrupt</span><span class="op">(</span><span class="ident">code</span><span class="op">,</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">Core</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;WriteByte&nbsp;appends&nbsp;a&nbsp;byte&nbsp;into&nbsp;the&nbsp;input&nbsp;ring&nbsp;buffer.</span><br>
+<span class="lineno">65</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">serial</span><span class="op">)</span>&nbsp;<span class="ident">WriteByte</span><span class="op">(</span><span class="ident">b</span>&nbsp;<span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">head</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">p</span><span class="op">.</span><span class="ident">ReadWord</span><span class="op">(</span><span class="ident">serialInHead</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tail</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">p</span><span class="op">.</span><span class="ident">ReadWord</span><span class="op">(</span><span class="ident">serialInTail</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">head</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">tail</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="op">&gt;=</span>&nbsp;<span class="ident">serialCap</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">p</span><span class="op">.</span><span class="ident">WriteByte</span><span class="op">(</span><span class="ident">serialInBuf</span><span class="op">+</span><span class="ident">head</span><span class="op">%</span><span class="num">32</span><span class="op">,</span>&nbsp;<span class="ident">b</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">head</span><span class="op">++</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">p</span><span class="op">.</span><span class="ident">WriteWord</span><span class="op">(</span><span class="ident">serialInTail</span><span class="op">,</span>&nbsp;<span class="ident">head</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span><span class="op">++</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">thresh</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">p</span><span class="op">.</span><span class="ident">ReadWord</span><span class="op">(</span><span class="ident">serialInThresh</span><span class="op">)</span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="op">&gt;=</span>&nbsp;<span class="ident">thresh</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">interrupt</span><span class="op">(</span><span class="ident">s</span><span class="op">.</span><span class="ident">IntIn</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno">85</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;OutLen&nbsp;returns&nbsp;the&nbsp;current&nbsp;buffer&nbsp;length&nbsp;of&nbsp;the&nbsp;output&nbsp;ring&nbsp;buffer.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">serial</span><span class="op">)</span>&nbsp;<span class="ident">OutLen</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">uint32</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">head</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">p</span><span class="op">.</span><span class="ident">ReadWord</span><span class="op">(</span><span class="ident">serialOutHead</span><span class="op">)</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tail</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">p</span><span class="op">.</span><span class="ident">ReadWord</span><span class="op">(</span><span class="ident">serialOutTail</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">head</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">tail</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">ret</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="ident">serialCap</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">log</span><span class="op">.</span><span class="ident">Printf</span><span class="op">(</span><span class="string">&#34;error&nbsp;output&nbsp;buffer&nbsp;length&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;on&nbsp;error&nbsp;set&nbsp;the&nbsp;length&nbsp;to&nbsp;full</span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;to&nbsp;avoid&nbsp;trigger&nbsp;interrupt</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">serialCap</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">ret</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">100</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;InLen&nbsp;returns&nbsp;the&nbsp;current&nbsp;buffer&nbsp;length&nbsp;of&nbsp;the&nbsp;input&nbsp;ring&nbsp;buffer.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">serial</span><span class="op">)</span>&nbsp;<span class="ident">InLen</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">uint32</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">head</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">p</span><span class="op">.</span><span class="ident">ReadWord</span><span class="op">(</span><span class="ident">serialInHead</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tail</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">p</span><span class="op">.</span><span class="ident">ReadWord</span><span class="op">(</span><span class="ident">serialInTail</span><span class="op">)</span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">head</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">tail</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">ret</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="ident">serialCap</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">log</span><span class="op">.</span><span class="ident">Printf</span><span class="op">(</span><span class="string">&#34;error&nbsp;input&nbsp;buffer&nbsp;length&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;on&nbsp;error,&nbsp;set&nbsp;the&nbsp;length&nbsp;to&nbsp;empty</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;to&nbsp;avoid&nbsp;trigger&nbsp;interrupt</span><br>
+<span class="lineno">110</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">ret</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">115</span><span class="comment">//&nbsp;ReadByte&nbsp;reads&nbsp;a&nbsp;byte&nbsp;out&nbsp;of&nbsp;serial&nbsp;output&nbsp;ring&nbsp;buffer.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">serial</span><span class="op">)</span>&nbsp;<span class="ident">ReadByte</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="builtintype">bool</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">head</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">p</span><span class="op">.</span><span class="ident">ReadWord</span><span class="op">(</span><span class="ident">serialOutHead</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tail</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">p</span><span class="op">.</span><span class="ident">ReadWord</span><span class="op">(</span><span class="ident">serialOutTail</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">head</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">tail</span><br>
+<span class="lineno">120</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="ident">serialCap</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">p</span><span class="op">.</span><span class="ident">ReadByte</span><span class="op">(</span><span class="ident">serialOutBuf</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">tail</span><span class="op">%</span><span class="num">32</span><span class="op">)</span><br>
+<span class="lineno">125</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tail</span><span class="op">++</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">p</span><span class="op">.</span><span class="ident">WriteWord</span><span class="op">(</span><span class="ident">serialOutTail</span><span class="op">,</span>&nbsp;<span class="ident">tail</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span><span class="op">--</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">thresh</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">p</span><span class="op">.</span><span class="ident">ReadWord</span><span class="op">(</span><span class="ident">serialOutThresh</span><span class="op">)</span><br>
+<span class="lineno">130</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">thresh</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">interrupt</span><span class="op">(</span><span class="ident">s</span><span class="op">.</span><span class="ident">IntOut</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">b</span><span class="op">,</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno">135</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">serial</span><span class="op">)</span>&nbsp;<span class="ident">countDown</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">inWait</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">p</span><span class="op">.</span><span class="ident">ReadWord</span><span class="op">(</span><span class="ident">serialInWait</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">outWait</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">p</span><span class="op">.</span><span class="ident">ReadWord</span><span class="op">(</span><span class="ident">serialOutWait</span><span class="op">)</span><br>
+<span class="lineno">140</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">inWait</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">inWait</span><span class="op">--</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">outWait</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">145</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">outWait</span><span class="op">--</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">inWait</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">InLen</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">150</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">interrupt</span><span class="op">(</span><span class="ident">s</span><span class="op">.</span><span class="ident">IntIn</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">outWait</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">155</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">OutLen</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">serialCap</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">interrupt</span><span class="op">(</span><span class="ident">s</span><span class="op">.</span><span class="ident">IntOut</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">160</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">p</span><span class="op">.</span><span class="ident">WriteWord</span><span class="op">(</span><span class="ident">serialInWait</span><span class="op">,</span>&nbsp;<span class="ident">inWait</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">p</span><span class="op">.</span><span class="ident">WriteWord</span><span class="op">(</span><span class="ident">serialOutWait</span><span class="op">,</span>&nbsp;<span class="ident">outWait</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">serial</span><span class="op">)</span>&nbsp;<span class="ident">flush</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">165</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">buf</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">new</span><span class="op">(</span><span class="ident">bytes</span><span class="op">.</span><span class="ident">Buffer</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span><span class="op">,</span>&nbsp;<span class="ident">valid</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">ReadByte</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">valid</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">buf</span><span class="op">.</span><span class="ident">WriteByte</span><span class="op">(</span><span class="ident">b</span><span class="op">)</span><br>
+<span class="lineno">170</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">break</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">175</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">Output</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">Output</span><span class="op">.</span><span class="ident">Write</span><span class="op">(</span><span class="ident">buf</span><span class="op">.</span><span class="ident">Bytes</span><span class="op">(</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">log</span><span class="op">.</span><span class="ident">Print</span><span class="op">(</span><span class="ident">e</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">180</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Tick&nbsp;counts&nbsp;down&nbsp;the&nbsp;waiting&nbsp;counters&nbsp;and&nbsp;triggers</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;interrupt&nbsp;when&nbsp;the&nbsp;count&nbsp;down&nbsp;reaches&nbsp;zero.</span><br>
+<span class="lineno">185</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">serial</span><span class="op">)</span>&nbsp;<span class="ident">Tick</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">flush</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">countDown</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

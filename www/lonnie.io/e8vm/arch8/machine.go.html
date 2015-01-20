@@ -1,0 +1,117 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="keyword">package</span>&nbsp;<span class="ident">arch8</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;io&#34;</span><br>
+<span class="lineno">5</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Machine&nbsp;is&nbsp;a&nbsp;multicore&nbsp;shared&nbsp;memory&nbsp;simulated&nbsp;arch8&nbsp;machine.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">Machine</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">phyMem</span>&nbsp;&nbsp;<span class="op">*</span><span class="ident">phyMemory</span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">inst</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">inst</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">cores</span>&nbsp;&nbsp;&nbsp;<span class="op">*</span><span class="ident">multiCore</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">serial</span>&nbsp;&nbsp;<span class="op">*</span><span class="ident">serial</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">console</span>&nbsp;<span class="op">*</span><span class="ident">console</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">15</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">devices</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="ident">device</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;NewMachine&nbsp;creates&nbsp;a&nbsp;machine&nbsp;with&nbsp;memory&nbsp;and&nbsp;cores.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">NewMachine</span><span class="op">(</span><span class="ident">memSize</span>&nbsp;<span class="builtintype">uint32</span><span class="op">,</span>&nbsp;<span class="ident">ncore</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">Machine</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">new</span><span class="op">(</span><span class="ident">Machine</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span><span class="op">.</span><span class="ident">phyMem</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">newPhyMemory</span><span class="op">(</span><span class="ident">memSize</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span><span class="op">.</span><span class="ident">inst</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">new</span><span class="op">(</span><span class="ident">instArch8</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span><span class="op">.</span><span class="ident">cores</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">newMultiCore</span><span class="op">(</span><span class="ident">ncore</span><span class="op">,</span>&nbsp;<span class="ident">ret</span><span class="op">.</span><span class="ident">phyMem</span><span class="op">,</span>&nbsp;<span class="ident">ret</span><span class="op">.</span><span class="ident">inst</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;hook-up&nbsp;devices</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">ret</span><span class="op">.</span><span class="ident">phyMem</span><span class="op">.</span><span class="ident">Page</span><span class="op">(</span><span class="ident">pageBasicIO</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span><span class="op">.</span><span class="ident">serial</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">newSerial</span><span class="op">(</span><span class="ident">p</span><span class="op">,</span>&nbsp;<span class="ident">ret</span><span class="op">.</span><span class="ident">cores</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span><span class="op">.</span><span class="ident">console</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">newConsole</span><span class="op">(</span><span class="ident">p</span><span class="op">,</span>&nbsp;<span class="ident">ret</span><span class="op">.</span><span class="ident">cores</span><span class="op">)</span><br>
+<span class="lineno">30</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span><span class="op">.</span><span class="ident">addDevice</span><span class="op">(</span><span class="ident">newTicker</span><span class="op">(</span><span class="ident">ret</span><span class="op">.</span><span class="ident">cores</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span><span class="op">.</span><span class="ident">addDevice</span><span class="op">(</span><span class="ident">ret</span><span class="op">.</span><span class="ident">serial</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span><span class="op">.</span><span class="ident">addDevice</span><span class="op">(</span><span class="ident">ret</span><span class="op">.</span><span class="ident">console</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">ret</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;SetOutput&nbsp;sets&nbsp;the&nbsp;output&nbsp;writer&nbsp;of&nbsp;the&nbsp;machine&#39;s&nbsp;serial</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;console.</span><br>
+<span class="lineno">40</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">m</span>&nbsp;<span class="op">*</span><span class="ident">Machine</span><span class="op">)</span>&nbsp;<span class="ident">SetOutput</span><span class="op">(</span><span class="ident">w</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">Writer</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">m</span><span class="op">.</span><span class="ident">serial</span><span class="op">.</span><span class="ident">Output</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">w</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">m</span><span class="op">.</span><span class="ident">console</span><span class="op">.</span><span class="ident">Output</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">w</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">45</span><span class="comment">//&nbsp;AddDevice&nbsp;adds&nbsp;a&nbsp;devices&nbsp;to&nbsp;the&nbsp;machine.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">m</span>&nbsp;<span class="op">*</span><span class="ident">Machine</span><span class="op">)</span>&nbsp;<span class="ident">addDevice</span><span class="op">(</span><span class="ident">d</span>&nbsp;<span class="ident">device</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">m</span><span class="op">.</span><span class="ident">devices</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">append</span><span class="op">(</span><span class="ident">m</span><span class="op">.</span><span class="ident">devices</span><span class="op">,</span>&nbsp;<span class="ident">d</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">50</span><span class="comment">//&nbsp;Tick&nbsp;proceeds&nbsp;the&nbsp;simulation&nbsp;by&nbsp;one&nbsp;tick.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">m</span>&nbsp;<span class="op">*</span><span class="ident">Machine</span><span class="op">)</span>&nbsp;<span class="ident">Tick</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">CoreExcep</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">d</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">m</span><span class="op">.</span><span class="ident">devices</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span><span class="op">.</span><span class="ident">Tick</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">55</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">m</span><span class="op">.</span><span class="ident">cores</span><span class="op">.</span><span class="ident">Tick</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Run&nbsp;simulates&nbsp;nticks.&nbsp;It&nbsp;returns&nbsp;the&nbsp;number&nbsp;of&nbsp;ticks</span><br>
+<span class="lineno">60</span><span class="comment">//&nbsp;simulated&nbsp;without&nbsp;error,&nbsp;and&nbsp;the&nbsp;first&nbsp;met&nbsp;error&nbsp;if&nbsp;any.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">m</span>&nbsp;<span class="op">*</span><span class="ident">Machine</span><span class="op">)</span>&nbsp;<span class="ident">Run</span><span class="op">(</span><span class="ident">nticks</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="op">*</span><span class="ident">CoreExcep</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="num">0</span><span class="op">;</span>&nbsp;<span class="ident">nticks</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">nticks</span><span class="op">;</span>&nbsp;<span class="ident">i</span><span class="op">++</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">e</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">m</span><span class="op">.</span><span class="ident">Tick</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span><span class="op">++</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">n</span><span class="op">,</span>&nbsp;<span class="ident">e</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">70</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">n</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;LoadImage&nbsp;loads&nbsp;an&nbsp;booting&nbsp;image&nbsp;from&nbsp;a&nbsp;reader&nbsp;and&nbsp;put&nbsp;it</span><br>
+<span class="lineno">75</span><span class="comment">//&nbsp;at&nbsp;a&nbsp;particular&nbsp;offset&nbsp;in&nbsp;the&nbsp;physical&nbsp;memory.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">m</span>&nbsp;<span class="op">*</span><span class="ident">Machine</span><span class="op">)</span>&nbsp;<span class="ident">LoadImage</span><span class="op">(</span><span class="ident">r</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">Reader</span><span class="op">,</span>&nbsp;<span class="ident">offset</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">offset</span><span class="op">%</span><span class="ident">PageSize</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">panic</span><span class="op">(</span><span class="string">&#34;boot&nbsp;image&nbsp;not&nbsp;page&nbsp;aligned&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">80</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pn</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">offset</span>&nbsp;<span class="op">/</span>&nbsp;<span class="ident">PageSize</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">m</span><span class="op">.</span><span class="ident">phyMem</span><span class="op">.</span><span class="ident">Page</span><span class="op">(</span><span class="ident">pn</span><span class="op">)</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">p</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">errOutOfRange</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">Read</span><span class="op">(</span><span class="ident">p</span><span class="op">.</span><span class="ident">Bytes</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">EOF</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="keyword">if</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">e</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pn</span><span class="op">++</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;PrintCoreStatus&nbsp;prints&nbsp;the&nbsp;cpu&nbsp;statuses.</span><br>
+<span class="lineno">100</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">m</span>&nbsp;<span class="op">*</span><span class="ident">Machine</span><span class="op">)</span>&nbsp;<span class="ident">PrintCoreStatus</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">m</span><span class="op">.</span><span class="ident">cores</span><span class="op">.</span><span class="ident">PrintStatus</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

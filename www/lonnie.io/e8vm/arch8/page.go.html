@@ -1,0 +1,70 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="keyword">package</span>&nbsp;<span class="ident">arch8</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;encoding/binary&#34;</span><br>
+<span class="lineno">5</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;PageSize&nbsp;is&nbsp;the&nbsp;number&nbsp;of&nbsp;bytes&nbsp;a&nbsp;page&nbsp;contains.</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">PageSize</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">4096</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">10</span><span class="comment">//&nbsp;Page&nbsp;is&nbsp;a&nbsp;memory&nbsp;addressable&nbsp;area&nbsp;of&nbsp;PageSize&nbsp;bytes</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">page</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Bytes</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">15</span><span class="comment">//&nbsp;NewPage&nbsp;creates&nbsp;a&nbsp;new&nbsp;empty&nbsp;page.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">newPage</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">page</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="op">&amp;</span><span class="ident">page</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Bytes</span><span class="op">:</span>&nbsp;<span class="builtinfunc">make</span><span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="ident">PageSize</span><span class="op">)</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">20</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ReadByte&nbsp;reads&nbsp;a&nbsp;byte&nbsp;at&nbsp;the&nbsp;particular&nbsp;offset.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;When&nbsp;offset&nbsp;is&nbsp;larger&nbsp;than&nbsp;offset,&nbsp;it&nbsp;uses&nbsp;the&nbsp;modular.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">*</span><span class="ident">page</span><span class="op">)</span>&nbsp;<span class="ident">ReadByte</span><span class="op">(</span><span class="ident">offset</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span>&nbsp;<span class="builtintype">byte</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">p</span><span class="op">.</span><span class="ident">Bytes</span><span class="op">[</span><span class="ident">offset</span><span class="op">%</span><span class="ident">PageSize</span><span class="op">]</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;WriteByte&nbsp;writes&nbsp;a&nbsp;byte&nbsp;into&nbsp;the&nbsp;page&nbsp;at&nbsp;a&nbsp;particular&nbsp;offset.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;When&nbsp;offset&nbsp;is&nbsp;larger&nbsp;than&nbsp;offset,&nbsp;it&nbsp;uses&nbsp;the&nbsp;modular.</span><br>
+<span class="lineno">30</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">*</span><span class="ident">page</span><span class="op">)</span>&nbsp;<span class="ident">WriteByte</span><span class="op">(</span><span class="ident">offset</span>&nbsp;<span class="builtintype">uint32</span><span class="op">,</span>&nbsp;<span class="ident">b</span>&nbsp;<span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">.</span><span class="ident">Bytes</span><span class="op">[</span><span class="ident">offset</span><span class="op">%</span><span class="ident">PageSize</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">b</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;machines&nbsp;endian.</span><br>
+<span class="lineno">35</span><span class="keyword">var</span>&nbsp;<span class="ident">Endian</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">binary</span><span class="op">.</span><span class="ident">LittleEndian</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">wordOff</span><span class="op">(</span><span class="ident">offset</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span>&nbsp;<span class="builtintype">uint32</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="op">(</span><span class="ident">offset</span>&nbsp;<span class="op">%</span>&nbsp;<span class="ident">PageSize</span><span class="op">)</span>&nbsp;<span class="op">&amp;</span>&nbsp;<span class="op">^</span><span class="builtintype">uint32</span><span class="op">(</span><span class="num">0x3</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">40</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ReadWord&nbsp;reads&nbsp;the&nbsp;word&nbsp;at&nbsp;the&nbsp;particular&nbsp;offset.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;When&nbsp;offset&nbsp;is&nbsp;larger&nbsp;than&nbsp;offset,&nbsp;it&nbsp;uses&nbsp;the&nbsp;modular.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;When&nbsp;offset&nbsp;is&nbsp;not&nbsp;4-byte&nbsp;aligned,&nbsp;it&nbsp;aligns&nbsp;down.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">*</span><span class="ident">page</span><span class="op">)</span>&nbsp;<span class="ident">ReadWord</span><span class="op">(</span><span class="ident">offset</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span>&nbsp;<span class="builtintype">uint32</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">offset</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">wordOff</span><span class="op">(</span><span class="ident">offset</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">Endian</span><span class="op">.</span><span class="ident">Uint32</span><span class="op">(</span><span class="ident">p</span><span class="op">.</span><span class="ident">Bytes</span><span class="op">[</span><span class="ident">offset</span>&nbsp;<span class="op">:</span>&nbsp;<span class="ident">offset</span><span class="op">+</span><span class="num">4</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;WriteWord&nbsp;writes&nbsp;the&nbsp;word&nbsp;at&nbsp;the&nbsp;particular&nbsp;offset.</span><br>
+<span class="lineno">50</span><span class="comment">//&nbsp;When&nbsp;offset&nbsp;is&nbsp;larger&nbsp;than&nbsp;offset,&nbsp;it&nbsp;uses&nbsp;the&nbsp;modular.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;When&nbsp;offset&nbsp;is&nbsp;not&nbsp;4-byte&nbsp;aligned,&nbsp;it&nbsp;aligns&nbsp;down.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">*</span><span class="ident">page</span><span class="op">)</span>&nbsp;<span class="ident">WriteWord</span><span class="op">(</span><span class="ident">offset</span>&nbsp;<span class="builtintype">uint32</span><span class="op">,</span>&nbsp;<span class="ident">w</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">offset</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">wordOff</span><span class="op">(</span><span class="ident">offset</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Endian</span><span class="op">.</span><span class="ident">PutUint32</span><span class="op">(</span><span class="ident">p</span><span class="op">.</span><span class="ident">Bytes</span><span class="op">[</span><span class="ident">offset</span><span class="op">:</span><span class="ident">offset</span><span class="op">+</span><span class="num">4</span><span class="op">]</span><span class="op">,</span>&nbsp;<span class="ident">w</span><span class="op">)</span><br>
+<span class="lineno">55</span><span class="op">}</span>
+</div>
+</body>
+</html>

@@ -1,0 +1,121 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="keyword">package</span>&nbsp;<span class="ident">lex8</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;io&#34;</span><br>
+<span class="lineno">5</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Lexer&nbsp;parses&nbsp;a&nbsp;file&nbsp;input&nbsp;stream&nbsp;into&nbsp;tokens.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">Lexer</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">LexScanner</span><br>
+<span class="lineno">10</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">e</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">error</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">errs</span>&nbsp;<span class="op">*</span><span class="ident">ErrorList</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">rune</span><br>
+<span class="lineno">15</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">IsWhite</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="ident">r</span>&nbsp;<span class="builtintype">rune</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">LexFunc</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="ident">x</span>&nbsp;<span class="op">*</span><span class="ident">Lexer</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">Token</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;NewLexer&nbsp;creates&nbsp;a&nbsp;new&nbsp;lexer.</span><br>
+<span class="lineno">20</span><span class="keyword">func</span>&nbsp;<span class="ident">NewLexer</span><span class="op">(</span><span class="ident">file</span>&nbsp;<span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">r</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">ReadCloser</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">Lexer</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">new</span><span class="op">(</span><span class="ident">Lexer</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span><span class="op">.</span><span class="ident">s</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">NewLexScanner</span><span class="op">(</span><span class="ident">file</span><span class="op">,</span>&nbsp;<span class="ident">r</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span><span class="op">.</span><span class="ident">errs</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">NewErrList</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span><span class="op">.</span><span class="ident">IsWhite</span>&nbsp;<span class="op">=</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="ident">r</span>&nbsp;<span class="builtintype">rune</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">r</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;&nbsp;&#39;</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">r</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;\t&#39;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span><span class="op">.</span><span class="ident">Next</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">30</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">ret</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Next&nbsp;pushes&nbsp;the&nbsp;current&nbsp;rune&nbsp;into&nbsp;the&nbsp;scanning&nbsp;buffer,</span><br>
+<span class="lineno">35</span><span class="comment">//&nbsp;and&nbsp;returns&nbsp;the&nbsp;next&nbsp;rune.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">x</span>&nbsp;<span class="op">*</span><span class="ident">Lexer</span><span class="op">)</span>&nbsp;<span class="ident">Next</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="builtintype">rune</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">x</span><span class="op">.</span><span class="ident">r</span><span class="op">,</span>&nbsp;<span class="ident">x</span><span class="op">.</span><span class="ident">e</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">x</span><span class="op">.</span><span class="ident">s</span><span class="op">.</span><span class="ident">Next</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">x</span><span class="op">.</span><span class="ident">r</span><span class="op">,</span>&nbsp;<span class="ident">x</span><span class="op">.</span><span class="ident">e</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">40</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Rune&nbsp;returns&nbsp;the&nbsp;current&nbsp;rune.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">x</span>&nbsp;<span class="op">*</span><span class="ident">Lexer</span><span class="op">)</span>&nbsp;<span class="ident">Rune</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">rune</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">x</span><span class="op">.</span><span class="ident">r</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">45</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;See&nbsp;returns&nbsp;true&nbsp;when&nbsp;the&nbsp;current&nbsp;rune&nbsp;is&nbsp;r.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">x</span>&nbsp;<span class="op">*</span><span class="ident">Lexer</span><span class="op">)</span>&nbsp;<span class="ident">See</span><span class="op">(</span><span class="ident">r</span>&nbsp;<span class="builtintype">rune</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">x</span><span class="op">.</span><span class="ident">r</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">r</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">50</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Discard&nbsp;clears&nbsp;the&nbsp;scanning&nbsp;buffer</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">x</span>&nbsp;<span class="op">*</span><span class="ident">Lexer</span><span class="op">)</span>&nbsp;<span class="ident">Discard</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span>&nbsp;<span class="ident">x</span><span class="op">.</span><span class="ident">s</span><span class="op">.</span><span class="ident">Accept</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Ended&nbsp;returns&nbsp;true&nbsp;when&nbsp;the&nbsp;scanning&nbsp;stops.</span><br>
+<span class="lineno">55</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">x</span>&nbsp;<span class="op">*</span><span class="ident">Lexer</span><span class="op">)</span>&nbsp;<span class="ident">Ended</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="ident">x</span><span class="op">.</span><span class="ident">e</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;SkipWhite&nbsp;is&nbsp;a&nbsp;helper&nbsp;function&nbsp;that&nbsp;skips</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;any&nbsp;rune&nbsp;that&nbsp;returns&nbsp;true&nbsp;by&nbsp;IsWhite&nbsp;function.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;buffer&nbsp;is&nbsp;discarded&nbsp;after&nbsp;the&nbsp;skipping.</span><br>
+<span class="lineno">60</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">x</span>&nbsp;<span class="op">*</span><span class="ident">Lexer</span><span class="op">)</span>&nbsp;<span class="ident">SkipWhite</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">x</span><span class="op">.</span><span class="ident">Ended</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">||</span>&nbsp;<span class="op">!</span><span class="ident">x</span><span class="op">.</span><span class="ident">IsWhite</span><span class="op">(</span><span class="ident">x</span><span class="op">.</span><span class="ident">r</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">break</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">x</span><span class="op">.</span><span class="ident">Next</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">x</span><span class="op">.</span><span class="ident">Discard</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">70</span><span class="comment">//&nbsp;MakeToken&nbsp;accepts&nbsp;the&nbsp;runes&nbsp;in&nbsp;the&nbsp;scanning&nbsp;buffer</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;and&nbsp;returns&nbsp;it&nbsp;as&nbsp;a&nbsp;token&nbsp;of&nbsp;type&nbsp;t.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">x</span>&nbsp;<span class="op">*</span><span class="ident">Lexer</span><span class="op">)</span>&nbsp;<span class="ident">MakeToken</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">Token</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">,</span>&nbsp;<span class="ident">p</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">x</span><span class="op">.</span><span class="ident">s</span><span class="op">.</span><span class="ident">Accept</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="op">&amp;</span><span class="ident">Token</span><span class="op">{</span><span class="ident">t</span><span class="op">,</span>&nbsp;<span class="ident">s</span><span class="op">,</span>&nbsp;<span class="ident">p</span><span class="op">}</span><br>
+<span class="lineno">75</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Token&nbsp;returns&nbsp;the&nbsp;next&nbsp;parsed&nbsp;token.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;It&nbsp;ends&nbsp;with&nbsp;a&nbsp;token&nbsp;with&nbsp;type&nbsp;EOF.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">x</span>&nbsp;<span class="op">*</span><span class="ident">Lexer</span><span class="op">)</span>&nbsp;<span class="ident">Token</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">Token</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">x</span><span class="op">.</span><span class="ident">SkipWhite</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">x</span><span class="op">.</span><span class="ident">Ended</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">x</span><span class="op">.</span><span class="ident">MakeToken</span><span class="op">(</span><span class="ident">EOF</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">85</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">x</span><span class="op">.</span><span class="ident">LexFunc</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">x</span><span class="op">.</span><span class="ident">Next</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">x</span><span class="op">.</span><span class="ident">MakeToken</span><span class="op">(</span><span class="ident">Illegal</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">90</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">x</span><span class="op">.</span><span class="ident">LexFunc</span><span class="op">(</span><span class="ident">x</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Err&nbsp;adds&nbsp;an&nbsp;error&nbsp;into&nbsp;the&nbsp;error&nbsp;list&nbsp;with&nbsp;current&nbsp;postion.</span><br>
+<span class="lineno">95</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">x</span>&nbsp;<span class="op">*</span><span class="ident">Lexer</span><span class="op">)</span>&nbsp;<span class="ident">Err</span><span class="op">(</span><span class="ident">f</span>&nbsp;<span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">args</span>&nbsp;<span class="op">...</span><span class="keyword">interface</span><span class="op">{</span><span class="op">}</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">x</span><span class="op">.</span><span class="ident">errs</span><span class="op">.</span><span class="ident">Addf</span><span class="op">(</span><span class="ident">x</span><span class="op">.</span><span class="ident">s</span><span class="op">.</span><span class="ident">Pos</span><span class="op">(</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">f</span><span class="op">,</span>&nbsp;<span class="ident">args</span><span class="op">...</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Errs&nbsp;returns&nbsp;the&nbsp;lexing&nbsp;errors.</span><br>
+<span class="lineno">100</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">x</span>&nbsp;<span class="op">*</span><span class="ident">Lexer</span><span class="op">)</span>&nbsp;<span class="ident">Errs</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="op">*</span><span class="ident">Error</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">x</span><span class="op">.</span><span class="ident">e</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">x</span><span class="op">.</span><span class="ident">e</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">EOF</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="op">*</span><span class="ident">Error</span><span class="op">{</span><span class="op">{</span><span class="ident">Err</span><span class="op">:</span>&nbsp;<span class="ident">x</span><span class="op">.</span><span class="ident">e</span><span class="op">}</span><span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">x</span><span class="op">.</span><span class="ident">errs</span><span class="op">.</span><span class="ident">Errs</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

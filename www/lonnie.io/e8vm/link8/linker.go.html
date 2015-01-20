@@ -1,0 +1,77 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="keyword">package</span>&nbsp;<span class="ident">link8</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Linker&nbsp;provides&nbsp;the&nbsp;framework&nbsp;to&nbsp;link&nbsp;packages&nbsp;together.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">Linker</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">5</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pkgs</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">[</span><span class="op">]</span><span class="op">*</span><span class="ident">Package</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pkgIndex</span>&nbsp;<span class="keyword">map</span><span class="op">[</span><span class="builtintype">string</span><span class="op">]</span><span class="builtintype">int</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;NewLinker&nbsp;creates&nbsp;a&nbsp;new&nbsp;linker&nbsp;with&nbsp;no&nbsp;packages.</span><br>
+<span class="lineno">10</span><span class="keyword">func</span>&nbsp;<span class="ident">NewLinker</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">Linker</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">new</span><span class="op">(</span><span class="ident">Linker</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span><span class="op">.</span><span class="ident">pkgIndex</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">make</span><span class="op">(</span><span class="keyword">map</span><span class="op">[</span><span class="builtintype">string</span><span class="op">]</span><span class="builtintype">int</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">ret</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">15</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;AddPkg&nbsp;adds&nbsp;a&nbsp;package&nbsp;into&nbsp;the&nbsp;linker.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;It&nbsp;returns&nbsp;the&nbsp;index&nbsp;of&nbsp;the&nbsp;package&nbsp;and&nbsp;if&nbsp;the&nbsp;package</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;is&nbsp;new.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">lnk</span>&nbsp;<span class="op">*</span><span class="ident">Linker</span><span class="op">)</span>&nbsp;<span class="ident">AddPkg</span><span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">*</span><span class="ident">Package</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">index</span>&nbsp;<span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">isNew</span>&nbsp;<span class="builtintype">bool</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">path</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">p</span><span class="op">.</span><span class="ident">path</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">index</span><span class="op">,</span>&nbsp;<span class="ident">found</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">lnk</span><span class="op">.</span><span class="ident">pkgIndex</span><span class="op">[</span><span class="ident">path</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">found</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">index</span><span class="op">,</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">25</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">index</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">lnk</span><span class="op">.</span><span class="ident">pkgs</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">lnk</span><span class="op">.</span><span class="ident">pkgs</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">append</span><span class="op">(</span><span class="ident">lnk</span><span class="op">.</span><span class="ident">pkgs</span><span class="op">,</span>&nbsp;<span class="ident">p</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">lnk</span><span class="op">.</span><span class="ident">pkgIndex</span><span class="op">[</span><span class="ident">path</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">index</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">index</span><span class="op">,</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno">30</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;AddPkgs&nbsp;adds&nbsp;the&nbsp;package&nbsp;and&nbsp;recursively&nbsp;adds&nbsp;the&nbsp;packages</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;it&nbsp;requires.&nbsp;It&nbsp;returns&nbsp;the&nbsp;package&nbsp;index.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">lnk</span>&nbsp;<span class="op">*</span><span class="ident">Linker</span><span class="op">)</span>&nbsp;<span class="ident">AddPkgs</span><span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">*</span><span class="ident">Package</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">index</span><span class="op">,</span>&nbsp;<span class="ident">isNew</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">lnk</span><span class="op">.</span><span class="ident">AddPkg</span><span class="op">(</span><span class="ident">p</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">isNew</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">req</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">p</span><span class="op">.</span><span class="ident">requires</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">lnk</span><span class="op">.</span><span class="ident">AddPkgs</span><span class="op">(</span><span class="ident">req</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">index</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">45</span><span class="comment">//&nbsp;PkgIndex&nbsp;returns&nbsp;the&nbsp;index&nbsp;of&nbsp;the&nbsp;particular&nbsp;package.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">lnk</span>&nbsp;<span class="op">*</span><span class="ident">Linker</span><span class="op">)</span>&nbsp;<span class="ident">PkgIndex</span><span class="op">(</span><span class="ident">path</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span><span class="op">,</span>&nbsp;<span class="ident">found</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">lnk</span><span class="op">.</span><span class="ident">pkgIndex</span><span class="op">[</span><span class="ident">path</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">found</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">panic</span><span class="op">(</span><span class="string">&#34;not&nbsp;found&#34;</span><span class="op">)</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">ret</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Pkg&nbsp;returns&nbsp;the&nbsp;package&nbsp;of&nbsp;index&nbsp;i.</span><br>
+<span class="lineno">55</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">lnk</span>&nbsp;<span class="op">*</span><span class="ident">Linker</span><span class="op">)</span>&nbsp;<span class="ident">Pkg</span><span class="op">(</span><span class="ident">i</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">Package</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">lnk</span><span class="op">.</span><span class="ident">pkgs</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Npkg&nbsp;retunrs&nbsp;the&nbsp;total&nbsp;number&nbsp;of&nbsp;packages.</span><br>
+<span class="lineno">60</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">lnk</span>&nbsp;<span class="op">*</span><span class="ident">Linker</span><span class="op">)</span>&nbsp;<span class="ident">Npkg</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">lnk</span><span class="op">.</span><span class="ident">pkgs</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

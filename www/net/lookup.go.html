@@ -1,0 +1,157 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2012&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">net</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="string">&#34;time&#34;</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;protocols&nbsp;contains&nbsp;minimal&nbsp;mappings&nbsp;between&nbsp;internet&nbsp;protocol</span><br>
+<span class="lineno">10</span><span class="comment">//&nbsp;names&nbsp;and&nbsp;numbers&nbsp;for&nbsp;platforms&nbsp;that&nbsp;don&#39;t&nbsp;have&nbsp;a&nbsp;complete&nbsp;list&nbsp;of</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;protocol&nbsp;numbers.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;See&nbsp;http://www.iana.org/assignments/protocol-numbers</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">protocols</span>&nbsp;<span class="op">=</span>&nbsp;<span class="keyword">map</span><span class="op">[</span><span class="builtintype">string</span><span class="op">]</span><span class="builtintype">int</span><span class="op">{</span><br>
+<span class="lineno">15</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;icmp&#34;</span><span class="op">:</span>&nbsp;<span class="num">1</span><span class="op">,</span>&nbsp;<span class="string">&#34;ICMP&#34;</span><span class="op">:</span>&nbsp;<span class="num">1</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;igmp&#34;</span><span class="op">:</span>&nbsp;<span class="num">2</span><span class="op">,</span>&nbsp;<span class="string">&#34;IGMP&#34;</span><span class="op">:</span>&nbsp;<span class="num">2</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;tcp&#34;</span><span class="op">:</span>&nbsp;<span class="num">6</span><span class="op">,</span>&nbsp;<span class="string">&#34;TCP&#34;</span><span class="op">:</span>&nbsp;<span class="num">6</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;udp&#34;</span><span class="op">:</span>&nbsp;<span class="num">17</span><span class="op">,</span>&nbsp;<span class="string">&#34;UDP&#34;</span><span class="op">:</span>&nbsp;<span class="num">17</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;ipv6-icmp&#34;</span><span class="op">:</span>&nbsp;<span class="num">58</span><span class="op">,</span>&nbsp;<span class="string">&#34;IPV6-ICMP&#34;</span><span class="op">:</span>&nbsp;<span class="num">58</span><span class="op">,</span>&nbsp;<span class="string">&#34;IPv6-ICMP&#34;</span><span class="op">:</span>&nbsp;<span class="num">58</span><span class="op">,</span><br>
+<span class="lineno">20</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;LookupHost&nbsp;looks&nbsp;up&nbsp;the&nbsp;given&nbsp;host&nbsp;using&nbsp;the&nbsp;local&nbsp;resolver.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;It&nbsp;returns&nbsp;an&nbsp;array&nbsp;of&nbsp;that&nbsp;host&#39;s&nbsp;addresses.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">LookupHost</span><span class="op">(</span><span class="ident">host</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">addrs</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">lookupHost</span><span class="op">(</span><span class="ident">host</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;LookupIP&nbsp;looks&nbsp;up&nbsp;host&nbsp;using&nbsp;the&nbsp;local&nbsp;resolver.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;It&nbsp;returns&nbsp;an&nbsp;array&nbsp;of&nbsp;that&nbsp;host&#39;s&nbsp;IPv4&nbsp;and&nbsp;IPv6&nbsp;addresses.</span><br>
+<span class="lineno">30</span><span class="keyword">func</span>&nbsp;<span class="ident">LookupIP</span><span class="op">(</span><span class="ident">host</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">addrs</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="ident">IP</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">lookupIPMerge</span><span class="op">(</span><span class="ident">host</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">lookupGroup</span>&nbsp;<span class="ident">singleflight</span><br>
+<span class="lineno">35</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;lookupIPMerge&nbsp;wraps&nbsp;lookupIP,&nbsp;but&nbsp;makes&nbsp;sure&nbsp;that&nbsp;for&nbsp;any&nbsp;given</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;host,&nbsp;only&nbsp;one&nbsp;lookup&nbsp;is&nbsp;in-flight&nbsp;at&nbsp;a&nbsp;time.&nbsp;The&nbsp;returned&nbsp;memory</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;is&nbsp;always&nbsp;owned&nbsp;by&nbsp;the&nbsp;caller.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">lookupIPMerge</span><span class="op">(</span><span class="ident">host</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">addrs</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="ident">IP</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">addrsi</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">,</span>&nbsp;<span class="ident">shared</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">lookupGroup</span><span class="op">.</span><span class="ident">Do</span><span class="op">(</span><span class="ident">host</span><span class="op">,</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="keyword">interface</span><span class="op">{</span><span class="op">}</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">lookupIP</span><span class="op">(</span><span class="ident">host</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">lookupIPReturn</span><span class="op">(</span><span class="ident">addrsi</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">,</span>&nbsp;<span class="ident">shared</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">45</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;lookupIPReturn&nbsp;turns&nbsp;the&nbsp;return&nbsp;values&nbsp;from&nbsp;singleflight.Do&nbsp;into</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;the&nbsp;return&nbsp;values&nbsp;from&nbsp;LookupIP.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">lookupIPReturn</span><span class="op">(</span><span class="ident">addrsi</span>&nbsp;<span class="keyword">interface</span><span class="op">{</span><span class="op">}</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">,</span>&nbsp;<span class="ident">shared</span>&nbsp;<span class="builtintype">bool</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="ident">IP</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">addrs</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">addrsi</span><span class="op">.</span><span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="ident">IP</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">shared</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">clone</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">make</span><span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="ident">IP</span><span class="op">,</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">addrs</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">copy</span><span class="op">(</span><span class="ident">clone</span><span class="op">,</span>&nbsp;<span class="ident">addrs</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">addrs</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">clone</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">addrs</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">60</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;lookupIPDeadline&nbsp;looks&nbsp;up&nbsp;a&nbsp;hostname&nbsp;with&nbsp;a&nbsp;deadline.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">lookupIPDeadline</span><span class="op">(</span><span class="ident">host</span>&nbsp;<span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">deadline</span>&nbsp;<span class="ident">time</span><span class="op">.</span><span class="ident">Time</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">addrs</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="ident">IP</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">deadline</span><span class="op">.</span><span class="ident">IsZero</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">lookupIPMerge</span><span class="op">(</span><span class="ident">host</span><span class="op">)</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;We&nbsp;could&nbsp;push&nbsp;the&nbsp;deadline&nbsp;down&nbsp;into&nbsp;the&nbsp;name&nbsp;resolution</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;functions.&nbsp;&nbsp;However,&nbsp;the&nbsp;most&nbsp;commonly&nbsp;used&nbsp;implementation</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;calls&nbsp;getaddrinfo,&nbsp;which&nbsp;has&nbsp;no&nbsp;timeout.</span><br>
+<span class="lineno">70</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">timeout</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">deadline</span><span class="op">.</span><span class="ident">Sub</span><span class="op">(</span><span class="ident">time</span><span class="op">.</span><span class="ident">Now</span><span class="op">(</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">timeout</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">errTimeout</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">time</span><span class="op">.</span><span class="ident">NewTimer</span><span class="op">(</span><span class="ident">timeout</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">defer</span>&nbsp;<span class="ident">t</span><span class="op">.</span><span class="ident">Stop</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ch</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">lookupGroup</span><span class="op">.</span><span class="ident">DoChan</span><span class="op">(</span><span class="ident">host</span><span class="op">,</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="keyword">interface</span><span class="op">{</span><span class="op">}</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">lookupIP</span><span class="op">(</span><span class="ident">host</span><span class="op">)</span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">select</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="op">&lt;-</span><span class="ident">t</span><span class="op">.</span><span class="ident">C</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;The&nbsp;DNS&nbsp;lookup&nbsp;timed&nbsp;out&nbsp;for&nbsp;some&nbsp;reason.&nbsp;&nbsp;Force</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;future&nbsp;requests&nbsp;to&nbsp;start&nbsp;the&nbsp;DNS&nbsp;lookup&nbsp;again</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;rather&nbsp;than&nbsp;waiting&nbsp;for&nbsp;the&nbsp;current&nbsp;lookup&nbsp;to</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;complete.&nbsp;&nbsp;See&nbsp;issue&nbsp;8602.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">lookupGroup</span><span class="op">.</span><span class="ident">Forget</span><span class="op">(</span><span class="ident">host</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">errTimeout</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">r</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">&lt;-</span><span class="ident">ch</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">lookupIPReturn</span><span class="op">(</span><span class="ident">r</span><span class="op">.</span><span class="ident">v</span><span class="op">,</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">err</span><span class="op">,</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">shared</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">95</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;LookupPort&nbsp;looks&nbsp;up&nbsp;the&nbsp;port&nbsp;for&nbsp;the&nbsp;given&nbsp;network&nbsp;and&nbsp;service.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">LookupPort</span><span class="op">(</span><span class="ident">network</span><span class="op">,</span>&nbsp;<span class="ident">service</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">port</span>&nbsp;<span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">lookupPort</span><span class="op">(</span><span class="ident">network</span><span class="op">,</span>&nbsp;<span class="ident">service</span><span class="op">)</span><br>
+<span class="lineno">100</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;LookupCNAME&nbsp;returns&nbsp;the&nbsp;canonical&nbsp;DNS&nbsp;host&nbsp;for&nbsp;the&nbsp;given&nbsp;name.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Callers&nbsp;that&nbsp;do&nbsp;not&nbsp;care&nbsp;about&nbsp;the&nbsp;canonical&nbsp;name&nbsp;can&nbsp;call</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;LookupHost&nbsp;or&nbsp;LookupIP&nbsp;directly;&nbsp;both&nbsp;take&nbsp;care&nbsp;of&nbsp;resolving</span><br>
+<span class="lineno">105</span><span class="comment">//&nbsp;the&nbsp;canonical&nbsp;name&nbsp;as&nbsp;part&nbsp;of&nbsp;the&nbsp;lookup.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">LookupCNAME</span><span class="op">(</span><span class="ident">name</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">cname</span>&nbsp;<span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">lookupCNAME</span><span class="op">(</span><span class="ident">name</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">110</span><span class="comment">//&nbsp;LookupSRV&nbsp;tries&nbsp;to&nbsp;resolve&nbsp;an&nbsp;SRV&nbsp;query&nbsp;of&nbsp;the&nbsp;given&nbsp;service,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;protocol,&nbsp;and&nbsp;domain&nbsp;name.&nbsp;&nbsp;The&nbsp;proto&nbsp;is&nbsp;&#34;tcp&#34;&nbsp;or&nbsp;&#34;udp&#34;.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;returned&nbsp;records&nbsp;are&nbsp;sorted&nbsp;by&nbsp;priority&nbsp;and&nbsp;randomized</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;by&nbsp;weight&nbsp;within&nbsp;a&nbsp;priority.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">115</span><span class="comment">//&nbsp;LookupSRV&nbsp;constructs&nbsp;the&nbsp;DNS&nbsp;name&nbsp;to&nbsp;look&nbsp;up&nbsp;following&nbsp;RFC&nbsp;2782.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;That&nbsp;is,&nbsp;it&nbsp;looks&nbsp;up&nbsp;_service._proto.name.&nbsp;&nbsp;To&nbsp;accommodate&nbsp;services</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;publishing&nbsp;SRV&nbsp;records&nbsp;under&nbsp;non-standard&nbsp;names,&nbsp;if&nbsp;both&nbsp;service</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;and&nbsp;proto&nbsp;are&nbsp;empty&nbsp;strings,&nbsp;LookupSRV&nbsp;looks&nbsp;up&nbsp;name&nbsp;directly.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">LookupSRV</span><span class="op">(</span><span class="ident">service</span><span class="op">,</span>&nbsp;<span class="ident">proto</span><span class="op">,</span>&nbsp;<span class="ident">name</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">cname</span>&nbsp;<span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">addrs</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="op">*</span><span class="ident">SRV</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">120</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">lookupSRV</span><span class="op">(</span><span class="ident">service</span><span class="op">,</span>&nbsp;<span class="ident">proto</span><span class="op">,</span>&nbsp;<span class="ident">name</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;LookupMX&nbsp;returns&nbsp;the&nbsp;DNS&nbsp;MX&nbsp;records&nbsp;for&nbsp;the&nbsp;given&nbsp;domain&nbsp;name&nbsp;sorted&nbsp;by&nbsp;preference.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">LookupMX</span><span class="op">(</span><span class="ident">name</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">mx</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="op">*</span><span class="ident">MX</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">125</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">lookupMX</span><span class="op">(</span><span class="ident">name</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;LookupNS&nbsp;returns&nbsp;the&nbsp;DNS&nbsp;NS&nbsp;records&nbsp;for&nbsp;the&nbsp;given&nbsp;domain&nbsp;name.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">LookupNS</span><span class="op">(</span><span class="ident">name</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">ns</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="op">*</span><span class="ident">NS</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">130</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">lookupNS</span><span class="op">(</span><span class="ident">name</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;LookupTXT&nbsp;returns&nbsp;the&nbsp;DNS&nbsp;TXT&nbsp;records&nbsp;for&nbsp;the&nbsp;given&nbsp;domain&nbsp;name.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">LookupTXT</span><span class="op">(</span><span class="ident">name</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">txt</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">135</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">lookupTXT</span><span class="op">(</span><span class="ident">name</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;LookupAddr&nbsp;performs&nbsp;a&nbsp;reverse&nbsp;lookup&nbsp;for&nbsp;the&nbsp;given&nbsp;address,&nbsp;returning&nbsp;a&nbsp;list</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;of&nbsp;names&nbsp;mapping&nbsp;to&nbsp;that&nbsp;address.</span><br>
+<span class="lineno">140</span><span class="keyword">func</span>&nbsp;<span class="ident">LookupAddr</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">name</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">lookupAddr</span><span class="op">(</span><span class="ident">addr</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

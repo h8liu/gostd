@@ -1,0 +1,94 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2009&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">tls</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="string">&#34;strconv&#34;</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">alert</span>&nbsp;<span class="builtintype">uint8</span><br>
+<span class="lineno">10</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;alert&nbsp;level</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alertLevelWarning</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alertLevelError</span>&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">2</span><br>
+<span class="lineno">15</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alertCloseNotify</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">alert</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alertUnexpectedMessage</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">alert</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">10</span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alertBadRecordMAC</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">alert</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">20</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alertDecryptionFailed</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">alert</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">21</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alertRecordOverflow</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">alert</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">22</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alertDecompressionFailure</span>&nbsp;&nbsp;&nbsp;<span class="ident">alert</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">30</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alertHandshakeFailure</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">alert</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">40</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alertBadCertificate</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">alert</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">42</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alertUnsupportedCertificate</span>&nbsp;<span class="ident">alert</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">43</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alertCertificateRevoked</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">alert</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">44</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alertCertificateExpired</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">alert</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">45</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alertCertificateUnknown</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">alert</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">46</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alertIllegalParameter</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">alert</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">47</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alertUnknownCA</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">alert</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">48</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alertAccessDenied</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">alert</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">49</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alertDecodeError</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">alert</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">50</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alertDecryptError</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">alert</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">51</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alertProtocolVersion</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">alert</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">70</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alertInsufficientSecurity</span>&nbsp;&nbsp;&nbsp;<span class="ident">alert</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">71</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alertInternalError</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">alert</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">80</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alertInappropriateFallback</span>&nbsp;&nbsp;<span class="ident">alert</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">86</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alertUserCanceled</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">alert</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">90</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alertNoRenegotiation</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">alert</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">100</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">alertText</span>&nbsp;<span class="op">=</span>&nbsp;<span class="keyword">map</span><span class="op">[</span><span class="ident">alert</span><span class="op">]</span><span class="builtintype">string</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alertCloseNotify</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;close&nbsp;notify&#34;</span><span class="op">,</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alertUnexpectedMessage</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;unexpected&nbsp;message&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alertBadRecordMAC</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;bad&nbsp;record&nbsp;MAC&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alertDecryptionFailed</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;decryption&nbsp;failed&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alertRecordOverflow</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;record&nbsp;overflow&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alertDecompressionFailure</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;<span class="string">&#34;decompression&nbsp;failure&#34;</span><span class="op">,</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alertHandshakeFailure</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;handshake&nbsp;failure&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alertBadCertificate</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;bad&nbsp;certificate&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alertUnsupportedCertificate</span><span class="op">:</span>&nbsp;<span class="string">&#34;unsupported&nbsp;certificate&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alertCertificateRevoked</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;revoked&nbsp;certificate&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alertCertificateExpired</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;expired&nbsp;certificate&#34;</span><span class="op">,</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alertCertificateUnknown</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;unknown&nbsp;certificate&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alertIllegalParameter</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;illegal&nbsp;parameter&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alertUnknownCA</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;unknown&nbsp;certificate&nbsp;authority&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alertAccessDenied</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;access&nbsp;denied&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alertDecodeError</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;error&nbsp;decoding&nbsp;message&#34;</span><span class="op">,</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alertDecryptError</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;error&nbsp;decrypting&nbsp;message&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alertProtocolVersion</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;protocol&nbsp;version&nbsp;not&nbsp;supported&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alertInsufficientSecurity</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;<span class="string">&#34;insufficient&nbsp;security&nbsp;level&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alertInternalError</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;internal&nbsp;error&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alertInappropriateFallback</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">&#34;inappropriate&nbsp;fallback&#34;</span><span class="op">,</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alertUserCanceled</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;user&nbsp;canceled&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alertNoRenegotiation</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;no&nbsp;renegotiation&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">e</span>&nbsp;<span class="ident">alert</span><span class="op">)</span>&nbsp;<span class="ident">String</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">,</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">alertText</span><span class="op">[</span><span class="ident">e</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">s</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="string">&#34;alert(&#34;</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">strconv</span><span class="op">.</span><span class="ident">Itoa</span><span class="op">(</span><span class="builtintype">int</span><span class="op">(</span><span class="ident">e</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">+</span>&nbsp;<span class="string">&#34;)&#34;</span><br>
+<span class="lineno">75</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">e</span>&nbsp;<span class="ident">alert</span><span class="op">)</span>&nbsp;<span class="ident">Error</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">e</span><span class="op">.</span><span class="ident">String</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

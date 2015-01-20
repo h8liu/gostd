@@ -1,0 +1,197 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2012&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">template_test</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;io&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;io/ioutil&#34;</span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;log&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;os&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;path/filepath&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;text/template&#34;</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno">15</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;templateFile&nbsp;defines&nbsp;the&nbsp;contents&nbsp;of&nbsp;a&nbsp;template&nbsp;to&nbsp;be&nbsp;stored&nbsp;in&nbsp;a&nbsp;file,&nbsp;for&nbsp;testing.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">templateFile</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">name</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">contents</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno">20</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">createTestDir</span><span class="op">(</span><span class="ident">files</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="ident">templateFile</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dir</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">ioutil</span><span class="op">.</span><span class="ident">TempDir</span><span class="op">(</span><span class="string">&#34;&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;template&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">log</span><span class="op">.</span><span class="ident">Fatal</span><span class="op">(</span><span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">file</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">files</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">f</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">os</span><span class="op">.</span><span class="ident">Create</span><span class="op">(</span><span class="ident">filepath</span><span class="op">.</span><span class="ident">Join</span><span class="op">(</span><span class="ident">dir</span><span class="op">,</span>&nbsp;<span class="ident">file</span><span class="op">.</span><span class="ident">name</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">log</span><span class="op">.</span><span class="ident">Fatal</span><span class="op">(</span><span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">defer</span>&nbsp;<span class="ident">f</span><span class="op">.</span><span class="ident">Close</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">WriteString</span><span class="op">(</span><span class="ident">f</span><span class="op">,</span>&nbsp;<span class="ident">file</span><span class="op">.</span><span class="ident">contents</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">log</span><span class="op">.</span><span class="ident">Fatal</span><span class="op">(</span><span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">dir</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">40</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Here&nbsp;we&nbsp;demonstrate&nbsp;loading&nbsp;a&nbsp;set&nbsp;of&nbsp;templates&nbsp;from&nbsp;a&nbsp;directory.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">ExampleTemplate_glob</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Here&nbsp;we&nbsp;create&nbsp;a&nbsp;temporary&nbsp;directory&nbsp;and&nbsp;populate&nbsp;it&nbsp;with&nbsp;our&nbsp;sample</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;template&nbsp;definition&nbsp;files;&nbsp;usually&nbsp;the&nbsp;template&nbsp;files&nbsp;would&nbsp;already</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;exist&nbsp;in&nbsp;some&nbsp;location&nbsp;known&nbsp;to&nbsp;the&nbsp;program.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dir</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">createTestDir</span><span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="ident">templateFile</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;T0.tmpl&nbsp;is&nbsp;a&nbsp;plain&nbsp;template&nbsp;file&nbsp;that&nbsp;just&nbsp;invokes&nbsp;T1.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;T0.tmpl&#34;</span><span class="op">,</span>&nbsp;<span class="string">`T0&nbsp;invokes&nbsp;T1:&nbsp;({{template&nbsp;&#34;T1&#34;}})`</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;T1.tmpl&nbsp;defines&nbsp;a&nbsp;template,&nbsp;T1&nbsp;that&nbsp;invokes&nbsp;T2.</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;T1.tmpl&#34;</span><span class="op">,</span>&nbsp;<span class="string">`{{define&nbsp;&#34;T1&#34;}}T1&nbsp;invokes&nbsp;T2:&nbsp;({{template&nbsp;&#34;T2&#34;}}){{end}}`</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;T2.tmpl&nbsp;defines&nbsp;a&nbsp;template&nbsp;T2.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;T2.tmpl&#34;</span><span class="op">,</span>&nbsp;<span class="string">`{{define&nbsp;&#34;T2&#34;}}This&nbsp;is&nbsp;T2{{end}}`</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Clean&nbsp;up&nbsp;after&nbsp;the&nbsp;test;&nbsp;another&nbsp;quirk&nbsp;of&nbsp;running&nbsp;as&nbsp;an&nbsp;example.</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">defer</span>&nbsp;<span class="ident">os</span><span class="op">.</span><span class="ident">RemoveAll</span><span class="op">(</span><span class="ident">dir</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;pattern&nbsp;is&nbsp;the&nbsp;glob&nbsp;pattern&nbsp;used&nbsp;to&nbsp;find&nbsp;all&nbsp;the&nbsp;template&nbsp;files.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pattern</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">filepath</span><span class="op">.</span><span class="ident">Join</span><span class="op">(</span><span class="ident">dir</span><span class="op">,</span>&nbsp;<span class="string">&#34;*.tmpl&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Here&nbsp;starts&nbsp;the&nbsp;example&nbsp;proper.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;T0.tmpl&nbsp;is&nbsp;the&nbsp;first&nbsp;name&nbsp;matched,&nbsp;so&nbsp;it&nbsp;becomes&nbsp;the&nbsp;starting&nbsp;template,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;the&nbsp;value&nbsp;returned&nbsp;by&nbsp;ParseGlob.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tmpl</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">template</span><span class="op">.</span><span class="ident">Must</span><span class="op">(</span><span class="ident">template</span><span class="op">.</span><span class="ident">ParseGlob</span><span class="op">(</span><span class="ident">pattern</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">tmpl</span><span class="op">.</span><span class="ident">Execute</span><span class="op">(</span><span class="ident">os</span><span class="op">.</span><span class="ident">Stdout</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">log</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;template&nbsp;execution:&nbsp;%s&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Output:</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;T0&nbsp;invokes&nbsp;T1:&nbsp;(T1&nbsp;invokes&nbsp;T2:&nbsp;(This&nbsp;is&nbsp;T2))</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;This&nbsp;example&nbsp;demonstrates&nbsp;one&nbsp;way&nbsp;to&nbsp;share&nbsp;some&nbsp;templates</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;and&nbsp;use&nbsp;them&nbsp;in&nbsp;different&nbsp;contexts.&nbsp;In&nbsp;this&nbsp;variant&nbsp;we&nbsp;add&nbsp;multiple&nbsp;driver</span><br>
+<span class="lineno">75</span><span class="comment">//&nbsp;templates&nbsp;by&nbsp;hand&nbsp;to&nbsp;an&nbsp;existing&nbsp;bundle&nbsp;of&nbsp;templates.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">ExampleTemplate_helpers</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Here&nbsp;we&nbsp;create&nbsp;a&nbsp;temporary&nbsp;directory&nbsp;and&nbsp;populate&nbsp;it&nbsp;with&nbsp;our&nbsp;sample</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;template&nbsp;definition&nbsp;files;&nbsp;usually&nbsp;the&nbsp;template&nbsp;files&nbsp;would&nbsp;already</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;exist&nbsp;in&nbsp;some&nbsp;location&nbsp;known&nbsp;to&nbsp;the&nbsp;program.</span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dir</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">createTestDir</span><span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="ident">templateFile</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;T1.tmpl&nbsp;defines&nbsp;a&nbsp;template,&nbsp;T1&nbsp;that&nbsp;invokes&nbsp;T2.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;T1.tmpl&#34;</span><span class="op">,</span>&nbsp;<span class="string">`{{define&nbsp;&#34;T1&#34;}}T1&nbsp;invokes&nbsp;T2:&nbsp;({{template&nbsp;&#34;T2&#34;}}){{end}}`</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;T2.tmpl&nbsp;defines&nbsp;a&nbsp;template&nbsp;T2.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;T2.tmpl&#34;</span><span class="op">,</span>&nbsp;<span class="string">`{{define&nbsp;&#34;T2&#34;}}This&nbsp;is&nbsp;T2{{end}}`</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Clean&nbsp;up&nbsp;after&nbsp;the&nbsp;test;&nbsp;another&nbsp;quirk&nbsp;of&nbsp;running&nbsp;as&nbsp;an&nbsp;example.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">defer</span>&nbsp;<span class="ident">os</span><span class="op">.</span><span class="ident">RemoveAll</span><span class="op">(</span><span class="ident">dir</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;pattern&nbsp;is&nbsp;the&nbsp;glob&nbsp;pattern&nbsp;used&nbsp;to&nbsp;find&nbsp;all&nbsp;the&nbsp;template&nbsp;files.</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pattern</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">filepath</span><span class="op">.</span><span class="ident">Join</span><span class="op">(</span><span class="ident">dir</span><span class="op">,</span>&nbsp;<span class="string">&#34;*.tmpl&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Here&nbsp;starts&nbsp;the&nbsp;example&nbsp;proper.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Load&nbsp;the&nbsp;helpers.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">templates</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">template</span><span class="op">.</span><span class="ident">Must</span><span class="op">(</span><span class="ident">template</span><span class="op">.</span><span class="ident">ParseGlob</span><span class="op">(</span><span class="ident">pattern</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Add&nbsp;one&nbsp;driver&nbsp;template&nbsp;to&nbsp;the&nbsp;bunch;&nbsp;we&nbsp;do&nbsp;this&nbsp;with&nbsp;an&nbsp;explicit&nbsp;template&nbsp;definition.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">templates</span><span class="op">.</span><span class="ident">Parse</span><span class="op">(</span><span class="string">&#34;{{define&nbsp;`driver1`}}Driver&nbsp;1&nbsp;calls&nbsp;T1:&nbsp;({{template&nbsp;`T1`}})\n{{end}}&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">log</span><span class="op">.</span><span class="ident">Fatal</span><span class="op">(</span><span class="string">&#34;parsing&nbsp;driver1:&nbsp;&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">100</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Add&nbsp;another&nbsp;driver&nbsp;template.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">templates</span><span class="op">.</span><span class="ident">Parse</span><span class="op">(</span><span class="string">&#34;{{define&nbsp;`driver2`}}Driver&nbsp;2&nbsp;calls&nbsp;T2:&nbsp;({{template&nbsp;`T2`}})\n{{end}}&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">log</span><span class="op">.</span><span class="ident">Fatal</span><span class="op">(</span><span class="string">&#34;parsing&nbsp;driver2:&nbsp;&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;We&nbsp;load&nbsp;all&nbsp;the&nbsp;templates&nbsp;before&nbsp;execution.&nbsp;This&nbsp;package&nbsp;does&nbsp;not&nbsp;require</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;that&nbsp;behavior&nbsp;but&nbsp;html/template&#39;s&nbsp;escaping&nbsp;does,&nbsp;so&nbsp;it&#39;s&nbsp;a&nbsp;good&nbsp;habit.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">templates</span><span class="op">.</span><span class="ident">ExecuteTemplate</span><span class="op">(</span><span class="ident">os</span><span class="op">.</span><span class="ident">Stdout</span><span class="op">,</span>&nbsp;<span class="string">&#34;driver1&#34;</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">log</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;driver1&nbsp;execution:&nbsp;%s&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno">110</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">templates</span><span class="op">.</span><span class="ident">ExecuteTemplate</span><span class="op">(</span><span class="ident">os</span><span class="op">.</span><span class="ident">Stdout</span><span class="op">,</span>&nbsp;<span class="string">&#34;driver2&#34;</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">log</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;driver2&nbsp;execution:&nbsp;%s&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">115</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Output:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Driver&nbsp;1&nbsp;calls&nbsp;T1:&nbsp;(T1&nbsp;invokes&nbsp;T2:&nbsp;(This&nbsp;is&nbsp;T2))</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Driver&nbsp;2&nbsp;calls&nbsp;T2:&nbsp;(This&nbsp;is&nbsp;T2)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">120</span><span class="comment">//&nbsp;This&nbsp;example&nbsp;demonstrates&nbsp;how&nbsp;to&nbsp;use&nbsp;one&nbsp;group&nbsp;of&nbsp;driver</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;templates&nbsp;with&nbsp;distinct&nbsp;sets&nbsp;of&nbsp;helper&nbsp;templates.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">ExampleTemplate_share</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Here&nbsp;we&nbsp;create&nbsp;a&nbsp;temporary&nbsp;directory&nbsp;and&nbsp;populate&nbsp;it&nbsp;with&nbsp;our&nbsp;sample</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;template&nbsp;definition&nbsp;files;&nbsp;usually&nbsp;the&nbsp;template&nbsp;files&nbsp;would&nbsp;already</span><br>
+<span class="lineno">125</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;exist&nbsp;in&nbsp;some&nbsp;location&nbsp;known&nbsp;to&nbsp;the&nbsp;program.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dir</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">createTestDir</span><span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="ident">templateFile</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;T0.tmpl&nbsp;is&nbsp;a&nbsp;plain&nbsp;template&nbsp;file&nbsp;that&nbsp;just&nbsp;invokes&nbsp;T1.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;T0.tmpl&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;T0&nbsp;({{.}}&nbsp;version)&nbsp;invokes&nbsp;T1:&nbsp;({{template&nbsp;`T1`}})\n&#34;</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;T1.tmpl&nbsp;defines&nbsp;a&nbsp;template,&nbsp;T1&nbsp;that&nbsp;invokes&nbsp;T2.&nbsp;Note&nbsp;T2&nbsp;is&nbsp;not&nbsp;defined</span><br>
+<span class="lineno">130</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;T1.tmpl&#34;</span><span class="op">,</span>&nbsp;<span class="string">`{{define&nbsp;&#34;T1&#34;}}T1&nbsp;invokes&nbsp;T2:&nbsp;({{template&nbsp;&#34;T2&#34;}}){{end}}`</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Clean&nbsp;up&nbsp;after&nbsp;the&nbsp;test;&nbsp;another&nbsp;quirk&nbsp;of&nbsp;running&nbsp;as&nbsp;an&nbsp;example.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">defer</span>&nbsp;<span class="ident">os</span><span class="op">.</span><span class="ident">RemoveAll</span><span class="op">(</span><span class="ident">dir</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">135</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;pattern&nbsp;is&nbsp;the&nbsp;glob&nbsp;pattern&nbsp;used&nbsp;to&nbsp;find&nbsp;all&nbsp;the&nbsp;template&nbsp;files.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pattern</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">filepath</span><span class="op">.</span><span class="ident">Join</span><span class="op">(</span><span class="ident">dir</span><span class="op">,</span>&nbsp;<span class="string">&#34;*.tmpl&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Here&nbsp;starts&nbsp;the&nbsp;example&nbsp;proper.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Load&nbsp;the&nbsp;drivers.</span><br>
+<span class="lineno">140</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">drivers</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">template</span><span class="op">.</span><span class="ident">Must</span><span class="op">(</span><span class="ident">template</span><span class="op">.</span><span class="ident">ParseGlob</span><span class="op">(</span><span class="ident">pattern</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;We&nbsp;must&nbsp;define&nbsp;an&nbsp;implementation&nbsp;of&nbsp;the&nbsp;T2&nbsp;template.&nbsp;First&nbsp;we&nbsp;clone</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;the&nbsp;drivers,&nbsp;then&nbsp;add&nbsp;a&nbsp;definition&nbsp;of&nbsp;T2&nbsp;to&nbsp;the&nbsp;template&nbsp;name&nbsp;space.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">145</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;1.&nbsp;Clone&nbsp;the&nbsp;helper&nbsp;set&nbsp;to&nbsp;create&nbsp;a&nbsp;new&nbsp;name&nbsp;space&nbsp;from&nbsp;which&nbsp;to&nbsp;run&nbsp;them.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">first</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">drivers</span><span class="op">.</span><span class="ident">Clone</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">log</span><span class="op">.</span><span class="ident">Fatal</span><span class="op">(</span><span class="string">&#34;cloning&nbsp;helpers:&nbsp;&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">150</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;2.&nbsp;Define&nbsp;T2,&nbsp;version&nbsp;A,&nbsp;and&nbsp;parse&nbsp;it.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">first</span><span class="op">.</span><span class="ident">Parse</span><span class="op">(</span><span class="string">&#34;{{define&nbsp;`T2`}}T2,&nbsp;version&nbsp;A{{end}}&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">log</span><span class="op">.</span><span class="ident">Fatal</span><span class="op">(</span><span class="string">&#34;parsing&nbsp;T2:&nbsp;&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">155</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Now&nbsp;repeat&nbsp;the&nbsp;whole&nbsp;thing,&nbsp;using&nbsp;a&nbsp;different&nbsp;version&nbsp;of&nbsp;T2.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;1.&nbsp;Clone&nbsp;the&nbsp;drivers.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">second</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">drivers</span><span class="op">.</span><span class="ident">Clone</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">160</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">log</span><span class="op">.</span><span class="ident">Fatal</span><span class="op">(</span><span class="string">&#34;cloning&nbsp;drivers:&nbsp;&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;2.&nbsp;Define&nbsp;T2,&nbsp;version&nbsp;B,&nbsp;and&nbsp;parse&nbsp;it.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">second</span><span class="op">.</span><span class="ident">Parse</span><span class="op">(</span><span class="string">&#34;{{define&nbsp;`T2`}}T2,&nbsp;version&nbsp;B{{end}}&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">165</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">log</span><span class="op">.</span><span class="ident">Fatal</span><span class="op">(</span><span class="string">&#34;parsing&nbsp;T2:&nbsp;&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Execute&nbsp;the&nbsp;templates&nbsp;in&nbsp;the&nbsp;reverse&nbsp;order&nbsp;to&nbsp;verify&nbsp;the</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;first&nbsp;is&nbsp;unaffected&nbsp;by&nbsp;the&nbsp;second.</span><br>
+<span class="lineno">170</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">second</span><span class="op">.</span><span class="ident">ExecuteTemplate</span><span class="op">(</span><span class="ident">os</span><span class="op">.</span><span class="ident">Stdout</span><span class="op">,</span>&nbsp;<span class="string">&#34;T0.tmpl&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;second&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">log</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;second&nbsp;execution:&nbsp;%s&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">first</span><span class="op">.</span><span class="ident">ExecuteTemplate</span><span class="op">(</span><span class="ident">os</span><span class="op">.</span><span class="ident">Stdout</span><span class="op">,</span>&nbsp;<span class="string">&#34;T0.tmpl&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;first&#34;</span><span class="op">)</span><br>
+<span class="lineno">175</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">log</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;first:&nbsp;execution:&nbsp;%s&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Output:</span><br>
+<span class="lineno">180</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;T0&nbsp;(second&nbsp;version)&nbsp;invokes&nbsp;T1:&nbsp;(T1&nbsp;invokes&nbsp;T2:&nbsp;(T2,&nbsp;version&nbsp;B))</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;T0&nbsp;(first&nbsp;version)&nbsp;invokes&nbsp;T1:&nbsp;(T1&nbsp;invokes&nbsp;T2:&nbsp;(T2,&nbsp;version&nbsp;A))</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

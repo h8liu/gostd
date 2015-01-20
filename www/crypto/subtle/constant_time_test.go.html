@@ -1,0 +1,142 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2009&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">subtle</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;testing&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;testing/quick&#34;</span><br>
+<span class="lineno">10</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">TestConstantTimeCompareStruct</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">a</span><span class="op">,</span>&nbsp;<span class="ident">b</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">out</span>&nbsp;&nbsp;<span class="builtintype">int</span><br>
+<span class="lineno">15</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">testConstantTimeCompareData</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="ident">TestConstantTimeCompareStruct</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">{</span><span class="op">}</span><span class="op">,</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">{</span><span class="op">}</span><span class="op">,</span>&nbsp;<span class="num">1</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">{</span><span class="num">0x11</span><span class="op">}</span><span class="op">,</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">{</span><span class="num">0x11</span><span class="op">}</span><span class="op">,</span>&nbsp;<span class="num">1</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">{</span><span class="num">0x12</span><span class="op">}</span><span class="op">,</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">{</span><span class="num">0x11</span><span class="op">}</span><span class="op">,</span>&nbsp;<span class="num">0</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">{</span><span class="num">0x11</span><span class="op">}</span><span class="op">,</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">{</span><span class="num">0x11</span><span class="op">,</span>&nbsp;<span class="num">0x12</span><span class="op">}</span><span class="op">,</span>&nbsp;<span class="num">0</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">{</span><span class="num">0x11</span><span class="op">,</span>&nbsp;<span class="num">0x12</span><span class="op">}</span><span class="op">,</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">{</span><span class="num">0x11</span><span class="op">}</span><span class="op">,</span>&nbsp;<span class="num">0</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">25</span><span class="keyword">func</span>&nbsp;<span class="ident">TestConstantTimeCompare</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span><span class="op">,</span>&nbsp;<span class="ident">test</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">testConstantTimeCompareData</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">r</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">ConstantTimeCompare</span><span class="op">(</span><span class="ident">test</span><span class="op">.</span><span class="ident">a</span><span class="op">,</span>&nbsp;<span class="ident">test</span><span class="op">.</span><span class="ident">b</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">r</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">test</span><span class="op">.</span><span class="ident">out</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Errorf</span><span class="op">(</span><span class="string">&#34;#%d&nbsp;bad&nbsp;result&nbsp;(got&nbsp;%x,&nbsp;want&nbsp;%x)&#34;</span><span class="op">,</span>&nbsp;<span class="ident">i</span><span class="op">,</span>&nbsp;<span class="ident">r</span><span class="op">,</span>&nbsp;<span class="ident">test</span><span class="op">.</span><span class="ident">out</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">TestConstantTimeByteEqStruct</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">a</span><span class="op">,</span>&nbsp;<span class="ident">b</span>&nbsp;<span class="builtintype">uint8</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">out</span>&nbsp;&nbsp;<span class="builtintype">int</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">testConstandTimeByteEqData</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="ident">TestConstantTimeByteEqStruct</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="num">0</span><span class="op">,</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="num">1</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="num">0</span><span class="op">,</span>&nbsp;<span class="num">1</span><span class="op">,</span>&nbsp;<span class="num">0</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="num">1</span><span class="op">,</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="num">0</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="num">0xff</span><span class="op">,</span>&nbsp;<span class="num">0xff</span><span class="op">,</span>&nbsp;<span class="num">1</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="num">0xff</span><span class="op">,</span>&nbsp;<span class="num">0xfe</span><span class="op">,</span>&nbsp;<span class="num">0</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">45</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">byteEq</span><span class="op">(</span><span class="ident">a</span><span class="op">,</span>&nbsp;<span class="ident">b</span>&nbsp;<span class="builtintype">uint8</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">a</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">b</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">TestConstantTimeByteEq</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span><span class="op">,</span>&nbsp;<span class="ident">test</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">testConstandTimeByteEqData</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">r</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">ConstantTimeByteEq</span><span class="op">(</span><span class="ident">test</span><span class="op">.</span><span class="ident">a</span><span class="op">,</span>&nbsp;<span class="ident">test</span><span class="op">.</span><span class="ident">b</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">r</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">test</span><span class="op">.</span><span class="ident">out</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Errorf</span><span class="op">(</span><span class="string">&#34;#%d&nbsp;bad&nbsp;result&nbsp;(got&nbsp;%x,&nbsp;want&nbsp;%x)&#34;</span><span class="op">,</span>&nbsp;<span class="ident">i</span><span class="op">,</span>&nbsp;<span class="ident">r</span><span class="op">,</span>&nbsp;<span class="ident">test</span><span class="op">.</span><span class="ident">out</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">quick</span><span class="op">.</span><span class="ident">CheckEqual</span><span class="op">(</span><span class="ident">ConstantTimeByteEq</span><span class="op">,</span>&nbsp;<span class="ident">byteEq</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><span class="op">)</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Error</span><span class="op">(</span><span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">65</span><span class="keyword">func</span>&nbsp;<span class="ident">eq</span><span class="op">(</span><span class="ident">a</span><span class="op">,</span>&nbsp;<span class="ident">b</span>&nbsp;<span class="builtintype">int32</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">a</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">b</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno">70</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">TestConstantTimeEq</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">quick</span><span class="op">.</span><span class="ident">CheckEqual</span><span class="op">(</span><span class="ident">ConstantTimeEq</span><span class="op">,</span>&nbsp;<span class="ident">eq</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Error</span><span class="op">(</span><span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">makeCopy</span><span class="op">(</span><span class="ident">v</span>&nbsp;<span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">x</span><span class="op">,</span>&nbsp;<span class="ident">y</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">x</span><span class="op">)</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">y</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">x</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">x</span><span class="op">[</span><span class="num">0</span><span class="op">:</span><span class="builtinfunc">len</span><span class="op">(</span><span class="ident">y</span><span class="op">)</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">y</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">y</span><span class="op">[</span><span class="num">0</span><span class="op">:</span><span class="builtinfunc">len</span><span class="op">(</span><span class="ident">x</span><span class="op">)</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">v</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">1</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">copy</span><span class="op">(</span><span class="ident">x</span><span class="op">,</span>&nbsp;<span class="ident">y</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">x</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">90</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">constantTimeCopyWrapper</span><span class="op">(</span><span class="ident">v</span>&nbsp;<span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">x</span><span class="op">,</span>&nbsp;<span class="ident">y</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">x</span><span class="op">)</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">y</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">x</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">x</span><span class="op">[</span><span class="num">0</span><span class="op">:</span><span class="builtinfunc">len</span><span class="op">(</span><span class="ident">y</span><span class="op">)</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">y</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">y</span><span class="op">[</span><span class="num">0</span><span class="op">:</span><span class="builtinfunc">len</span><span class="op">(</span><span class="ident">x</span><span class="op">)</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span>&nbsp;<span class="op">&amp;=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ConstantTimeCopy</span><span class="op">(</span><span class="ident">v</span><span class="op">,</span>&nbsp;<span class="ident">x</span><span class="op">,</span>&nbsp;<span class="ident">y</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">x</span><br>
+<span class="lineno">100</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">TestConstantTimeCopy</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">quick</span><span class="op">.</span><span class="ident">CheckEqual</span><span class="op">(</span><span class="ident">constantTimeCopyWrapper</span><span class="op">,</span>&nbsp;<span class="ident">makeCopy</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Error</span><span class="op">(</span><span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">lessOrEqTests</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">110</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">x</span><span class="op">,</span>&nbsp;<span class="ident">y</span><span class="op">,</span>&nbsp;<span class="ident">result</span>&nbsp;<span class="builtintype">int</span><br>
+<span class="lineno"></span><span class="op">}</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="num">0</span><span class="op">,</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="num">1</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="num">1</span><span class="op">,</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="num">0</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="num">0</span><span class="op">,</span>&nbsp;<span class="num">1</span><span class="op">,</span>&nbsp;<span class="num">1</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno">115</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="num">10</span><span class="op">,</span>&nbsp;<span class="num">20</span><span class="op">,</span>&nbsp;<span class="num">1</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="num">20</span><span class="op">,</span>&nbsp;<span class="num">10</span><span class="op">,</span>&nbsp;<span class="num">0</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="num">10</span><span class="op">,</span>&nbsp;<span class="num">10</span><span class="op">,</span>&nbsp;<span class="num">1</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">120</span><span class="keyword">func</span>&nbsp;<span class="ident">TestConstantTimeLessOrEq</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span><span class="op">,</span>&nbsp;<span class="ident">test</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">lessOrEqTests</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">result</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">ConstantTimeLessOrEq</span><span class="op">(</span><span class="ident">test</span><span class="op">.</span><span class="ident">x</span><span class="op">,</span>&nbsp;<span class="ident">test</span><span class="op">.</span><span class="ident">y</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">result</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">test</span><span class="op">.</span><span class="ident">result</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Errorf</span><span class="op">(</span><span class="string">&#34;#%d:&nbsp;%d&nbsp;&lt;=&nbsp;%d&nbsp;gave&nbsp;%d,&nbsp;expected&nbsp;%d&#34;</span><span class="op">,</span>&nbsp;<span class="ident">i</span><span class="op">,</span>&nbsp;<span class="ident">test</span><span class="op">.</span><span class="ident">x</span><span class="op">,</span>&nbsp;<span class="ident">test</span><span class="op">.</span><span class="ident">y</span><span class="op">,</span>&nbsp;<span class="ident">result</span><span class="op">,</span>&nbsp;<span class="ident">test</span><span class="op">.</span><span class="ident">result</span><span class="op">)</span><br>
+<span class="lineno">125</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

@@ -1,0 +1,636 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2009&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">tls</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;container/list&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;crypto&#34;</span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;crypto/rand&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;crypto/x509&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;fmt&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;io&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;math/big&#34;</span><br>
+<span class="lineno">15</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;strings&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;sync&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;time&#34;</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">20</span><span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">VersionSSL30</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0x0300</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">VersionTLS10</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0x0301</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">VersionTLS11</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0x0302</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">VersionTLS12</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0x0303</span><br>
+<span class="lineno">25</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">maxPlaintext</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">16384</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;maximum&nbsp;plaintext&nbsp;payload&nbsp;length</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">maxCiphertext</span>&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">16384</span>&nbsp;<span class="op">+</span>&nbsp;<span class="num">2048</span>&nbsp;<span class="comment">//&nbsp;maximum&nbsp;ciphertext&nbsp;payload&nbsp;length</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">recordHeaderLen</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">5</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;record&nbsp;header&nbsp;length</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">maxHandshake</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">65536</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;maximum&nbsp;handshake&nbsp;we&nbsp;support&nbsp;(protocol&nbsp;max&nbsp;is&nbsp;16&nbsp;MB)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">minVersion</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">VersionSSL30</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">maxVersion</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">VersionTLS12</span><br>
+<span class="lineno">35</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;TLS&nbsp;record&nbsp;types.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">recordType</span>&nbsp;<span class="builtintype">uint8</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">40</span><span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">recordTypeChangeCipherSpec</span>&nbsp;<span class="ident">recordType</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">20</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">recordTypeAlert</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">recordType</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">21</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">recordTypeHandshake</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">recordType</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">22</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">recordTypeApplicationData</span>&nbsp;&nbsp;<span class="ident">recordType</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">23</span><br>
+<span class="lineno">45</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;TLS&nbsp;handshake&nbsp;message&nbsp;types.</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">typeClientHello</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">uint8</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">typeServerHello</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">uint8</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">2</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">typeNewSessionTicket</span>&nbsp;&nbsp;&nbsp;<span class="builtintype">uint8</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">4</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">typeCertificate</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">uint8</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">11</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">typeServerKeyExchange</span>&nbsp;&nbsp;<span class="builtintype">uint8</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">12</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">typeCertificateRequest</span>&nbsp;<span class="builtintype">uint8</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">13</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">typeServerHelloDone</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">uint8</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">14</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">typeCertificateVerify</span>&nbsp;&nbsp;<span class="builtintype">uint8</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">15</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">typeClientKeyExchange</span>&nbsp;&nbsp;<span class="builtintype">uint8</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">16</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">typeFinished</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">uint8</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">20</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">typeCertificateStatus</span>&nbsp;&nbsp;<span class="builtintype">uint8</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">22</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">typeNextProtocol</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">uint8</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">67</span>&nbsp;<span class="comment">//&nbsp;Not&nbsp;IANA&nbsp;assigned</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;TLS&nbsp;compression&nbsp;types.</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">compressionNone</span>&nbsp;<span class="builtintype">uint8</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;TLS&nbsp;extension&nbsp;numbers</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">extensionServerName</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">uint16</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">extensionStatusRequest</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">uint16</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">5</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">extensionSupportedCurves</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">uint16</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">10</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">extensionSupportedPoints</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">uint16</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">11</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">extensionSignatureAlgorithms</span>&nbsp;<span class="builtintype">uint16</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">13</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">extensionALPN</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">uint16</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">16</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">extensionSessionTicket</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">uint16</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">35</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">extensionNextProtoNeg</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">uint16</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">13172</span>&nbsp;<span class="comment">//&nbsp;not&nbsp;IANA&nbsp;assigned</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">extensionRenegotiationInfo</span>&nbsp;&nbsp;&nbsp;<span class="builtintype">uint16</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0xff01</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno">80</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;TLS&nbsp;signaling&nbsp;cipher&nbsp;suite&nbsp;values</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">scsvRenegotiation</span>&nbsp;<span class="builtintype">uint16</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0x00ff</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno">85</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;CurveID&nbsp;is&nbsp;the&nbsp;type&nbsp;of&nbsp;a&nbsp;TLS&nbsp;identifier&nbsp;for&nbsp;an&nbsp;elliptic&nbsp;curve.&nbsp;See</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;http://www.iana.org/assignments/tls-parameters/tls-parameters.xml#tls-parameters-8</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">CurveID</span>&nbsp;<span class="builtintype">uint16</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">90</span><span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">CurveP256</span>&nbsp;<span class="ident">CurveID</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">23</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">CurveP384</span>&nbsp;<span class="ident">CurveID</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">24</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">CurveP521</span>&nbsp;<span class="ident">CurveID</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">25</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno">95</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;TLS&nbsp;Elliptic&nbsp;Curve&nbsp;Point&nbsp;Formats</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;http://www.iana.org/assignments/tls-parameters/tls-parameters.xml#tls-parameters-9</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pointFormatUncompressed</span>&nbsp;<span class="builtintype">uint8</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno">100</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;TLS&nbsp;CertificateStatusType&nbsp;(RFC&nbsp;3546)</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">statusTypeOCSP</span>&nbsp;<span class="builtintype">uint8</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno">105</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Certificate&nbsp;types&nbsp;(for&nbsp;certificateRequestMsg)</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">certTypeRSASign</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span>&nbsp;<span class="comment">//&nbsp;A&nbsp;certificate&nbsp;containing&nbsp;an&nbsp;RSA&nbsp;key</span><br>
+<span class="lineno">110</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">certTypeDSSSign</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">2</span>&nbsp;<span class="comment">//&nbsp;A&nbsp;certificate&nbsp;containing&nbsp;a&nbsp;DSA&nbsp;key</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">certTypeRSAFixedDH</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">3</span>&nbsp;<span class="comment">//&nbsp;A&nbsp;certificate&nbsp;containing&nbsp;a&nbsp;static&nbsp;DH&nbsp;key</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">certTypeDSSFixedDH</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">4</span>&nbsp;<span class="comment">//&nbsp;A&nbsp;certificate&nbsp;containing&nbsp;a&nbsp;static&nbsp;DH&nbsp;key</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;See&nbsp;RFC4492&nbsp;sections&nbsp;3&nbsp;and&nbsp;5.5.</span><br>
+<span class="lineno">115</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">certTypeECDSASign</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">64</span>&nbsp;<span class="comment">//&nbsp;A&nbsp;certificate&nbsp;containing&nbsp;an&nbsp;ECDSA-capable&nbsp;public&nbsp;key,&nbsp;signed&nbsp;with&nbsp;ECDSA.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">certTypeRSAFixedECDH</span>&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">65</span>&nbsp;<span class="comment">//&nbsp;A&nbsp;certificate&nbsp;containing&nbsp;an&nbsp;ECDH-capable&nbsp;public&nbsp;key,&nbsp;signed&nbsp;with&nbsp;RSA.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">certTypeECDSAFixedECDH</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">66</span>&nbsp;<span class="comment">//&nbsp;A&nbsp;certificate&nbsp;containing&nbsp;an&nbsp;ECDH-capable&nbsp;public&nbsp;key,&nbsp;signed&nbsp;with&nbsp;ECDSA.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Rest&nbsp;of&nbsp;these&nbsp;are&nbsp;reserved&nbsp;by&nbsp;the&nbsp;TLS&nbsp;spec</span><br>
+<span class="lineno">120</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Hash&nbsp;functions&nbsp;for&nbsp;TLS&nbsp;1.2&nbsp;(See&nbsp;RFC&nbsp;5246,&nbsp;section&nbsp;A.4.1)</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">hashSHA1</span>&nbsp;&nbsp;&nbsp;<span class="builtintype">uint8</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">2</span><br>
+<span class="lineno">125</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">hashSHA256</span>&nbsp;<span class="builtintype">uint8</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">4</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Signature&nbsp;algorithms&nbsp;for&nbsp;TLS&nbsp;1.2&nbsp;(See&nbsp;RFC&nbsp;5246,&nbsp;section&nbsp;A.4.1)</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno">130</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">signatureRSA</span>&nbsp;&nbsp;&nbsp;<span class="builtintype">uint8</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">signatureECDSA</span>&nbsp;<span class="builtintype">uint8</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">3</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;signatureAndHash&nbsp;mirrors&nbsp;the&nbsp;TLS&nbsp;1.2,&nbsp;SignatureAndHashAlgorithm&nbsp;struct.&nbsp;See</span><br>
+<span class="lineno">135</span><span class="comment">//&nbsp;RFC&nbsp;5246,&nbsp;section&nbsp;A.4.1.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">signatureAndHash</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">hash</span><span class="op">,</span>&nbsp;<span class="ident">signature</span>&nbsp;<span class="builtintype">uint8</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">140</span><span class="comment">//&nbsp;supportedSKXSignatureAlgorithms&nbsp;contains&nbsp;the&nbsp;signature&nbsp;and&nbsp;hash&nbsp;algorithms</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;that&nbsp;the&nbsp;code&nbsp;advertises&nbsp;as&nbsp;supported&nbsp;in&nbsp;a&nbsp;TLS&nbsp;1.2&nbsp;ClientHello.</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">supportedSKXSignatureAlgorithms</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="ident">signatureAndHash</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="ident">hashSHA256</span><span class="op">,</span>&nbsp;<span class="ident">signatureRSA</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="ident">hashSHA256</span><span class="op">,</span>&nbsp;<span class="ident">signatureECDSA</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno">145</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="ident">hashSHA1</span><span class="op">,</span>&nbsp;<span class="ident">signatureRSA</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="ident">hashSHA1</span><span class="op">,</span>&nbsp;<span class="ident">signatureECDSA</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;supportedClientCertSignatureAlgorithms&nbsp;contains&nbsp;the&nbsp;signature&nbsp;and&nbsp;hash</span><br>
+<span class="lineno">150</span><span class="comment">//&nbsp;algorithms&nbsp;that&nbsp;the&nbsp;code&nbsp;advertises&nbsp;as&nbsp;supported&nbsp;in&nbsp;a&nbsp;TLS&nbsp;1.2</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;CertificateRequest.</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">supportedClientCertSignatureAlgorithms</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="ident">signatureAndHash</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="ident">hashSHA256</span><span class="op">,</span>&nbsp;<span class="ident">signatureRSA</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="ident">hashSHA256</span><span class="op">,</span>&nbsp;<span class="ident">signatureECDSA</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno">155</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ConnectionState&nbsp;records&nbsp;basic&nbsp;TLS&nbsp;details&nbsp;about&nbsp;the&nbsp;connection.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">ConnectionState</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Version</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">uint16</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;TLS&nbsp;version&nbsp;used&nbsp;by&nbsp;the&nbsp;connection&nbsp;(e.g.&nbsp;VersionTLS12)</span><br>
+<span class="lineno">160</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">HandshakeComplete</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">bool</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;TLS&nbsp;handshake&nbsp;is&nbsp;complete</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">DidResume</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">bool</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;connection&nbsp;resumes&nbsp;a&nbsp;previous&nbsp;TLS&nbsp;connection</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">CipherSuite</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">uint16</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;cipher&nbsp;suite&nbsp;in&nbsp;use&nbsp;(TLS_RSA_WITH_RC4_128_SHA,&nbsp;...)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">NegotiatedProtocol</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">string</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;negotiated&nbsp;next&nbsp;protocol&nbsp;(from&nbsp;Config.NextProtos)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">NegotiatedProtocolIsMutual</span>&nbsp;<span class="builtintype">bool</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;negotiated&nbsp;protocol&nbsp;was&nbsp;advertised&nbsp;by&nbsp;server</span><br>
+<span class="lineno">165</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ServerName</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">string</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;server&nbsp;name&nbsp;requested&nbsp;by&nbsp;client,&nbsp;if&nbsp;any&nbsp;(server&nbsp;side&nbsp;only)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">PeerCertificates</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">[</span><span class="op">]</span><span class="op">*</span><span class="ident">x509</span><span class="op">.</span><span class="ident">Certificate</span>&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;certificate&nbsp;chain&nbsp;presented&nbsp;by&nbsp;remote&nbsp;peer</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">VerifiedChains</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">[</span><span class="op">]</span><span class="op">[</span><span class="op">]</span><span class="op">*</span><span class="ident">x509</span><span class="op">.</span><span class="ident">Certificate</span>&nbsp;<span class="comment">//&nbsp;verified&nbsp;chains&nbsp;built&nbsp;from&nbsp;PeerCertificates</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;TLSUnique&nbsp;contains&nbsp;the&nbsp;&#34;tls-unique&#34;&nbsp;channel&nbsp;binding&nbsp;value&nbsp;(see&nbsp;RFC</span><br>
+<span class="lineno">170</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;5929,&nbsp;section&nbsp;3).&nbsp;For&nbsp;resumed&nbsp;sessions&nbsp;this&nbsp;value&nbsp;will&nbsp;be&nbsp;nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;because&nbsp;resumption&nbsp;does&nbsp;not&nbsp;include&nbsp;enough&nbsp;context&nbsp;(see</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;https://secure-resumption.com/#channelbindings).&nbsp;This&nbsp;will&nbsp;change&nbsp;in</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;future&nbsp;versions&nbsp;of&nbsp;Go&nbsp;once&nbsp;the&nbsp;TLS&nbsp;master-secret&nbsp;fix&nbsp;has&nbsp;been</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;standardized&nbsp;and&nbsp;implemented.</span><br>
+<span class="lineno">175</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">TLSUnique</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ClientAuthType&nbsp;declares&nbsp;the&nbsp;policy&nbsp;the&nbsp;server&nbsp;will&nbsp;follow&nbsp;for</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;TLS&nbsp;Client&nbsp;Authentication.</span><br>
+<span class="lineno">180</span><span class="keyword">type</span>&nbsp;<span class="ident">ClientAuthType</span>&nbsp;<span class="builtintype">int</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">NoClientCert</span>&nbsp;<span class="ident">ClientAuthType</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">iota</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">RequestClientCert</span><br>
+<span class="lineno">185</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">RequireAnyClientCert</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">VerifyClientCertIfGiven</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">RequireAndVerifyClientCert</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">190</span><span class="comment">//&nbsp;ClientSessionState&nbsp;contains&nbsp;the&nbsp;state&nbsp;needed&nbsp;by&nbsp;clients&nbsp;to&nbsp;resume&nbsp;TLS</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;sessions.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">ClientSessionState</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sessionTicket</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">uint8</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;Encrypted&nbsp;ticket&nbsp;used&nbsp;for&nbsp;session&nbsp;resumption&nbsp;with&nbsp;server</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">vers</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">uint16</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;SSL/TLS&nbsp;version&nbsp;negotiated&nbsp;for&nbsp;the&nbsp;session</span><br>
+<span class="lineno">195</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">cipherSuite</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">uint16</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;Ciphersuite&nbsp;negotiated&nbsp;for&nbsp;the&nbsp;session</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">masterSecret</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;MasterSecret&nbsp;generated&nbsp;by&nbsp;client&nbsp;on&nbsp;a&nbsp;full&nbsp;handshake</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">serverCertificates</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="op">*</span><span class="ident">x509</span><span class="op">.</span><span class="ident">Certificate</span>&nbsp;<span class="comment">//&nbsp;Certificate&nbsp;chain&nbsp;presented&nbsp;by&nbsp;the&nbsp;server</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">200</span><span class="comment">//&nbsp;ClientSessionCache&nbsp;is&nbsp;a&nbsp;cache&nbsp;of&nbsp;ClientSessionState&nbsp;objects&nbsp;that&nbsp;can&nbsp;be&nbsp;used</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;by&nbsp;a&nbsp;client&nbsp;to&nbsp;resume&nbsp;a&nbsp;TLS&nbsp;session&nbsp;with&nbsp;a&nbsp;given&nbsp;server.&nbsp;ClientSessionCache</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;implementations&nbsp;should&nbsp;expect&nbsp;to&nbsp;be&nbsp;called&nbsp;concurrently&nbsp;from&nbsp;different</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;goroutines.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">ClientSessionCache</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">205</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Get&nbsp;searches&nbsp;for&nbsp;a&nbsp;ClientSessionState&nbsp;associated&nbsp;with&nbsp;the&nbsp;given&nbsp;key.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;On&nbsp;return,&nbsp;ok&nbsp;is&nbsp;true&nbsp;if&nbsp;one&nbsp;was&nbsp;found.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Get</span><span class="op">(</span><span class="ident">sessionKey</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">session</span>&nbsp;<span class="op">*</span><span class="ident">ClientSessionState</span><span class="op">,</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="builtintype">bool</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Put&nbsp;adds&nbsp;the&nbsp;ClientSessionState&nbsp;to&nbsp;the&nbsp;cache&nbsp;with&nbsp;the&nbsp;given&nbsp;key.</span><br>
+<span class="lineno">210</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Put</span><span class="op">(</span><span class="ident">sessionKey</span>&nbsp;<span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">cs</span>&nbsp;<span class="op">*</span><span class="ident">ClientSessionState</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ClientHelloInfo&nbsp;contains&nbsp;information&nbsp;from&nbsp;a&nbsp;ClientHello&nbsp;message&nbsp;in&nbsp;order&nbsp;to</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;guide&nbsp;certificate&nbsp;selection&nbsp;in&nbsp;the&nbsp;GetCertificate&nbsp;callback.</span><br>
+<span class="lineno">215</span><span class="keyword">type</span>&nbsp;<span class="ident">ClientHelloInfo</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;CipherSuites&nbsp;lists&nbsp;the&nbsp;CipherSuites&nbsp;supported&nbsp;by&nbsp;the&nbsp;client&nbsp;(e.g.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;TLS_RSA_WITH_RC4_128_SHA).</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">CipherSuites</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">uint16</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">220</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;ServerName&nbsp;indicates&nbsp;the&nbsp;name&nbsp;of&nbsp;the&nbsp;server&nbsp;requested&nbsp;by&nbsp;the&nbsp;client</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;in&nbsp;order&nbsp;to&nbsp;support&nbsp;virtual&nbsp;hosting.&nbsp;ServerName&nbsp;is&nbsp;only&nbsp;set&nbsp;if&nbsp;the</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;client&nbsp;is&nbsp;using&nbsp;SNI&nbsp;(see</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;http://tools.ietf.org/html/rfc4366#section-3.1).</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ServerName</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno">225</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;SupportedCurves&nbsp;lists&nbsp;the&nbsp;elliptic&nbsp;curves&nbsp;supported&nbsp;by&nbsp;the&nbsp;client.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;SupportedCurves&nbsp;is&nbsp;set&nbsp;only&nbsp;if&nbsp;the&nbsp;Supported&nbsp;Elliptic&nbsp;Curves</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Extension&nbsp;is&nbsp;being&nbsp;used&nbsp;(see</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;http://tools.ietf.org/html/rfc4492#section-5.1.1).</span><br>
+<span class="lineno">230</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">SupportedCurves</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="ident">CurveID</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;SupportedPoints&nbsp;lists&nbsp;the&nbsp;point&nbsp;formats&nbsp;supported&nbsp;by&nbsp;the&nbsp;client.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;SupportedPoints&nbsp;is&nbsp;set&nbsp;only&nbsp;if&nbsp;the&nbsp;Supported&nbsp;Point&nbsp;Formats&nbsp;Extension</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;is&nbsp;being&nbsp;used&nbsp;(see</span><br>
+<span class="lineno">235</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;http://tools.ietf.org/html/rfc4492#section-5.1.2).</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">SupportedPoints</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">uint8</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;A&nbsp;Config&nbsp;structure&nbsp;is&nbsp;used&nbsp;to&nbsp;configure&nbsp;a&nbsp;TLS&nbsp;client&nbsp;or&nbsp;server.</span><br>
+<span class="lineno">240</span><span class="comment">//&nbsp;After&nbsp;one&nbsp;has&nbsp;been&nbsp;passed&nbsp;to&nbsp;a&nbsp;TLS&nbsp;function&nbsp;it&nbsp;must&nbsp;not&nbsp;be</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;modified.&nbsp;A&nbsp;Config&nbsp;may&nbsp;be&nbsp;reused;&nbsp;the&nbsp;tls&nbsp;package&nbsp;will&nbsp;also&nbsp;not</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;modify&nbsp;it.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">Config</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Rand&nbsp;provides&nbsp;the&nbsp;source&nbsp;of&nbsp;entropy&nbsp;for&nbsp;nonces&nbsp;and&nbsp;RSA&nbsp;blinding.</span><br>
+<span class="lineno">245</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;If&nbsp;Rand&nbsp;is&nbsp;nil,&nbsp;TLS&nbsp;uses&nbsp;the&nbsp;cryptographic&nbsp;random&nbsp;reader&nbsp;in&nbsp;package</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;crypto/rand.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;The&nbsp;Reader&nbsp;must&nbsp;be&nbsp;safe&nbsp;for&nbsp;use&nbsp;by&nbsp;multiple&nbsp;goroutines.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Rand</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">Reader</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">250</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Time&nbsp;returns&nbsp;the&nbsp;current&nbsp;time&nbsp;as&nbsp;the&nbsp;number&nbsp;of&nbsp;seconds&nbsp;since&nbsp;the&nbsp;epoch.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;If&nbsp;Time&nbsp;is&nbsp;nil,&nbsp;TLS&nbsp;uses&nbsp;time.Now.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Time</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="ident">time</span><span class="op">.</span><span class="ident">Time</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Certificates&nbsp;contains&nbsp;one&nbsp;or&nbsp;more&nbsp;certificate&nbsp;chains</span><br>
+<span class="lineno">255</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;to&nbsp;present&nbsp;to&nbsp;the&nbsp;other&nbsp;side&nbsp;of&nbsp;the&nbsp;connection.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Server&nbsp;configurations&nbsp;must&nbsp;include&nbsp;at&nbsp;least&nbsp;one&nbsp;certificate.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Certificates</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="ident">Certificate</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;NameToCertificate&nbsp;maps&nbsp;from&nbsp;a&nbsp;certificate&nbsp;name&nbsp;to&nbsp;an&nbsp;element&nbsp;of</span><br>
+<span class="lineno">260</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Certificates.&nbsp;Note&nbsp;that&nbsp;a&nbsp;certificate&nbsp;name&nbsp;can&nbsp;be&nbsp;of&nbsp;the&nbsp;form</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;&#39;*.example.com&#39;&nbsp;and&nbsp;so&nbsp;doesn&#39;t&nbsp;have&nbsp;to&nbsp;be&nbsp;a&nbsp;domain&nbsp;name&nbsp;as&nbsp;such.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;See&nbsp;Config.BuildNameToCertificate</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;The&nbsp;nil&nbsp;value&nbsp;causes&nbsp;the&nbsp;first&nbsp;element&nbsp;of&nbsp;Certificates&nbsp;to&nbsp;be&nbsp;used</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;for&nbsp;all&nbsp;connections.</span><br>
+<span class="lineno">265</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">NameToCertificate</span>&nbsp;<span class="keyword">map</span><span class="op">[</span><span class="builtintype">string</span><span class="op">]</span><span class="op">*</span><span class="ident">Certificate</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;GetCertificate&nbsp;returns&nbsp;a&nbsp;Certificate&nbsp;based&nbsp;on&nbsp;the&nbsp;given</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;ClientHelloInfo.&nbsp;If&nbsp;GetCertificate&nbsp;is&nbsp;nil&nbsp;or&nbsp;returns&nbsp;nil,&nbsp;then&nbsp;the</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;certificate&nbsp;is&nbsp;retrieved&nbsp;from&nbsp;NameToCertificate.&nbsp;If</span><br>
+<span class="lineno">270</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;NameToCertificate&nbsp;is&nbsp;nil,&nbsp;the&nbsp;first&nbsp;element&nbsp;of&nbsp;Certificates&nbsp;will&nbsp;be</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;used.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">GetCertificate</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="ident">clientHello</span>&nbsp;<span class="op">*</span><span class="ident">ClientHelloInfo</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="op">*</span><span class="ident">Certificate</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;RootCAs&nbsp;defines&nbsp;the&nbsp;set&nbsp;of&nbsp;root&nbsp;certificate&nbsp;authorities</span><br>
+<span class="lineno">275</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;that&nbsp;clients&nbsp;use&nbsp;when&nbsp;verifying&nbsp;server&nbsp;certificates.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;If&nbsp;RootCAs&nbsp;is&nbsp;nil,&nbsp;TLS&nbsp;uses&nbsp;the&nbsp;host&#39;s&nbsp;root&nbsp;CA&nbsp;set.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">RootCAs</span>&nbsp;<span class="op">*</span><span class="ident">x509</span><span class="op">.</span><span class="ident">CertPool</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;NextProtos&nbsp;is&nbsp;a&nbsp;list&nbsp;of&nbsp;supported,&nbsp;application&nbsp;level&nbsp;protocols.</span><br>
+<span class="lineno">280</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">NextProtos</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">string</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;ServerName&nbsp;is&nbsp;used&nbsp;to&nbsp;verify&nbsp;the&nbsp;hostname&nbsp;on&nbsp;the&nbsp;returned</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;certificates&nbsp;unless&nbsp;InsecureSkipVerify&nbsp;is&nbsp;given.&nbsp;It&nbsp;is&nbsp;also&nbsp;included</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;in&nbsp;the&nbsp;client&#39;s&nbsp;handshake&nbsp;to&nbsp;support&nbsp;virtual&nbsp;hosting.</span><br>
+<span class="lineno">285</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ServerName</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;ClientAuth&nbsp;determines&nbsp;the&nbsp;server&#39;s&nbsp;policy&nbsp;for</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;TLS&nbsp;Client&nbsp;Authentication.&nbsp;The&nbsp;default&nbsp;is&nbsp;NoClientCert.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ClientAuth</span>&nbsp;<span class="ident">ClientAuthType</span><br>
+<span class="lineno">290</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;ClientCAs&nbsp;defines&nbsp;the&nbsp;set&nbsp;of&nbsp;root&nbsp;certificate&nbsp;authorities</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;that&nbsp;servers&nbsp;use&nbsp;if&nbsp;required&nbsp;to&nbsp;verify&nbsp;a&nbsp;client&nbsp;certificate</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;by&nbsp;the&nbsp;policy&nbsp;in&nbsp;ClientAuth.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ClientCAs</span>&nbsp;<span class="op">*</span><span class="ident">x509</span><span class="op">.</span><span class="ident">CertPool</span><br>
+<span class="lineno">295</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;InsecureSkipVerify&nbsp;controls&nbsp;whether&nbsp;a&nbsp;client&nbsp;verifies&nbsp;the</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;server&#39;s&nbsp;certificate&nbsp;chain&nbsp;and&nbsp;host&nbsp;name.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;If&nbsp;InsecureSkipVerify&nbsp;is&nbsp;true,&nbsp;TLS&nbsp;accepts&nbsp;any&nbsp;certificate</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;presented&nbsp;by&nbsp;the&nbsp;server&nbsp;and&nbsp;any&nbsp;host&nbsp;name&nbsp;in&nbsp;that&nbsp;certificate.</span><br>
+<span class="lineno">300</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;In&nbsp;this&nbsp;mode,&nbsp;TLS&nbsp;is&nbsp;susceptible&nbsp;to&nbsp;man-in-the-middle&nbsp;attacks.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;This&nbsp;should&nbsp;be&nbsp;used&nbsp;only&nbsp;for&nbsp;testing.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">InsecureSkipVerify</span>&nbsp;<span class="builtintype">bool</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;CipherSuites&nbsp;is&nbsp;a&nbsp;list&nbsp;of&nbsp;supported&nbsp;cipher&nbsp;suites.&nbsp;If&nbsp;CipherSuites</span><br>
+<span class="lineno">305</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;is&nbsp;nil,&nbsp;TLS&nbsp;uses&nbsp;a&nbsp;list&nbsp;of&nbsp;suites&nbsp;supported&nbsp;by&nbsp;the&nbsp;implementation.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">CipherSuites</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">uint16</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;PreferServerCipherSuites&nbsp;controls&nbsp;whether&nbsp;the&nbsp;server&nbsp;selects&nbsp;the</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;client&#39;s&nbsp;most&nbsp;preferred&nbsp;ciphersuite,&nbsp;or&nbsp;the&nbsp;server&#39;s&nbsp;most&nbsp;preferred</span><br>
+<span class="lineno">310</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;ciphersuite.&nbsp;If&nbsp;true&nbsp;then&nbsp;the&nbsp;server&#39;s&nbsp;preference,&nbsp;as&nbsp;expressed&nbsp;in</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;the&nbsp;order&nbsp;of&nbsp;elements&nbsp;in&nbsp;CipherSuites,&nbsp;is&nbsp;used.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">PreferServerCipherSuites</span>&nbsp;<span class="builtintype">bool</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;SessionTicketsDisabled&nbsp;may&nbsp;be&nbsp;set&nbsp;to&nbsp;true&nbsp;to&nbsp;disable&nbsp;session&nbsp;ticket</span><br>
+<span class="lineno">315</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;(resumption)&nbsp;support.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">SessionTicketsDisabled</span>&nbsp;<span class="builtintype">bool</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;SessionTicketKey&nbsp;is&nbsp;used&nbsp;by&nbsp;TLS&nbsp;servers&nbsp;to&nbsp;provide&nbsp;session</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;resumption.&nbsp;See&nbsp;RFC&nbsp;5077.&nbsp;If&nbsp;zero,&nbsp;it&nbsp;will&nbsp;be&nbsp;filled&nbsp;with</span><br>
+<span class="lineno">320</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;random&nbsp;data&nbsp;before&nbsp;the&nbsp;first&nbsp;server&nbsp;handshake.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;If&nbsp;multiple&nbsp;servers&nbsp;are&nbsp;terminating&nbsp;connections&nbsp;for&nbsp;the&nbsp;same&nbsp;host</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;they&nbsp;should&nbsp;all&nbsp;have&nbsp;the&nbsp;same&nbsp;SessionTicketKey.&nbsp;If&nbsp;the</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;SessionTicketKey&nbsp;leaks,&nbsp;previously&nbsp;recorded&nbsp;and&nbsp;future&nbsp;TLS</span><br>
+<span class="lineno">325</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;connections&nbsp;using&nbsp;that&nbsp;key&nbsp;are&nbsp;compromised.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">SessionTicketKey</span>&nbsp;<span class="op">[</span><span class="num">32</span><span class="op">]</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;SessionCache&nbsp;is&nbsp;a&nbsp;cache&nbsp;of&nbsp;ClientSessionState&nbsp;entries&nbsp;for&nbsp;TLS&nbsp;session</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;resumption.</span><br>
+<span class="lineno">330</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ClientSessionCache</span>&nbsp;<span class="ident">ClientSessionCache</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;MinVersion&nbsp;contains&nbsp;the&nbsp;minimum&nbsp;SSL/TLS&nbsp;version&nbsp;that&nbsp;is&nbsp;acceptable.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;If&nbsp;zero,&nbsp;then&nbsp;SSLv3&nbsp;is&nbsp;taken&nbsp;as&nbsp;the&nbsp;minimum.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">MinVersion</span>&nbsp;<span class="builtintype">uint16</span><br>
+<span class="lineno">335</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;MaxVersion&nbsp;contains&nbsp;the&nbsp;maximum&nbsp;SSL/TLS&nbsp;version&nbsp;that&nbsp;is&nbsp;acceptable.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;If&nbsp;zero,&nbsp;then&nbsp;the&nbsp;maximum&nbsp;version&nbsp;supported&nbsp;by&nbsp;this&nbsp;package&nbsp;is&nbsp;used,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;which&nbsp;is&nbsp;currently&nbsp;TLS&nbsp;1.2.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">MaxVersion</span>&nbsp;<span class="builtintype">uint16</span><br>
+<span class="lineno">340</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;CurvePreferences&nbsp;contains&nbsp;the&nbsp;elliptic&nbsp;curves&nbsp;that&nbsp;will&nbsp;be&nbsp;used&nbsp;in</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;an&nbsp;ECDHE&nbsp;handshake,&nbsp;in&nbsp;preference&nbsp;order.&nbsp;If&nbsp;empty,&nbsp;the&nbsp;default&nbsp;will</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;be&nbsp;used.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">CurvePreferences</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="ident">CurveID</span><br>
+<span class="lineno">345</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">serverInitOnce</span>&nbsp;<span class="ident">sync</span><span class="op">.</span><span class="ident">Once</span>&nbsp;<span class="comment">//&nbsp;guards&nbsp;calling&nbsp;(*Config).serverInit</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">Config</span><span class="op">)</span>&nbsp;<span class="ident">serverInit</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">350</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">SessionTicketsDisabled</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;If&nbsp;the&nbsp;key&nbsp;has&nbsp;already&nbsp;been&nbsp;set&nbsp;then&nbsp;we&nbsp;have&nbsp;nothing&nbsp;to&nbsp;do.</span><br>
+<span class="lineno">355</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">b</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">SessionTicketKey</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">b</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">360</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">ReadFull</span><span class="op">(</span><span class="ident">c</span><span class="op">.</span><span class="ident">rand</span><span class="op">(</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">SessionTicketKey</span><span class="op">[</span><span class="op">:</span><span class="op">]</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">SessionTicketsDisabled</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">365</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">Config</span><span class="op">)</span>&nbsp;<span class="ident">rand</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">Reader</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">Rand</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">r</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">rand</span><span class="op">.</span><span class="ident">Reader</span><br>
+<span class="lineno">370</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">r</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">Config</span><span class="op">)</span>&nbsp;<span class="ident">time</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="ident">time</span><span class="op">.</span><span class="ident">Time</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">375</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">Time</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">t</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">time</span><span class="op">.</span><span class="ident">Now</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">t</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">380</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">Config</span><span class="op">)</span>&nbsp;<span class="ident">cipherSuites</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">uint16</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">CipherSuites</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">s</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">385</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">defaultCipherSuites</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">s</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">390</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">Config</span><span class="op">)</span>&nbsp;<span class="ident">minVersion</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">uint16</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">MinVersion</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">minVersion</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">MinVersion</span><br>
+<span class="lineno">395</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">Config</span><span class="op">)</span>&nbsp;<span class="ident">maxVersion</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">uint16</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">MaxVersion</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">maxVersion</span><br>
+<span class="lineno">400</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">MaxVersion</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">defaultCurvePreferences</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="ident">CurveID</span><span class="op">{</span><span class="ident">CurveP256</span><span class="op">,</span>&nbsp;<span class="ident">CurveP384</span><span class="op">,</span>&nbsp;<span class="ident">CurveP521</span><span class="op">}</span><br>
+<span class="lineno">405</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">Config</span><span class="op">)</span>&nbsp;<span class="ident">curvePreferences</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="ident">CurveID</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">||</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">c</span><span class="op">.</span><span class="ident">CurvePreferences</span><span class="op">)</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">defaultCurvePreferences</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">410</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">CurvePreferences</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;mutualVersion&nbsp;returns&nbsp;the&nbsp;protocol&nbsp;version&nbsp;to&nbsp;use&nbsp;given&nbsp;the&nbsp;advertised</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;version&nbsp;of&nbsp;the&nbsp;peer.</span><br>
+<span class="lineno">415</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">Config</span><span class="op">)</span>&nbsp;<span class="ident">mutualVersion</span><span class="op">(</span><span class="ident">vers</span>&nbsp;<span class="builtintype">uint16</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="builtintype">uint16</span><span class="op">,</span>&nbsp;<span class="builtintype">bool</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">minVersion</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">minVersion</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">maxVersion</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">maxVersion</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">vers</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">minVersion</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">420</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">vers</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="ident">maxVersion</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">vers</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">maxVersion</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">425</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">vers</span><span class="op">,</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;getCertificate&nbsp;returns&nbsp;the&nbsp;best&nbsp;certificate&nbsp;for&nbsp;the&nbsp;given&nbsp;ClientHelloInfo,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;defaulting&nbsp;to&nbsp;the&nbsp;first&nbsp;element&nbsp;of&nbsp;c.Certificates.</span><br>
+<span class="lineno">430</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">Config</span><span class="op">)</span>&nbsp;<span class="ident">getCertificate</span><span class="op">(</span><span class="ident">clientHello</span>&nbsp;<span class="op">*</span><span class="ident">ClientHelloInfo</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="op">*</span><span class="ident">Certificate</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">GetCertificate</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">cert</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">GetCertificate</span><span class="op">(</span><span class="ident">clientHello</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">cert</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">cert</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno">435</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">c</span><span class="op">.</span><span class="ident">Certificates</span><span class="op">)</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">1</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">NameToCertificate</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;There&#39;s&nbsp;only&nbsp;one&nbsp;choice,&nbsp;so&nbsp;no&nbsp;point&nbsp;doing&nbsp;any&nbsp;work.</span><br>
+<span class="lineno">440</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="op">&amp;</span><span class="ident">c</span><span class="op">.</span><span class="ident">Certificates</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">name</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">strings</span><span class="op">.</span><span class="ident">ToLower</span><span class="op">(</span><span class="ident">clientHello</span><span class="op">.</span><span class="ident">ServerName</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">name</span><span class="op">)</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">name</span><span class="op">[</span><span class="builtinfunc">len</span><span class="op">(</span><span class="ident">name</span><span class="op">)</span><span class="op">-</span><span class="num">1</span><span class="op">]</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;.&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">445</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">name</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">name</span><span class="op">[</span><span class="op">:</span><span class="builtinfunc">len</span><span class="op">(</span><span class="ident">name</span><span class="op">)</span><span class="op">-</span><span class="num">1</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">cert</span><span class="op">,</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">NameToCertificate</span><span class="op">[</span><span class="ident">name</span><span class="op">]</span><span class="op">;</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">cert</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno">450</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;try&nbsp;replacing&nbsp;labels&nbsp;in&nbsp;the&nbsp;name&nbsp;with&nbsp;wildcards&nbsp;until&nbsp;we&nbsp;get&nbsp;a</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;match.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">labels</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">strings</span><span class="op">.</span><span class="ident">Split</span><span class="op">(</span><span class="ident">name</span><span class="op">,</span>&nbsp;<span class="string">&#34;.&#34;</span><span class="op">)</span><br>
+<span class="lineno">455</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">labels</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">labels</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">&#34;*&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">candidate</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">strings</span><span class="op">.</span><span class="ident">Join</span><span class="op">(</span><span class="ident">labels</span><span class="op">,</span>&nbsp;<span class="string">&#34;.&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">cert</span><span class="op">,</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">NameToCertificate</span><span class="op">[</span><span class="ident">candidate</span><span class="op">]</span><span class="op">;</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">cert</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno">460</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;If&nbsp;nothing&nbsp;matches,&nbsp;return&nbsp;the&nbsp;first&nbsp;certificate.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="op">&amp;</span><span class="ident">c</span><span class="op">.</span><span class="ident">Certificates</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno">465</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;BuildNameToCertificate&nbsp;parses&nbsp;c.Certificates&nbsp;and&nbsp;builds&nbsp;c.NameToCertificate</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;from&nbsp;the&nbsp;CommonName&nbsp;and&nbsp;SubjectAlternateName&nbsp;fields&nbsp;of&nbsp;each&nbsp;of&nbsp;the&nbsp;leaf</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;certificates.</span><br>
+<span class="lineno">470</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">Config</span><span class="op">)</span>&nbsp;<span class="ident">BuildNameToCertificate</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">NameToCertificate</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">make</span><span class="op">(</span><span class="keyword">map</span><span class="op">[</span><span class="builtintype">string</span><span class="op">]</span><span class="op">*</span><span class="ident">Certificate</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">Certificates</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">cert</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">&amp;</span><span class="ident">c</span><span class="op">.</span><span class="ident">Certificates</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">x509Cert</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">x509</span><span class="op">.</span><span class="ident">ParseCertificate</span><span class="op">(</span><span class="ident">cert</span><span class="op">.</span><span class="ident">Certificate</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno">475</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">continue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">x509Cert</span><span class="op">.</span><span class="ident">Subject</span><span class="op">.</span><span class="ident">CommonName</span><span class="op">)</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">NameToCertificate</span><span class="op">[</span><span class="ident">x509Cert</span><span class="op">.</span><span class="ident">Subject</span><span class="op">.</span><span class="ident">CommonName</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">cert</span><br>
+<span class="lineno">480</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">san</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">x509Cert</span><span class="op">.</span><span class="ident">DNSNames</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">NameToCertificate</span><span class="op">[</span><span class="ident">san</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">cert</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">485</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;A&nbsp;Certificate&nbsp;is&nbsp;a&nbsp;chain&nbsp;of&nbsp;one&nbsp;or&nbsp;more&nbsp;certificates,&nbsp;leaf&nbsp;first.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">Certificate</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Certificate</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><br>
+<span class="lineno">490</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;PrivateKey&nbsp;contains&nbsp;the&nbsp;private&nbsp;key&nbsp;corresponding&nbsp;to&nbsp;the&nbsp;public&nbsp;key</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;in&nbsp;Leaf.&nbsp;For&nbsp;a&nbsp;server,&nbsp;this&nbsp;must&nbsp;be&nbsp;a&nbsp;*rsa.PrivateKey&nbsp;or</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;*ecdsa.PrivateKey.&nbsp;For&nbsp;a&nbsp;client&nbsp;doing&nbsp;client&nbsp;authentication,&nbsp;this</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;can&nbsp;be&nbsp;any&nbsp;type&nbsp;that&nbsp;implements&nbsp;crypto.Signer&nbsp;(which&nbsp;includes&nbsp;RSA</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;and&nbsp;ECDSA&nbsp;private&nbsp;keys).</span><br>
+<span class="lineno">495</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">PrivateKey</span>&nbsp;<span class="ident">crypto</span><span class="op">.</span><span class="ident">PrivateKey</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;OCSPStaple&nbsp;contains&nbsp;an&nbsp;optional&nbsp;OCSP&nbsp;response&nbsp;which&nbsp;will&nbsp;be&nbsp;served</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;to&nbsp;clients&nbsp;that&nbsp;request&nbsp;it.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">OCSPStaple</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Leaf&nbsp;is&nbsp;the&nbsp;parsed&nbsp;form&nbsp;of&nbsp;the&nbsp;leaf&nbsp;certificate,&nbsp;which&nbsp;may&nbsp;be</span><br>
+<span class="lineno">500</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;initialized&nbsp;using&nbsp;x509.ParseCertificate&nbsp;to&nbsp;reduce&nbsp;per-handshake</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;processing&nbsp;for&nbsp;TLS&nbsp;clients&nbsp;doing&nbsp;client&nbsp;authentication.&nbsp;If&nbsp;nil,&nbsp;the</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;leaf&nbsp;certificate&nbsp;will&nbsp;be&nbsp;parsed&nbsp;as&nbsp;needed.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Leaf</span>&nbsp;<span class="op">*</span><span class="ident">x509</span><span class="op">.</span><span class="ident">Certificate</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">505</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;A&nbsp;TLS&nbsp;record.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">record</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">contentType</span>&nbsp;&nbsp;<span class="ident">recordType</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">major</span><span class="op">,</span>&nbsp;<span class="ident">minor</span>&nbsp;<span class="builtintype">uint8</span><br>
+<span class="lineno">510</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">payload</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">handshakeMessage</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">marshal</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><br>
+<span class="lineno">515</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">unmarshal</span><span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;lruSessionCache&nbsp;is&nbsp;a&nbsp;ClientSessionCache&nbsp;implementation&nbsp;that&nbsp;uses&nbsp;an&nbsp;LRU</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;caching&nbsp;strategy.</span><br>
+<span class="lineno">520</span><span class="keyword">type</span>&nbsp;<span class="ident">lruSessionCache</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sync</span><span class="op">.</span><span class="ident">Mutex</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">m</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">map</span><span class="op">[</span><span class="builtintype">string</span><span class="op">]</span><span class="op">*</span><span class="ident">list</span><span class="op">.</span><span class="ident">Element</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">q</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">*</span><span class="ident">list</span><span class="op">.</span><span class="ident">List</span><br>
+<span class="lineno">525</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">capacity</span>&nbsp;<span class="builtintype">int</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">lruSessionCacheEntry</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sessionKey</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno">530</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">state</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">*</span><span class="ident">ClientSessionState</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;NewLRUClientSessionCache&nbsp;returns&nbsp;a&nbsp;ClientSessionCache&nbsp;with&nbsp;the&nbsp;given</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;capacity&nbsp;that&nbsp;uses&nbsp;an&nbsp;LRU&nbsp;strategy.&nbsp;If&nbsp;capacity&nbsp;is&nbsp;&lt;&nbsp;1,&nbsp;a&nbsp;default&nbsp;capacity</span><br>
+<span class="lineno">535</span><span class="comment">//&nbsp;is&nbsp;used&nbsp;instead.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">NewLRUClientSessionCache</span><span class="op">(</span><span class="ident">capacity</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="ident">ClientSessionCache</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">const</span>&nbsp;<span class="ident">defaultSessionCacheCapacity</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">64</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">capacity</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">1</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">540</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">capacity</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">defaultSessionCacheCapacity</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="op">&amp;</span><span class="ident">lruSessionCache</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">m</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtinfunc">make</span><span class="op">(</span><span class="keyword">map</span><span class="op">[</span><span class="builtintype">string</span><span class="op">]</span><span class="op">*</span><span class="ident">list</span><span class="op">.</span><span class="ident">Element</span><span class="op">)</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">q</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">list</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="op">)</span><span class="op">,</span><br>
+<span class="lineno">545</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">capacity</span><span class="op">:</span>&nbsp;<span class="ident">capacity</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Put&nbsp;adds&nbsp;the&nbsp;provided&nbsp;(sessionKey,&nbsp;cs)&nbsp;pair&nbsp;to&nbsp;the&nbsp;cache.</span><br>
+<span class="lineno">550</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">lruSessionCache</span><span class="op">)</span>&nbsp;<span class="ident">Put</span><span class="op">(</span><span class="ident">sessionKey</span>&nbsp;<span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">cs</span>&nbsp;<span class="op">*</span><span class="ident">ClientSessionState</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">Lock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">defer</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">Unlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">elem</span><span class="op">,</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">m</span><span class="op">[</span><span class="ident">sessionKey</span><span class="op">]</span><span class="op">;</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">555</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">entry</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">elem</span><span class="op">.</span><span class="ident">Value</span><span class="op">.</span><span class="op">(</span><span class="op">*</span><span class="ident">lruSessionCacheEntry</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">entry</span><span class="op">.</span><span class="ident">state</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">cs</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">q</span><span class="op">.</span><span class="ident">MoveToFront</span><span class="op">(</span><span class="ident">elem</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">560</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">q</span><span class="op">.</span><span class="ident">Len</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">capacity</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">entry</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">&amp;</span><span class="ident">lruSessionCacheEntry</span><span class="op">{</span><span class="ident">sessionKey</span><span class="op">,</span>&nbsp;<span class="ident">cs</span><span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">m</span><span class="op">[</span><span class="ident">sessionKey</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">q</span><span class="op">.</span><span class="ident">PushFront</span><span class="op">(</span><span class="ident">entry</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno">565</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">elem</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">q</span><span class="op">.</span><span class="ident">Back</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">entry</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">elem</span><span class="op">.</span><span class="ident">Value</span><span class="op">.</span><span class="op">(</span><span class="op">*</span><span class="ident">lruSessionCacheEntry</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">delete</span><span class="op">(</span><span class="ident">c</span><span class="op">.</span><span class="ident">m</span><span class="op">,</span>&nbsp;<span class="ident">entry</span><span class="op">.</span><span class="ident">sessionKey</span><span class="op">)</span><br>
+<span class="lineno">570</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">entry</span><span class="op">.</span><span class="ident">sessionKey</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">sessionKey</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">entry</span><span class="op">.</span><span class="ident">state</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">cs</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">q</span><span class="op">.</span><span class="ident">MoveToFront</span><span class="op">(</span><span class="ident">elem</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">m</span><span class="op">[</span><span class="ident">sessionKey</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">elem</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">575</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Get&nbsp;returns&nbsp;the&nbsp;ClientSessionState&nbsp;value&nbsp;associated&nbsp;with&nbsp;a&nbsp;given&nbsp;key.&nbsp;It</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;returns&nbsp;(nil,&nbsp;false)&nbsp;if&nbsp;no&nbsp;value&nbsp;is&nbsp;found.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">lruSessionCache</span><span class="op">)</span>&nbsp;<span class="ident">Get</span><span class="op">(</span><span class="ident">sessionKey</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="op">*</span><span class="ident">ClientSessionState</span><span class="op">,</span>&nbsp;<span class="builtintype">bool</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">Lock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">580</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">defer</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">Unlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">elem</span><span class="op">,</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">m</span><span class="op">[</span><span class="ident">sessionKey</span><span class="op">]</span><span class="op">;</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">q</span><span class="op">.</span><span class="ident">MoveToFront</span><span class="op">(</span><span class="ident">elem</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">elem</span><span class="op">.</span><span class="ident">Value</span><span class="op">.</span><span class="op">(</span><span class="op">*</span><span class="ident">lruSessionCacheEntry</span><span class="op">)</span><span class="op">.</span><span class="ident">state</span><span class="op">,</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno">585</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;TODO(jsing):&nbsp;Make&nbsp;these&nbsp;available&nbsp;to&nbsp;both&nbsp;crypto/x509&nbsp;and&nbsp;crypto/tls.</span><br>
+<span class="lineno">590</span><span class="keyword">type</span>&nbsp;<span class="ident">dsaSignature</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">R</span><span class="op">,</span>&nbsp;<span class="ident">S</span>&nbsp;<span class="op">*</span><span class="ident">big</span><span class="op">.</span><span class="ident">Int</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">ecdsaSignature</span>&nbsp;<span class="ident">dsaSignature</span><br>
+<span class="lineno">595</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">emptyConfig</span>&nbsp;<span class="ident">Config</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">defaultConfig</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">Config</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="op">&amp;</span><span class="ident">emptyConfig</span><br>
+<span class="lineno">600</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">once</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">sync</span><span class="op">.</span><span class="ident">Once</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">varDefaultCipherSuites</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">uint16</span><br>
+<span class="lineno">605</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">defaultCipherSuites</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">uint16</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">once</span><span class="op">.</span><span class="ident">Do</span><span class="op">(</span><span class="ident">initDefaultCipherSuites</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">varDefaultCipherSuites</span><br>
+<span class="lineno">610</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">initDefaultCipherSuites</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">varDefaultCipherSuites</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">make</span><span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">uint16</span><span class="op">,</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">cipherSuites</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span><span class="op">,</span>&nbsp;<span class="ident">suite</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">cipherSuites</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">615</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">varDefaultCipherSuites</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">suite</span><span class="op">.</span><span class="ident">id</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">unexpectedMessageError</span><span class="op">(</span><span class="ident">wanted</span><span class="op">,</span>&nbsp;<span class="ident">got</span>&nbsp;<span class="keyword">interface</span><span class="op">{</span><span class="op">}</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">620</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">fmt</span><span class="op">.</span><span class="ident">Errorf</span><span class="op">(</span><span class="string">&#34;tls:&nbsp;received&nbsp;unexpected&nbsp;handshake&nbsp;message&nbsp;of&nbsp;type&nbsp;%T&nbsp;when&nbsp;waiting&nbsp;for&nbsp;%T&#34;</span><span class="op">,</span>&nbsp;<span class="ident">got</span><span class="op">,</span>&nbsp;<span class="ident">wanted</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

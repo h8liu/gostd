@@ -1,0 +1,93 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2009&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="comment">//&nbsp;Package&nbsp;adler32&nbsp;implements&nbsp;the&nbsp;Adler-32&nbsp;checksum.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;It&nbsp;is&nbsp;defined&nbsp;in&nbsp;RFC&nbsp;1950:</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspAdler-32&nbsp;is&nbsp;composed&nbsp;of&nbsp;two&nbsp;sums&nbsp;accumulated&nbsp;per&nbsp;byte:&nbsp;s1&nbsp;is</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspthe&nbsp;sum&nbsp;of&nbsp;all&nbsp;bytes,&nbsp;s2&nbsp;is&nbsp;the&nbsp;sum&nbsp;of&nbsp;all&nbsp;s1&nbsp;values.&nbsp;Both&nbsp;sums</span><br>
+<span class="lineno">10</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspare&nbsp;done&nbsp;modulo&nbsp;65521.&nbsp;s1&nbsp;is&nbsp;initialized&nbsp;to&nbsp;1,&nbsp;s2&nbsp;to&nbsp;zero.&nbsp;&nbsp;The</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspAdler-32&nbsp;checksum&nbsp;is&nbsp;stored&nbsp;as&nbsp;s2*65536&nbsp;+&nbsp;s1&nbsp;in&nbsp;most-</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspsignificant-byte&nbsp;first&nbsp;(network)&nbsp;order.</span><br>
+<span class="lineno"></span><span class="keyword">package</span>&nbsp;<span class="ident">adler32</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">15</span><span class="keyword">import</span>&nbsp;<span class="string">&#34;hash&#34;</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;mod&nbsp;is&nbsp;the&nbsp;largest&nbsp;prime&nbsp;that&nbsp;is&nbsp;less&nbsp;than&nbsp;65536.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mod</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">65521</span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;nmax&nbsp;is&nbsp;the&nbsp;largest&nbsp;n&nbsp;such&nbsp;that</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;255&nbsp;*&nbsp;n&nbsp;*&nbsp;(n+1)&nbsp;/&nbsp;2&nbsp;+&nbsp;(n+1)&nbsp;*&nbsp;(mod-1)&nbsp;&lt;=&nbsp;2^32-1.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;It&nbsp;is&nbsp;mentioned&nbsp;in&nbsp;RFC&nbsp;1950&nbsp;(search&nbsp;for&nbsp;&#34;5552&#34;).</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nmax</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">5552</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno">25</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;size&nbsp;of&nbsp;an&nbsp;Adler-32&nbsp;checksum&nbsp;in&nbsp;bytes.</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">Size</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">4</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;digest&nbsp;represents&nbsp;the&nbsp;partial&nbsp;evaluation&nbsp;of&nbsp;a&nbsp;checksum.</span><br>
+<span class="lineno">30</span><span class="comment">//&nbsp;The&nbsp;low&nbsp;16&nbsp;bits&nbsp;are&nbsp;s1,&nbsp;the&nbsp;high&nbsp;16&nbsp;bits&nbsp;are&nbsp;s2.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">digest</span>&nbsp;<span class="builtintype">uint32</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">d</span>&nbsp;<span class="op">*</span><span class="ident">digest</span><span class="op">)</span>&nbsp;<span class="ident">Reset</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span>&nbsp;<span class="op">*</span><span class="ident">d</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">35</span><span class="comment">//&nbsp;New&nbsp;returns&nbsp;a&nbsp;new&nbsp;hash.Hash32&nbsp;computing&nbsp;the&nbsp;Adler-32&nbsp;checksum.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">New</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="ident">hash</span><span class="op">.</span><span class="ident">Hash32</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">new</span><span class="op">(</span><span class="ident">digest</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span><span class="op">.</span><span class="ident">Reset</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">d</span><br>
+<span class="lineno">40</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">d</span>&nbsp;<span class="op">*</span><span class="ident">digest</span><span class="op">)</span>&nbsp;<span class="ident">Size</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="ident">Size</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">d</span>&nbsp;<span class="op">*</span><span class="ident">digest</span><span class="op">)</span>&nbsp;<span class="ident">BlockSize</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="num">1</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno">45</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Add&nbsp;p&nbsp;to&nbsp;the&nbsp;running&nbsp;checksum&nbsp;d.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">update</span><span class="op">(</span><span class="ident">d</span>&nbsp;<span class="ident">digest</span><span class="op">,</span>&nbsp;<span class="ident">p</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="ident">digest</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s1</span><span class="op">,</span>&nbsp;<span class="ident">s2</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtintype">uint32</span><span class="op">(</span><span class="ident">d</span><span class="op">&amp;</span><span class="num">0xffff</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="builtintype">uint32</span><span class="op">(</span><span class="ident">d</span><span class="op">&gt;&gt;</span><span class="num">16</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">p</span><span class="op">)</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">q</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">p</span><span class="op">)</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="ident">nmax</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">,</span>&nbsp;<span class="ident">q</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">p</span><span class="op">[</span><span class="op">:</span><span class="ident">nmax</span><span class="op">]</span><span class="op">,</span>&nbsp;<span class="ident">p</span><span class="op">[</span><span class="ident">nmax</span><span class="op">:</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">p</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s1</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="builtintype">uint32</span><span class="op">(</span><span class="ident">x</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s2</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="ident">s1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s1</span>&nbsp;<span class="op">%=</span>&nbsp;<span class="ident">mod</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s2</span>&nbsp;<span class="op">%=</span>&nbsp;<span class="ident">mod</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">q</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">digest</span><span class="op">(</span><span class="ident">s2</span><span class="op">&lt;&lt;</span><span class="num">16</span>&nbsp;<span class="op">|</span>&nbsp;<span class="ident">s1</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">65</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">d</span>&nbsp;<span class="op">*</span><span class="ident">digest</span><span class="op">)</span>&nbsp;<span class="ident">Write</span><span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">nn</span>&nbsp;<span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">d</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">update</span><span class="op">(</span><span class="op">*</span><span class="ident">d</span><span class="op">,</span>&nbsp;<span class="ident">p</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">p</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">70</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">d</span>&nbsp;<span class="op">*</span><span class="ident">digest</span><span class="op">)</span>&nbsp;<span class="ident">Sum32</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">uint32</span>&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="builtintype">uint32</span><span class="op">(</span><span class="op">*</span><span class="ident">d</span><span class="op">)</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">d</span>&nbsp;<span class="op">*</span><span class="ident">digest</span><span class="op">)</span>&nbsp;<span class="ident">Sum</span><span class="op">(</span><span class="ident">in</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtintype">uint32</span><span class="op">(</span><span class="op">*</span><span class="ident">d</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="builtinfunc">append</span><span class="op">(</span><span class="ident">in</span><span class="op">,</span>&nbsp;<span class="builtintype">byte</span><span class="op">(</span><span class="ident">s</span><span class="op">&gt;&gt;</span><span class="num">24</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="builtintype">byte</span><span class="op">(</span><span class="ident">s</span><span class="op">&gt;&gt;</span><span class="num">16</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="builtintype">byte</span><span class="op">(</span><span class="ident">s</span><span class="op">&gt;&gt;</span><span class="num">8</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="builtintype">byte</span><span class="op">(</span><span class="ident">s</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno">75</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Checksum&nbsp;returns&nbsp;the&nbsp;Adler-32&nbsp;checksum&nbsp;of&nbsp;data.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">Checksum</span><span class="op">(</span><span class="ident">data</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="builtintype">uint32</span>&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="builtintype">uint32</span><span class="op">(</span><span class="ident">update</span><span class="op">(</span><span class="num">1</span><span class="op">,</span>&nbsp;<span class="ident">data</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">}</span>
+</div>
+</body>
+</html>

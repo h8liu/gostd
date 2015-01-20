@@ -1,0 +1,132 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2010&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">textproto</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;sync&#34;</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno">10</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;A&nbsp;Pipeline&nbsp;manages&nbsp;a&nbsp;pipelined&nbsp;in-order&nbsp;request/response&nbsp;sequence.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;To&nbsp;use&nbsp;a&nbsp;Pipeline&nbsp;p&nbsp;to&nbsp;manage&nbsp;multiple&nbsp;clients&nbsp;on&nbsp;a&nbsp;connection,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;each&nbsp;client&nbsp;should&nbsp;run:</span><br>
+<span class="lineno">15</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspid&nbsp;:=&nbsp;p.Next()&nbsp;&nbsp;&nbsp;&nbsp//&nbsp;take&nbsp;a&nbsp;number</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspp.StartRequest(id)&nbsp;&nbsp;&nbsp;&nbsp//&nbsp;wait&nbsp;for&nbsp;turn&nbsp;to&nbsp;send&nbsp;request</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp«send&nbsp;request»</span><br>
+<span class="lineno">20</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspp.EndRequest(id)&nbsp;&nbsp;&nbsp;&nbsp//&nbsp;notify&nbsp;Pipeline&nbsp;that&nbsp;request&nbsp;is&nbsp;sent</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspp.StartResponse(id)&nbsp;&nbsp;&nbsp;&nbsp//&nbsp;wait&nbsp;for&nbsp;turn&nbsp;to&nbsp;read&nbsp;response</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp«read&nbsp;response»</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspp.EndResponse(id)&nbsp;&nbsp;&nbsp;&nbsp//&nbsp;notify&nbsp;Pipeline&nbsp;that&nbsp;response&nbsp;is&nbsp;read</span><br>
+<span class="lineno">25</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;A&nbsp;pipelined&nbsp;server&nbsp;can&nbsp;use&nbsp;the&nbsp;same&nbsp;calls&nbsp;to&nbsp;ensure&nbsp;that</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;responses&nbsp;computed&nbsp;in&nbsp;parallel&nbsp;are&nbsp;written&nbsp;in&nbsp;the&nbsp;correct&nbsp;order.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">Pipeline</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mu</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">sync</span><span class="op">.</span><span class="ident">Mutex</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">id</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">uint</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">request</span>&nbsp;&nbsp;<span class="ident">sequencer</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">response</span>&nbsp;<span class="ident">sequencer</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">35</span><span class="comment">//&nbsp;Next&nbsp;returns&nbsp;the&nbsp;next&nbsp;id&nbsp;for&nbsp;a&nbsp;request/response&nbsp;pair.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">*</span><span class="ident">Pipeline</span><span class="op">)</span>&nbsp;<span class="ident">Next</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">uint</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">.</span><span class="ident">mu</span><span class="op">.</span><span class="ident">Lock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">id</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">p</span><span class="op">.</span><span class="ident">id</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">.</span><span class="ident">id</span><span class="op">++</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">.</span><span class="ident">mu</span><span class="op">.</span><span class="ident">Unlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">id</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;StartRequest&nbsp;blocks&nbsp;until&nbsp;it&nbsp;is&nbsp;time&nbsp;to&nbsp;send&nbsp;(or,&nbsp;if&nbsp;this&nbsp;is&nbsp;a&nbsp;server,&nbsp;receive)</span><br>
+<span class="lineno">45</span><span class="comment">//&nbsp;the&nbsp;request&nbsp;with&nbsp;the&nbsp;given&nbsp;id.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">*</span><span class="ident">Pipeline</span><span class="op">)</span>&nbsp;<span class="ident">StartRequest</span><span class="op">(</span><span class="ident">id</span>&nbsp;<span class="builtintype">uint</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">.</span><span class="ident">request</span><span class="op">.</span><span class="ident">Start</span><span class="op">(</span><span class="ident">id</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">50</span><span class="comment">//&nbsp;EndRequest&nbsp;notifies&nbsp;p&nbsp;that&nbsp;the&nbsp;request&nbsp;with&nbsp;the&nbsp;given&nbsp;id&nbsp;has&nbsp;been&nbsp;sent</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;(or,&nbsp;if&nbsp;this&nbsp;is&nbsp;a&nbsp;server,&nbsp;received).</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">*</span><span class="ident">Pipeline</span><span class="op">)</span>&nbsp;<span class="ident">EndRequest</span><span class="op">(</span><span class="ident">id</span>&nbsp;<span class="builtintype">uint</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">.</span><span class="ident">request</span><span class="op">.</span><span class="ident">End</span><span class="op">(</span><span class="ident">id</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">55</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;StartResponse&nbsp;blocks&nbsp;until&nbsp;it&nbsp;is&nbsp;time&nbsp;to&nbsp;receive&nbsp;(or,&nbsp;if&nbsp;this&nbsp;is&nbsp;a&nbsp;server,&nbsp;send)</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;the&nbsp;request&nbsp;with&nbsp;the&nbsp;given&nbsp;id.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">*</span><span class="ident">Pipeline</span><span class="op">)</span>&nbsp;<span class="ident">StartResponse</span><span class="op">(</span><span class="ident">id</span>&nbsp;<span class="builtintype">uint</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">.</span><span class="ident">response</span><span class="op">.</span><span class="ident">Start</span><span class="op">(</span><span class="ident">id</span><span class="op">)</span><br>
+<span class="lineno">60</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;EndResponse&nbsp;notifies&nbsp;p&nbsp;that&nbsp;the&nbsp;response&nbsp;with&nbsp;the&nbsp;given&nbsp;id&nbsp;has&nbsp;been&nbsp;received</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;(or,&nbsp;if&nbsp;this&nbsp;is&nbsp;a&nbsp;server,&nbsp;sent).</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">*</span><span class="ident">Pipeline</span><span class="op">)</span>&nbsp;<span class="ident">EndResponse</span><span class="op">(</span><span class="ident">id</span>&nbsp;<span class="builtintype">uint</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">.</span><span class="ident">response</span><span class="op">.</span><span class="ident">End</span><span class="op">(</span><span class="ident">id</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;A&nbsp;sequencer&nbsp;schedules&nbsp;a&nbsp;sequence&nbsp;of&nbsp;numbered&nbsp;events&nbsp;that&nbsp;must</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;happen&nbsp;in&nbsp;order,&nbsp;one&nbsp;after&nbsp;the&nbsp;other.&nbsp;&nbsp;The&nbsp;event&nbsp;numbering&nbsp;must&nbsp;start</span><br>
+<span class="lineno">70</span><span class="comment">//&nbsp;at&nbsp;0&nbsp;and&nbsp;increment&nbsp;without&nbsp;skipping.&nbsp;&nbsp;The&nbsp;event&nbsp;number&nbsp;wraps&nbsp;around</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;safely&nbsp;as&nbsp;long&nbsp;as&nbsp;there&nbsp;are&nbsp;not&nbsp;2^32&nbsp;simultaneous&nbsp;events&nbsp;pending.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">sequencer</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mu</span>&nbsp;&nbsp;&nbsp;<span class="ident">sync</span><span class="op">.</span><span class="ident">Mutex</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">id</span>&nbsp;&nbsp;&nbsp;<span class="builtintype">uint</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">wait</span>&nbsp;<span class="keyword">map</span><span class="op">[</span><span class="builtintype">uint</span><span class="op">]</span><span class="keyword">chan</span>&nbsp;<span class="builtintype">uint</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Start&nbsp;waits&nbsp;until&nbsp;it&nbsp;is&nbsp;time&nbsp;for&nbsp;the&nbsp;event&nbsp;numbered&nbsp;id&nbsp;to&nbsp;begin.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;That&nbsp;is,&nbsp;except&nbsp;for&nbsp;the&nbsp;first&nbsp;event,&nbsp;it&nbsp;waits&nbsp;until&nbsp;End(id-1)&nbsp;has</span><br>
+<span class="lineno">80</span><span class="comment">//&nbsp;been&nbsp;called.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">sequencer</span><span class="op">)</span>&nbsp;<span class="ident">Start</span><span class="op">(</span><span class="ident">id</span>&nbsp;<span class="builtintype">uint</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">mu</span><span class="op">.</span><span class="ident">Lock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">id</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">id</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">mu</span><span class="op">.</span><span class="ident">Unlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">make</span><span class="op">(</span><span class="keyword">chan</span>&nbsp;<span class="builtintype">uint</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">wait</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">wait</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">make</span><span class="op">(</span><span class="keyword">map</span><span class="op">[</span><span class="builtintype">uint</span><span class="op">]</span><span class="keyword">chan</span>&nbsp;<span class="builtintype">uint</span><span class="op">)</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">wait</span><span class="op">[</span><span class="ident">id</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">c</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">mu</span><span class="op">.</span><span class="ident">Unlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">&lt;-</span><span class="ident">c</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">95</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;End&nbsp;notifies&nbsp;the&nbsp;sequencer&nbsp;that&nbsp;the&nbsp;event&nbsp;numbered&nbsp;id&nbsp;has&nbsp;completed,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;allowing&nbsp;it&nbsp;to&nbsp;schedule&nbsp;the&nbsp;event&nbsp;numbered&nbsp;id+1.&nbsp;&nbsp;It&nbsp;is&nbsp;a&nbsp;run-time&nbsp;error</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;to&nbsp;call&nbsp;End&nbsp;with&nbsp;an&nbsp;id&nbsp;that&nbsp;is&nbsp;not&nbsp;the&nbsp;number&nbsp;of&nbsp;the&nbsp;active&nbsp;event.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">sequencer</span><span class="op">)</span>&nbsp;<span class="ident">End</span><span class="op">(</span><span class="ident">id</span>&nbsp;<span class="builtintype">uint</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">100</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">mu</span><span class="op">.</span><span class="ident">Lock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">id</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">id</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">panic</span><span class="op">(</span><span class="string">&#34;out&nbsp;of&nbsp;sync&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">id</span><span class="op">++</span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">id</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">id</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">wait</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">wait</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">make</span><span class="op">(</span><span class="keyword">map</span><span class="op">[</span><span class="builtintype">uint</span><span class="op">]</span><span class="keyword">chan</span>&nbsp;<span class="builtintype">uint</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">,</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">wait</span><span class="op">[</span><span class="ident">id</span><span class="op">]</span><br>
+<span class="lineno">110</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">delete</span><span class="op">(</span><span class="ident">s</span><span class="op">.</span><span class="ident">wait</span><span class="op">,</span>&nbsp;<span class="ident">id</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">mu</span><span class="op">.</span><span class="ident">Unlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">115</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span>&nbsp;<span class="op">&lt;-</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

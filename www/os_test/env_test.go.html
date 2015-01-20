@@ -1,0 +1,111 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2010&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">os_test</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">.</span>&nbsp;<span class="string">&#34;os&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;reflect&#34;</span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;strings&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;testing&#34;</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;testGetenv&nbsp;gives&nbsp;us&nbsp;a&nbsp;controlled&nbsp;set&nbsp;of&nbsp;variables&nbsp;for&nbsp;testing&nbsp;Expand.</span><br>
+<span class="lineno">15</span><span class="keyword">func</span>&nbsp;<span class="ident">testGetenv</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="ident">s</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="string">&#34;*&#34;</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="string">&#34;all&nbsp;the&nbsp;args&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="string">&#34;#&#34;</span><span class="op">:</span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="string">&#34;NARGS&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="string">&#34;$&#34;</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="string">&#34;PID&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="string">&#34;1&#34;</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="string">&#34;ARGUMENT1&#34;</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="string">&#34;HOME&#34;</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="string">&#34;/usr/gopher&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="string">&#34;H&#34;</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="string">&#34;(Value&nbsp;of&nbsp;H)&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="string">&#34;home_1&#34;</span><span class="op">:</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="string">&#34;/usr/foo&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="string">&#34;_&#34;</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="string">&#34;underscore&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="string">&#34;&#34;</span><br>
+<span class="lineno">35</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">expandTests</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">in</span><span class="op">,</span>&nbsp;<span class="ident">out</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span><span class="op">}</span><span class="op">{</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;&#34;</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;$*&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;all&nbsp;the&nbsp;args&#34;</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;$$&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;PID&#34;</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;${*}&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;all&nbsp;the&nbsp;args&#34;</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;$1&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;ARGUMENT1&#34;</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;${1}&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;ARGUMENT1&#34;</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;now&nbsp;is&nbsp;the&nbsp;time&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;now&nbsp;is&nbsp;the&nbsp;time&#34;</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;$HOME&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;/usr/gopher&#34;</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;$home_1&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;/usr/foo&#34;</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;${HOME}&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;/usr/gopher&#34;</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;${H}OME&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;(Value&nbsp;of&nbsp;H)OME&#34;</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;A$$$#$1$H$home_1*B&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;APIDNARGSARGUMENT1(Value&nbsp;of&nbsp;H)/usr/foo*B&#34;</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">TestExpand</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">test</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">expandTests</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">result</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">Expand</span><span class="op">(</span><span class="ident">test</span><span class="op">.</span><span class="ident">in</span><span class="op">,</span>&nbsp;<span class="ident">testGetenv</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">result</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">test</span><span class="op">.</span><span class="ident">out</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Errorf</span><span class="op">(</span><span class="string">&#34;Expand(%q)=%q;&nbsp;expected&nbsp;%q&#34;</span><span class="op">,</span>&nbsp;<span class="ident">test</span><span class="op">.</span><span class="ident">in</span><span class="op">,</span>&nbsp;<span class="ident">result</span><span class="op">,</span>&nbsp;<span class="ident">test</span><span class="op">.</span><span class="ident">out</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">TestConsistentEnviron</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">e0</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">Environ</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="num">0</span><span class="op">;</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">10</span><span class="op">;</span>&nbsp;<span class="ident">i</span><span class="op">++</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">e1</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">Environ</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">reflect</span><span class="op">.</span><span class="ident">DeepEqual</span><span class="op">(</span><span class="ident">e0</span><span class="op">,</span>&nbsp;<span class="ident">e1</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;environment&nbsp;changed&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">TestUnsetenv</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">const</span>&nbsp;<span class="ident">testKey</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">&#34;GO_TEST_UNSETENV&#34;</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">set</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">prefix</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">testKey</span>&nbsp;<span class="op">+</span>&nbsp;<span class="string">&#34;=&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">key</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">Environ</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">strings</span><span class="op">.</span><span class="ident">HasPrefix</span><span class="op">(</span><span class="ident">key</span><span class="op">,</span>&nbsp;<span class="ident">prefix</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">Setenv</span><span class="op">(</span><span class="ident">testKey</span><span class="op">,</span>&nbsp;<span class="string">&#34;1&#34;</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;Setenv:&nbsp;%v&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">set</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Error</span><span class="op">(</span><span class="string">&#34;Setenv&nbsp;didn&#39;t&nbsp;set&nbsp;TestUnsetenv&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">Unsetenv</span><span class="op">(</span><span class="ident">testKey</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;Unsetenv:&nbsp;%v&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">set</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatal</span><span class="op">(</span><span class="string">&#34;Unsetenv&nbsp;didn&#39;t&nbsp;clear&nbsp;TestUnsetenv&#34;</span><span class="op">)</span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

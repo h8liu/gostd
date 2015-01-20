@@ -1,0 +1,103 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2009&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="comment">//&nbsp;Package&nbsp;iotest&nbsp;implements&nbsp;Readers&nbsp;and&nbsp;Writers&nbsp;useful&nbsp;mainly&nbsp;for&nbsp;testing.</span><br>
+<span class="lineno"></span><span class="keyword">package</span>&nbsp;<span class="ident">iotest</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;errors&#34;</span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;io&#34;</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;OneByteReader&nbsp;returns&nbsp;a&nbsp;Reader&nbsp;that&nbsp;implements</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;each&nbsp;non-empty&nbsp;Read&nbsp;by&nbsp;reading&nbsp;one&nbsp;byte&nbsp;from&nbsp;r.</span><br>
+<span class="lineno">15</span><span class="keyword">func</span>&nbsp;<span class="ident">OneByteReader</span><span class="op">(</span><span class="ident">r</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">Reader</span><span class="op">)</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">Reader</span>&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="op">&amp;</span><span class="ident">oneByteReader</span><span class="op">{</span><span class="ident">r</span><span class="op">}</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">oneByteReader</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">Reader</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">20</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">r</span>&nbsp;<span class="op">*</span><span class="ident">oneByteReader</span><span class="op">)</span>&nbsp;<span class="ident">Read</span><span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">p</span><span class="op">)</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">r</span><span class="op">.</span><span class="ident">Read</span><span class="op">(</span><span class="ident">p</span><span class="op">[</span><span class="num">0</span><span class="op">:</span><span class="num">1</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;HalfReader&nbsp;returns&nbsp;a&nbsp;Reader&nbsp;that&nbsp;implements&nbsp;Read</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;by&nbsp;reading&nbsp;half&nbsp;as&nbsp;many&nbsp;requested&nbsp;bytes&nbsp;from&nbsp;r.</span><br>
+<span class="lineno">30</span><span class="keyword">func</span>&nbsp;<span class="ident">HalfReader</span><span class="op">(</span><span class="ident">r</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">Reader</span><span class="op">)</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">Reader</span>&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="op">&amp;</span><span class="ident">halfReader</span><span class="op">{</span><span class="ident">r</span><span class="op">}</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">halfReader</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">Reader</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">35</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">r</span>&nbsp;<span class="op">*</span><span class="ident">halfReader</span><span class="op">)</span>&nbsp;<span class="ident">Read</span><span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">r</span><span class="op">.</span><span class="ident">Read</span><span class="op">(</span><span class="ident">p</span><span class="op">[</span><span class="num">0</span>&nbsp;<span class="op">:</span>&nbsp;<span class="op">(</span><span class="builtinfunc">len</span><span class="op">(</span><span class="ident">p</span><span class="op">)</span><span class="op">+</span><span class="num">1</span><span class="op">)</span><span class="op">/</span><span class="num">2</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">40</span><span class="comment">//&nbsp;DataErrReader&nbsp;changes&nbsp;the&nbsp;way&nbsp;errors&nbsp;are&nbsp;handled&nbsp;by&nbsp;a&nbsp;Reader.&nbsp;Normally,&nbsp;a</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Reader&nbsp;returns&nbsp;an&nbsp;error&nbsp;(typically&nbsp;EOF)&nbsp;from&nbsp;the&nbsp;first&nbsp;Read&nbsp;call&nbsp;after&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;last&nbsp;piece&nbsp;of&nbsp;data&nbsp;is&nbsp;read.&nbsp;DataErrReader&nbsp;wraps&nbsp;a&nbsp;Reader&nbsp;and&nbsp;changes&nbsp;its</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;behavior&nbsp;so&nbsp;the&nbsp;final&nbsp;error&nbsp;is&nbsp;returned&nbsp;along&nbsp;with&nbsp;the&nbsp;final&nbsp;data,&nbsp;instead</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;of&nbsp;in&nbsp;the&nbsp;first&nbsp;call&nbsp;after&nbsp;the&nbsp;final&nbsp;data.</span><br>
+<span class="lineno">45</span><span class="keyword">func</span>&nbsp;<span class="ident">DataErrReader</span><span class="op">(</span><span class="ident">r</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">Reader</span><span class="op">)</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">Reader</span>&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="op">&amp;</span><span class="ident">dataErrReader</span><span class="op">{</span><span class="ident">r</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="builtinfunc">make</span><span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="num">1024</span><span class="op">)</span><span class="op">}</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">dataErrReader</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">Reader</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">unread</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">data</span>&nbsp;&nbsp;&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">r</span>&nbsp;<span class="op">*</span><span class="ident">dataErrReader</span><span class="op">)</span>&nbsp;<span class="ident">Read</span><span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">n</span>&nbsp;<span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;loop&nbsp;because&nbsp;first&nbsp;call&nbsp;needs&nbsp;two&nbsp;reads:</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;one&nbsp;to&nbsp;get&nbsp;data&nbsp;and&nbsp;a&nbsp;second&nbsp;to&nbsp;look&nbsp;for&nbsp;an&nbsp;error.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">r</span><span class="op">.</span><span class="ident">unread</span><span class="op">)</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n1</span><span class="op">,</span>&nbsp;<span class="ident">err1</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">r</span><span class="op">.</span><span class="ident">Read</span><span class="op">(</span><span class="ident">r</span><span class="op">.</span><span class="ident">data</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span><span class="op">.</span><span class="ident">unread</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">data</span><span class="op">[</span><span class="num">0</span><span class="op">:</span><span class="ident">n1</span><span class="op">]</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">err1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">break</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">copy</span><span class="op">(</span><span class="ident">p</span><span class="op">,</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">unread</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span><span class="op">.</span><span class="ident">unread</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">unread</span><span class="op">[</span><span class="ident">n</span><span class="op">:</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">70</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">ErrTimeout</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">errors</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="string">&#34;timeout&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;TimeoutReader&nbsp;returns&nbsp;ErrTimeout&nbsp;on&nbsp;the&nbsp;second&nbsp;read</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;with&nbsp;no&nbsp;data.&nbsp;&nbsp;Subsequent&nbsp;calls&nbsp;to&nbsp;read&nbsp;succeed.</span><br>
+<span class="lineno">75</span><span class="keyword">func</span>&nbsp;<span class="ident">TimeoutReader</span><span class="op">(</span><span class="ident">r</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">Reader</span><span class="op">)</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">Reader</span>&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="op">&amp;</span><span class="ident">timeoutReader</span><span class="op">{</span><span class="ident">r</span><span class="op">,</span>&nbsp;<span class="num">0</span><span class="op">}</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">timeoutReader</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">Reader</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">count</span>&nbsp;<span class="builtintype">int</span><br>
+<span class="lineno">80</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">r</span>&nbsp;<span class="op">*</span><span class="ident">timeoutReader</span><span class="op">)</span>&nbsp;<span class="ident">Read</span><span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span><span class="op">.</span><span class="ident">count</span><span class="op">++</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">count</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">2</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">ErrTimeout</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">r</span><span class="op">.</span><span class="ident">Read</span><span class="op">(</span><span class="ident">p</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

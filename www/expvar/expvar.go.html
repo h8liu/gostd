@@ -1,0 +1,351 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2009&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="comment">//&nbsp;Package&nbsp;expvar&nbsp;provides&nbsp;a&nbsp;standardized&nbsp;interface&nbsp;to&nbsp;public&nbsp;variables,&nbsp;such</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;as&nbsp;operation&nbsp;counters&nbsp;in&nbsp;servers.&nbsp;It&nbsp;exposes&nbsp;these&nbsp;variables&nbsp;via&nbsp;HTTP&nbsp;at</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;/debug/vars&nbsp;in&nbsp;JSON&nbsp;format.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Operations&nbsp;to&nbsp;set&nbsp;or&nbsp;modify&nbsp;these&nbsp;public&nbsp;variables&nbsp;are&nbsp;atomic.</span><br>
+<span class="lineno">10</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;In&nbsp;addition&nbsp;to&nbsp;adding&nbsp;the&nbsp;HTTP&nbsp;handler,&nbsp;this&nbsp;package&nbsp;registers&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;following&nbsp;variables:</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspcmdline&nbsp;&nbsp;&nbsp;os.Args</span><br>
+<span class="lineno">15</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspmemstats&nbsp;&nbsp;runtime.Memstats</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;package&nbsp;is&nbsp;sometimes&nbsp;only&nbsp;imported&nbsp;for&nbsp;the&nbsp;side&nbsp;effect&nbsp;of</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;registering&nbsp;its&nbsp;HTTP&nbsp;handler&nbsp;and&nbsp;the&nbsp;above&nbsp;variables.&nbsp;&nbsp;To&nbsp;use&nbsp;it</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;this&nbsp;way,&nbsp;link&nbsp;this&nbsp;package&nbsp;into&nbsp;your&nbsp;program:</span><br>
+<span class="lineno">20</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspimport&nbsp;_&nbsp;&#34;expvar&#34;</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="keyword">package</span>&nbsp;<span class="ident">expvar</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;bytes&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;encoding/json&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;fmt&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;log&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;net/http&#34;</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;os&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;runtime&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;sort&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;strconv&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;sync&#34;</span><br>
+<span class="lineno">35</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Var&nbsp;is&nbsp;an&nbsp;abstract&nbsp;type&nbsp;for&nbsp;all&nbsp;exported&nbsp;variables.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">Var</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">String</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno">40</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Int&nbsp;is&nbsp;a&nbsp;64-bit&nbsp;integer&nbsp;variable&nbsp;that&nbsp;satisfies&nbsp;the&nbsp;Var&nbsp;interface.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">Int</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mu</span>&nbsp;<span class="ident">sync</span><span class="op">.</span><span class="ident">RWMutex</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">i</span>&nbsp;&nbsp;<span class="ident">int64</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">v</span>&nbsp;<span class="op">*</span><span class="ident">Int</span><span class="op">)</span>&nbsp;<span class="ident">String</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span><span class="op">.</span><span class="ident">mu</span><span class="op">.</span><span class="ident">RLock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">defer</span>&nbsp;<span class="ident">v</span><span class="op">.</span><span class="ident">mu</span><span class="op">.</span><span class="ident">RUnlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">strconv</span><span class="op">.</span><span class="ident">FormatInt</span><span class="op">(</span><span class="ident">v</span><span class="op">.</span><span class="ident">i</span><span class="op">,</span>&nbsp;<span class="num">10</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">v</span>&nbsp;<span class="op">*</span><span class="ident">Int</span><span class="op">)</span>&nbsp;<span class="ident">Add</span><span class="op">(</span><span class="ident">delta</span>&nbsp;<span class="ident">int64</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span><span class="op">.</span><span class="ident">mu</span><span class="op">.</span><span class="ident">Lock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">defer</span>&nbsp;<span class="ident">v</span><span class="op">.</span><span class="ident">mu</span><span class="op">.</span><span class="ident">Unlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span><span class="op">.</span><span class="ident">i</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="ident">delta</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">60</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">v</span>&nbsp;<span class="op">*</span><span class="ident">Int</span><span class="op">)</span>&nbsp;<span class="ident">Set</span><span class="op">(</span><span class="ident">value</span>&nbsp;<span class="ident">int64</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span><span class="op">.</span><span class="ident">mu</span><span class="op">.</span><span class="ident">Lock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">defer</span>&nbsp;<span class="ident">v</span><span class="op">.</span><span class="ident">mu</span><span class="op">.</span><span class="ident">Unlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span><span class="op">.</span><span class="ident">i</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">value</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">65</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Float&nbsp;is&nbsp;a&nbsp;64-bit&nbsp;float&nbsp;variable&nbsp;that&nbsp;satisfies&nbsp;the&nbsp;Var&nbsp;interface.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">Float</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mu</span>&nbsp;<span class="ident">sync</span><span class="op">.</span><span class="ident">RWMutex</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">f</span>&nbsp;&nbsp;<span class="builtintype">float64</span><br>
+<span class="lineno">70</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">v</span>&nbsp;<span class="op">*</span><span class="ident">Float</span><span class="op">)</span>&nbsp;<span class="ident">String</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span><span class="op">.</span><span class="ident">mu</span><span class="op">.</span><span class="ident">RLock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">defer</span>&nbsp;<span class="ident">v</span><span class="op">.</span><span class="ident">mu</span><span class="op">.</span><span class="ident">RUnlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">strconv</span><span class="op">.</span><span class="ident">FormatFloat</span><span class="op">(</span><span class="ident">v</span><span class="op">.</span><span class="ident">f</span><span class="op">,</span>&nbsp;<span class="string">&#39;g&#39;</span><span class="op">,</span>&nbsp;<span class="op">-</span><span class="num">1</span><span class="op">,</span>&nbsp;<span class="num">64</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Add&nbsp;adds&nbsp;delta&nbsp;to&nbsp;v.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">v</span>&nbsp;<span class="op">*</span><span class="ident">Float</span><span class="op">)</span>&nbsp;<span class="ident">Add</span><span class="op">(</span><span class="ident">delta</span>&nbsp;<span class="builtintype">float64</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span><span class="op">.</span><span class="ident">mu</span><span class="op">.</span><span class="ident">Lock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">defer</span>&nbsp;<span class="ident">v</span><span class="op">.</span><span class="ident">mu</span><span class="op">.</span><span class="ident">Unlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span><span class="op">.</span><span class="ident">f</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="ident">delta</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">85</span><span class="comment">//&nbsp;Set&nbsp;sets&nbsp;v&nbsp;to&nbsp;value.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">v</span>&nbsp;<span class="op">*</span><span class="ident">Float</span><span class="op">)</span>&nbsp;<span class="ident">Set</span><span class="op">(</span><span class="ident">value</span>&nbsp;<span class="builtintype">float64</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span><span class="op">.</span><span class="ident">mu</span><span class="op">.</span><span class="ident">Lock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">defer</span>&nbsp;<span class="ident">v</span><span class="op">.</span><span class="ident">mu</span><span class="op">.</span><span class="ident">Unlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span><span class="op">.</span><span class="ident">f</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">value</span><br>
+<span class="lineno">90</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Map&nbsp;is&nbsp;a&nbsp;string-to-Var&nbsp;map&nbsp;variable&nbsp;that&nbsp;satisfies&nbsp;the&nbsp;Var&nbsp;interface.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">Map</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mu</span>&nbsp;&nbsp;&nbsp;<span class="ident">sync</span><span class="op">.</span><span class="ident">RWMutex</span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">m</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">map</span><span class="op">[</span><span class="builtintype">string</span><span class="op">]</span><span class="ident">Var</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">keys</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">string</span>&nbsp;<span class="comment">//&nbsp;sorted</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;KeyValue&nbsp;represents&nbsp;a&nbsp;single&nbsp;entry&nbsp;in&nbsp;a&nbsp;Map.</span><br>
+<span class="lineno">100</span><span class="keyword">type</span>&nbsp;<span class="ident">KeyValue</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Key</span>&nbsp;&nbsp;&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Value</span>&nbsp;<span class="ident">Var</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">105</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">v</span>&nbsp;<span class="op">*</span><span class="ident">Map</span><span class="op">)</span>&nbsp;<span class="ident">String</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span><span class="op">.</span><span class="ident">mu</span><span class="op">.</span><span class="ident">RLock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">defer</span>&nbsp;<span class="ident">v</span><span class="op">.</span><span class="ident">mu</span><span class="op">.</span><span class="ident">RUnlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">b</span>&nbsp;<span class="ident">bytes</span><span class="op">.</span><span class="ident">Buffer</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fmt</span><span class="op">.</span><span class="ident">Fprintf</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">b</span><span class="op">,</span>&nbsp;<span class="string">&#34;{&#34;</span><span class="op">)</span><br>
+<span class="lineno">110</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">first</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span><span class="op">.</span><span class="ident">doLocked</span><span class="op">(</span><span class="keyword">func</span><span class="op">(</span><span class="ident">kv</span>&nbsp;<span class="ident">KeyValue</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">first</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fmt</span><span class="op">.</span><span class="ident">Fprintf</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">b</span><span class="op">,</span>&nbsp;<span class="string">&#34;,&nbsp;&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">115</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fmt</span><span class="op">.</span><span class="ident">Fprintf</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">b</span><span class="op">,</span>&nbsp;<span class="string">&#34;%q:&nbsp;%v&#34;</span><span class="op">,</span>&nbsp;<span class="ident">kv</span><span class="op">.</span><span class="ident">Key</span><span class="op">,</span>&nbsp;<span class="ident">kv</span><span class="op">.</span><span class="ident">Value</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">first</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fmt</span><span class="op">.</span><span class="ident">Fprintf</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">b</span><span class="op">,</span>&nbsp;<span class="string">&#34;}&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">b</span><span class="op">.</span><span class="ident">String</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">120</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">v</span>&nbsp;<span class="op">*</span><span class="ident">Map</span><span class="op">)</span>&nbsp;<span class="ident">Init</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">Map</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span><span class="op">.</span><span class="ident">m</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">make</span><span class="op">(</span><span class="keyword">map</span><span class="op">[</span><span class="builtintype">string</span><span class="op">]</span><span class="ident">Var</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">v</span><br>
+<span class="lineno">125</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;updateKeys&nbsp;updates&nbsp;the&nbsp;sorted&nbsp;list&nbsp;of&nbsp;keys&nbsp;in&nbsp;v.keys.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;must&nbsp;be&nbsp;called&nbsp;with&nbsp;v.mu&nbsp;held.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">v</span>&nbsp;<span class="op">*</span><span class="ident">Map</span><span class="op">)</span>&nbsp;<span class="ident">updateKeys</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">130</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">v</span><span class="op">.</span><span class="ident">m</span><span class="op">)</span>&nbsp;<span class="op">==</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">v</span><span class="op">.</span><span class="ident">keys</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;No&nbsp;new&nbsp;key.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span><span class="op">.</span><span class="ident">keys</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">v</span><span class="op">.</span><span class="ident">keys</span><span class="op">[</span><span class="op">:</span><span class="num">0</span><span class="op">]</span><br>
+<span class="lineno">135</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">k</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">v</span><span class="op">.</span><span class="ident">m</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span><span class="op">.</span><span class="ident">keys</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">append</span><span class="op">(</span><span class="ident">v</span><span class="op">.</span><span class="ident">keys</span><span class="op">,</span>&nbsp;<span class="ident">k</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sort</span><span class="op">.</span><span class="ident">Strings</span><span class="op">(</span><span class="ident">v</span><span class="op">.</span><span class="ident">keys</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">140</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">v</span>&nbsp;<span class="op">*</span><span class="ident">Map</span><span class="op">)</span>&nbsp;<span class="ident">Get</span><span class="op">(</span><span class="ident">key</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="ident">Var</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span><span class="op">.</span><span class="ident">mu</span><span class="op">.</span><span class="ident">RLock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">defer</span>&nbsp;<span class="ident">v</span><span class="op">.</span><span class="ident">mu</span><span class="op">.</span><span class="ident">RUnlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">v</span><span class="op">.</span><span class="ident">m</span><span class="op">[</span><span class="ident">key</span><span class="op">]</span><br>
+<span class="lineno">145</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">v</span>&nbsp;<span class="op">*</span><span class="ident">Map</span><span class="op">)</span>&nbsp;<span class="ident">Set</span><span class="op">(</span><span class="ident">key</span>&nbsp;<span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">av</span>&nbsp;<span class="ident">Var</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span><span class="op">.</span><span class="ident">mu</span><span class="op">.</span><span class="ident">Lock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">defer</span>&nbsp;<span class="ident">v</span><span class="op">.</span><span class="ident">mu</span><span class="op">.</span><span class="ident">Unlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">150</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span><span class="op">.</span><span class="ident">m</span><span class="op">[</span><span class="ident">key</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">av</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span><span class="op">.</span><span class="ident">updateKeys</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">v</span>&nbsp;<span class="op">*</span><span class="ident">Map</span><span class="op">)</span>&nbsp;<span class="ident">Add</span><span class="op">(</span><span class="ident">key</span>&nbsp;<span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">delta</span>&nbsp;<span class="ident">int64</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">155</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span><span class="op">.</span><span class="ident">mu</span><span class="op">.</span><span class="ident">RLock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">av</span><span class="op">,</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">v</span><span class="op">.</span><span class="ident">m</span><span class="op">[</span><span class="ident">key</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span><span class="op">.</span><span class="ident">mu</span><span class="op">.</span><span class="ident">RUnlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">ok</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;check&nbsp;again&nbsp;under&nbsp;the&nbsp;write&nbsp;lock</span><br>
+<span class="lineno">160</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span><span class="op">.</span><span class="ident">mu</span><span class="op">.</span><span class="ident">Lock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">av</span><span class="op">,</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">v</span><span class="op">.</span><span class="ident">m</span><span class="op">[</span><span class="ident">key</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">ok</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">av</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">new</span><span class="op">(</span><span class="ident">Int</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span><span class="op">.</span><span class="ident">m</span><span class="op">[</span><span class="ident">key</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">av</span><br>
+<span class="lineno">165</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span><span class="op">.</span><span class="ident">updateKeys</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span><span class="op">.</span><span class="ident">mu</span><span class="op">.</span><span class="ident">Unlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">170</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Add&nbsp;to&nbsp;Int;&nbsp;ignore&nbsp;otherwise.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">iv</span><span class="op">,</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">av</span><span class="op">.</span><span class="op">(</span><span class="op">*</span><span class="ident">Int</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">iv</span><span class="op">.</span><span class="ident">Add</span><span class="op">(</span><span class="ident">delta</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">175</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;AddFloat&nbsp;adds&nbsp;delta&nbsp;to&nbsp;the&nbsp;*Float&nbsp;value&nbsp;stored&nbsp;under&nbsp;the&nbsp;given&nbsp;map&nbsp;key.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">v</span>&nbsp;<span class="op">*</span><span class="ident">Map</span><span class="op">)</span>&nbsp;<span class="ident">AddFloat</span><span class="op">(</span><span class="ident">key</span>&nbsp;<span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">delta</span>&nbsp;<span class="builtintype">float64</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span><span class="op">.</span><span class="ident">mu</span><span class="op">.</span><span class="ident">RLock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">av</span><span class="op">,</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">v</span><span class="op">.</span><span class="ident">m</span><span class="op">[</span><span class="ident">key</span><span class="op">]</span><br>
+<span class="lineno">180</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span><span class="op">.</span><span class="ident">mu</span><span class="op">.</span><span class="ident">RUnlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">ok</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;check&nbsp;again&nbsp;under&nbsp;the&nbsp;write&nbsp;lock</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span><span class="op">.</span><span class="ident">mu</span><span class="op">.</span><span class="ident">Lock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">av</span><span class="op">,</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">v</span><span class="op">.</span><span class="ident">m</span><span class="op">[</span><span class="ident">key</span><span class="op">]</span><br>
+<span class="lineno">185</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">ok</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">av</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">new</span><span class="op">(</span><span class="ident">Float</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span><span class="op">.</span><span class="ident">m</span><span class="op">[</span><span class="ident">key</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">av</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span><span class="op">.</span><span class="ident">updateKeys</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">190</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span><span class="op">.</span><span class="ident">mu</span><span class="op">.</span><span class="ident">Unlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Add&nbsp;to&nbsp;Float;&nbsp;ignore&nbsp;otherwise.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">iv</span><span class="op">,</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">av</span><span class="op">.</span><span class="op">(</span><span class="op">*</span><span class="ident">Float</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">195</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">iv</span><span class="op">.</span><span class="ident">Add</span><span class="op">(</span><span class="ident">delta</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Do&nbsp;calls&nbsp;f&nbsp;for&nbsp;each&nbsp;entry&nbsp;in&nbsp;the&nbsp;map.</span><br>
+<span class="lineno">200</span><span class="comment">//&nbsp;The&nbsp;map&nbsp;is&nbsp;locked&nbsp;during&nbsp;the&nbsp;iteration,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;but&nbsp;existing&nbsp;entries&nbsp;may&nbsp;be&nbsp;concurrently&nbsp;updated.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">v</span>&nbsp;<span class="op">*</span><span class="ident">Map</span><span class="op">)</span>&nbsp;<span class="ident">Do</span><span class="op">(</span><span class="ident">f</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="ident">KeyValue</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span><span class="op">.</span><span class="ident">mu</span><span class="op">.</span><span class="ident">RLock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">defer</span>&nbsp;<span class="ident">v</span><span class="op">.</span><span class="ident">mu</span><span class="op">.</span><span class="ident">RUnlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">205</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span><span class="op">.</span><span class="ident">doLocked</span><span class="op">(</span><span class="ident">f</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;doLocked&nbsp;calls&nbsp;f&nbsp;for&nbsp;each&nbsp;entry&nbsp;in&nbsp;the&nbsp;map.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;v.mu&nbsp;must&nbsp;be&nbsp;held&nbsp;for&nbsp;reads.</span><br>
+<span class="lineno">210</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">v</span>&nbsp;<span class="op">*</span><span class="ident">Map</span><span class="op">)</span>&nbsp;<span class="ident">doLocked</span><span class="op">(</span><span class="ident">f</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="ident">KeyValue</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">k</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">v</span><span class="op">.</span><span class="ident">keys</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">f</span><span class="op">(</span><span class="ident">KeyValue</span><span class="op">{</span><span class="ident">k</span><span class="op">,</span>&nbsp;<span class="ident">v</span><span class="op">.</span><span class="ident">m</span><span class="op">[</span><span class="ident">k</span><span class="op">]</span><span class="op">}</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">215</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;String&nbsp;is&nbsp;a&nbsp;string&nbsp;variable,&nbsp;and&nbsp;satisfies&nbsp;the&nbsp;Var&nbsp;interface.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">String</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mu</span>&nbsp;<span class="ident">sync</span><span class="op">.</span><span class="ident">RWMutex</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno">220</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">v</span>&nbsp;<span class="op">*</span><span class="ident">String</span><span class="op">)</span>&nbsp;<span class="ident">String</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span><span class="op">.</span><span class="ident">mu</span><span class="op">.</span><span class="ident">RLock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">defer</span>&nbsp;<span class="ident">v</span><span class="op">.</span><span class="ident">mu</span><span class="op">.</span><span class="ident">RUnlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">225</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">strconv</span><span class="op">.</span><span class="ident">Quote</span><span class="op">(</span><span class="ident">v</span><span class="op">.</span><span class="ident">s</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">v</span>&nbsp;<span class="op">*</span><span class="ident">String</span><span class="op">)</span>&nbsp;<span class="ident">Set</span><span class="op">(</span><span class="ident">value</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span><span class="op">.</span><span class="ident">mu</span><span class="op">.</span><span class="ident">Lock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">230</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">defer</span>&nbsp;<span class="ident">v</span><span class="op">.</span><span class="ident">mu</span><span class="op">.</span><span class="ident">Unlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span><span class="op">.</span><span class="ident">s</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">value</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Func&nbsp;implements&nbsp;Var&nbsp;by&nbsp;calling&nbsp;the&nbsp;function</span><br>
+<span class="lineno">235</span><span class="comment">//&nbsp;and&nbsp;formatting&nbsp;the&nbsp;returned&nbsp;value&nbsp;using&nbsp;JSON.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">Func</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="keyword">interface</span><span class="op">{</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">f</span>&nbsp;<span class="ident">Func</span><span class="op">)</span>&nbsp;<span class="ident">String</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span><span class="op">,</span>&nbsp;<span class="ident">_</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">json</span><span class="op">.</span><span class="ident">Marshal</span><span class="op">(</span><span class="ident">f</span><span class="op">(</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno">240</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="builtintype">string</span><span class="op">(</span><span class="ident">v</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;All&nbsp;published&nbsp;variables.</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno">245</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mutex</span>&nbsp;&nbsp;&nbsp;<span class="ident">sync</span><span class="op">.</span><span class="ident">RWMutex</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">vars</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">make</span><span class="op">(</span><span class="keyword">map</span><span class="op">[</span><span class="builtintype">string</span><span class="op">]</span><span class="ident">Var</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">varKeys</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">string</span>&nbsp;<span class="comment">//&nbsp;sorted</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">250</span><span class="comment">//&nbsp;Publish&nbsp;declares&nbsp;a&nbsp;named&nbsp;exported&nbsp;variable.&nbsp;This&nbsp;should&nbsp;be&nbsp;called&nbsp;from&nbsp;a</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;package&#39;s&nbsp;init&nbsp;function&nbsp;when&nbsp;it&nbsp;creates&nbsp;its&nbsp;Vars.&nbsp;If&nbsp;the&nbsp;name&nbsp;is&nbsp;already</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;registered&nbsp;then&nbsp;this&nbsp;will&nbsp;log.Panic.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">Publish</span><span class="op">(</span><span class="ident">name</span>&nbsp;<span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">v</span>&nbsp;<span class="ident">Var</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mutex</span><span class="op">.</span><span class="ident">Lock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">255</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">defer</span>&nbsp;<span class="ident">mutex</span><span class="op">.</span><span class="ident">Unlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">existing</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">vars</span><span class="op">[</span><span class="ident">name</span><span class="op">]</span><span class="op">;</span>&nbsp;<span class="ident">existing</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">log</span><span class="op">.</span><span class="ident">Panicln</span><span class="op">(</span><span class="string">&#34;Reuse&nbsp;of&nbsp;exported&nbsp;var&nbsp;name:&#34;</span><span class="op">,</span>&nbsp;<span class="ident">name</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">vars</span><span class="op">[</span><span class="ident">name</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">v</span><br>
+<span class="lineno">260</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">varKeys</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">append</span><span class="op">(</span><span class="ident">varKeys</span><span class="op">,</span>&nbsp;<span class="ident">name</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sort</span><span class="op">.</span><span class="ident">Strings</span><span class="op">(</span><span class="ident">varKeys</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Get&nbsp;retrieves&nbsp;a&nbsp;named&nbsp;exported&nbsp;variable.</span><br>
+<span class="lineno">265</span><span class="keyword">func</span>&nbsp;<span class="ident">Get</span><span class="op">(</span><span class="ident">name</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="ident">Var</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mutex</span><span class="op">.</span><span class="ident">RLock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">defer</span>&nbsp;<span class="ident">mutex</span><span class="op">.</span><span class="ident">RUnlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">vars</span><span class="op">[</span><span class="ident">name</span><span class="op">]</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">270</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Convenience&nbsp;functions&nbsp;for&nbsp;creating&nbsp;new&nbsp;exported&nbsp;variables.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">NewInt</span><span class="op">(</span><span class="ident">name</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">Int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">new</span><span class="op">(</span><span class="ident">Int</span><span class="op">)</span><br>
+<span class="lineno">275</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Publish</span><span class="op">(</span><span class="ident">name</span><span class="op">,</span>&nbsp;<span class="ident">v</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">v</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">NewFloat</span><span class="op">(</span><span class="ident">name</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">Float</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">280</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">new</span><span class="op">(</span><span class="ident">Float</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Publish</span><span class="op">(</span><span class="ident">name</span><span class="op">,</span>&nbsp;<span class="ident">v</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">v</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">285</span><span class="keyword">func</span>&nbsp;<span class="ident">NewMap</span><span class="op">(</span><span class="ident">name</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">Map</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">new</span><span class="op">(</span><span class="ident">Map</span><span class="op">)</span><span class="op">.</span><span class="ident">Init</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Publish</span><span class="op">(</span><span class="ident">name</span><span class="op">,</span>&nbsp;<span class="ident">v</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">v</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">290</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">NewString</span><span class="op">(</span><span class="ident">name</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">String</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">new</span><span class="op">(</span><span class="ident">String</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Publish</span><span class="op">(</span><span class="ident">name</span><span class="op">,</span>&nbsp;<span class="ident">v</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">v</span><br>
+<span class="lineno">295</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Do&nbsp;calls&nbsp;f&nbsp;for&nbsp;each&nbsp;exported&nbsp;variable.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;global&nbsp;variable&nbsp;map&nbsp;is&nbsp;locked&nbsp;during&nbsp;the&nbsp;iteration,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;but&nbsp;existing&nbsp;entries&nbsp;may&nbsp;be&nbsp;concurrently&nbsp;updated.</span><br>
+<span class="lineno">300</span><span class="keyword">func</span>&nbsp;<span class="ident">Do</span><span class="op">(</span><span class="ident">f</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="ident">KeyValue</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mutex</span><span class="op">.</span><span class="ident">RLock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">defer</span>&nbsp;<span class="ident">mutex</span><span class="op">.</span><span class="ident">RUnlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">k</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">varKeys</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">f</span><span class="op">(</span><span class="ident">KeyValue</span><span class="op">{</span><span class="ident">k</span><span class="op">,</span>&nbsp;<span class="ident">vars</span><span class="op">[</span><span class="ident">k</span><span class="op">]</span><span class="op">}</span><span class="op">)</span><br>
+<span class="lineno">305</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">expvarHandler</span><span class="op">(</span><span class="ident">w</span>&nbsp;<span class="ident">http</span><span class="op">.</span><span class="ident">ResponseWriter</span><span class="op">,</span>&nbsp;<span class="ident">r</span>&nbsp;<span class="op">*</span><span class="ident">http</span><span class="op">.</span><span class="ident">Request</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">w</span><span class="op">.</span><span class="ident">Header</span><span class="op">(</span><span class="op">)</span><span class="op">.</span><span class="ident">Set</span><span class="op">(</span><span class="string">&#34;Content-Type&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;application/json;&nbsp;charset=utf-8&#34;</span><span class="op">)</span><br>
+<span class="lineno">310</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fmt</span><span class="op">.</span><span class="ident">Fprintf</span><span class="op">(</span><span class="ident">w</span><span class="op">,</span>&nbsp;<span class="string">&#34;{\n&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">first</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Do</span><span class="op">(</span><span class="keyword">func</span><span class="op">(</span><span class="ident">kv</span>&nbsp;<span class="ident">KeyValue</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">first</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fmt</span><span class="op">.</span><span class="ident">Fprintf</span><span class="op">(</span><span class="ident">w</span><span class="op">,</span>&nbsp;<span class="string">&#34;,\n&#34;</span><span class="op">)</span><br>
+<span class="lineno">315</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">first</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fmt</span><span class="op">.</span><span class="ident">Fprintf</span><span class="op">(</span><span class="ident">w</span><span class="op">,</span>&nbsp;<span class="string">&#34;%q:&nbsp;%s&#34;</span><span class="op">,</span>&nbsp;<span class="ident">kv</span><span class="op">.</span><span class="ident">Key</span><span class="op">,</span>&nbsp;<span class="ident">kv</span><span class="op">.</span><span class="ident">Value</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fmt</span><span class="op">.</span><span class="ident">Fprintf</span><span class="op">(</span><span class="ident">w</span><span class="op">,</span>&nbsp;<span class="string">&#34;\n}\n&#34;</span><span class="op">)</span><br>
+<span class="lineno">320</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">cmdline</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="keyword">interface</span><span class="op">{</span><span class="op">}</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">os</span><span class="op">.</span><span class="ident">Args</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">325</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">memstats</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="keyword">interface</span><span class="op">{</span><span class="op">}</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stats</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">new</span><span class="op">(</span><span class="ident">runtime</span><span class="op">.</span><span class="ident">MemStats</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">runtime</span><span class="op">.</span><span class="ident">ReadMemStats</span><span class="op">(</span><span class="ident">stats</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="op">*</span><span class="ident">stats</span><br>
+<span class="lineno">330</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">init</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">http</span><span class="op">.</span><span class="ident">HandleFunc</span><span class="op">(</span><span class="string">&#34;/debug/vars&#34;</span><span class="op">,</span>&nbsp;<span class="ident">expvarHandler</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Publish</span><span class="op">(</span><span class="string">&#34;cmdline&#34;</span><span class="op">,</span>&nbsp;<span class="ident">Func</span><span class="op">(</span><span class="ident">cmdline</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno">335</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Publish</span><span class="op">(</span><span class="string">&#34;memstats&#34;</span><span class="op">,</span>&nbsp;<span class="ident">Func</span><span class="op">(</span><span class="ident">memstats</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

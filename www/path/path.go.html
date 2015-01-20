@@ -1,0 +1,225 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2009&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="comment">//&nbsp;Package&nbsp;path&nbsp;implements&nbsp;utility&nbsp;routines&nbsp;for&nbsp;manipulating&nbsp;slash-separated</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;paths.</span><br>
+<span class="lineno"></span><span class="keyword">package</span>&nbsp;<span class="ident">path</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;strings&#34;</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;A&nbsp;lazybuf&nbsp;is&nbsp;a&nbsp;lazily&nbsp;constructed&nbsp;path&nbsp;buffer.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;It&nbsp;supports&nbsp;append,&nbsp;reading&nbsp;previously&nbsp;appended&nbsp;bytes,</span><br>
+<span class="lineno">15</span><span class="comment">//&nbsp;and&nbsp;retrieving&nbsp;the&nbsp;final&nbsp;string.&nbsp;It&nbsp;does&nbsp;not&nbsp;allocate&nbsp;a&nbsp;buffer</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;to&nbsp;hold&nbsp;the&nbsp;output&nbsp;until&nbsp;that&nbsp;output&nbsp;diverges&nbsp;from&nbsp;s.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">lazybuf</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;&nbsp;&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">buf</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">w</span>&nbsp;&nbsp;&nbsp;<span class="builtintype">int</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">b</span>&nbsp;<span class="op">*</span><span class="ident">lazybuf</span><span class="op">)</span>&nbsp;<span class="ident">index</span><span class="op">(</span><span class="ident">i</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">byte</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">b</span><span class="op">.</span><span class="ident">buf</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">b</span><span class="op">.</span><span class="ident">buf</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">b</span><span class="op">.</span><span class="ident">s</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">30</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">b</span>&nbsp;<span class="op">*</span><span class="ident">lazybuf</span><span class="op">)</span>&nbsp;<span class="builtinfunc">append</span><span class="op">(</span><span class="ident">c</span>&nbsp;<span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">b</span><span class="op">.</span><span class="ident">buf</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">b</span><span class="op">.</span><span class="ident">w</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">b</span><span class="op">.</span><span class="ident">s</span><span class="op">)</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">b</span><span class="op">.</span><span class="ident">s</span><span class="op">[</span><span class="ident">b</span><span class="op">.</span><span class="ident">w</span><span class="op">]</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span><span class="op">.</span><span class="ident">w</span><span class="op">++</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span><span class="op">.</span><span class="ident">buf</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">make</span><span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">b</span><span class="op">.</span><span class="ident">s</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">copy</span><span class="op">(</span><span class="ident">b</span><span class="op">.</span><span class="ident">buf</span><span class="op">,</span>&nbsp;<span class="ident">b</span><span class="op">.</span><span class="ident">s</span><span class="op">[</span><span class="op">:</span><span class="ident">b</span><span class="op">.</span><span class="ident">w</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span><span class="op">.</span><span class="ident">buf</span><span class="op">[</span><span class="ident">b</span><span class="op">.</span><span class="ident">w</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">c</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span><span class="op">.</span><span class="ident">w</span><span class="op">++</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">b</span>&nbsp;<span class="op">*</span><span class="ident">lazybuf</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">b</span><span class="op">.</span><span class="ident">buf</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">b</span><span class="op">.</span><span class="ident">s</span><span class="op">[</span><span class="op">:</span><span class="ident">b</span><span class="op">.</span><span class="ident">w</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="builtintype">string</span><span class="op">(</span><span class="ident">b</span><span class="op">.</span><span class="ident">buf</span><span class="op">[</span><span class="op">:</span><span class="ident">b</span><span class="op">.</span><span class="ident">w</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">50</span><span class="comment">//&nbsp;Clean&nbsp;returns&nbsp;the&nbsp;shortest&nbsp;path&nbsp;name&nbsp;equivalent&nbsp;to&nbsp;path</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;by&nbsp;purely&nbsp;lexical&nbsp;processing.&nbsp;&nbsp;It&nbsp;applies&nbsp;the&nbsp;following&nbsp;rules</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;iteratively&nbsp;until&nbsp;no&nbsp;further&nbsp;processing&nbsp;can&nbsp;be&nbsp;done:</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp1.&nbsp;Replace&nbsp;multiple&nbsp;slashes&nbsp;with&nbsp;a&nbsp;single&nbsp;slash.</span><br>
+<span class="lineno">55</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp2.&nbsp;Eliminate&nbsp;each&nbsp;.&nbsp;path&nbsp;name&nbsp;element&nbsp;(the&nbsp;current&nbsp;directory).</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp3.&nbsp;Eliminate&nbsp;each&nbsp;inner&nbsp;..&nbsp;path&nbsp;name&nbsp;element&nbsp;(the&nbsp;parent&nbsp;directory)</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;along&nbsp;with&nbsp;the&nbsp;non-..&nbsp;element&nbsp;that&nbsp;precedes&nbsp;it.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp4.&nbsp;Eliminate&nbsp;..&nbsp;elements&nbsp;that&nbsp;begin&nbsp;a&nbsp;rooted&nbsp;path:</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;that&nbsp;is,&nbsp;replace&nbsp;&#34;/..&#34;&nbsp;by&nbsp;&#34;/&#34;&nbsp;at&nbsp;the&nbsp;beginning&nbsp;of&nbsp;a&nbsp;path.</span><br>
+<span class="lineno">60</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;returned&nbsp;path&nbsp;ends&nbsp;in&nbsp;a&nbsp;slash&nbsp;only&nbsp;if&nbsp;it&nbsp;is&nbsp;the&nbsp;root&nbsp;&#34;/&#34;.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;If&nbsp;the&nbsp;result&nbsp;of&nbsp;this&nbsp;process&nbsp;is&nbsp;an&nbsp;empty&nbsp;string,&nbsp;Clean</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;returns&nbsp;the&nbsp;string&nbsp;&#34;.&#34;.</span><br>
+<span class="lineno">65</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;See&nbsp;also&nbsp;Rob&nbsp;Pike,&nbsp;``Lexical&nbsp;File&nbsp;Names&nbsp;in&nbsp;Plan&nbsp;9&nbsp;or</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Getting&nbsp;Dot-Dot&nbsp;Right,&#39;&#39;</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;http://plan9.bell-labs.com/sys/doc/lexnames.html</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">Clean</span><span class="op">(</span><span class="ident">path</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">path</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#34;&#34;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="string">&#34;.&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">rooted</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">path</span><span class="op">[</span><span class="num">0</span><span class="op">]</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;/&#39;</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">path</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Invariants:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;&nbsp;&nbsp;&nbspreading&nbsp;from&nbsp;path;&nbsp;r&nbsp;is&nbsp;index&nbsp;of&nbsp;next&nbsp;byte&nbsp;to&nbsp;process.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;&nbsp;&nbsp;&nbspwriting&nbsp;to&nbsp;buf;&nbsp;w&nbsp;is&nbsp;index&nbsp;of&nbsp;next&nbsp;byte&nbsp;to&nbsp;write.</span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;&nbsp;&nbsp;&nbspdotdot&nbsp;is&nbsp;index&nbsp;in&nbsp;buf&nbsp;where&nbsp;..&nbsp;must&nbsp;stop,&nbsp;either&nbsp;because</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspit&nbsp;is&nbsp;the&nbsp;leading&nbsp;slash&nbsp;or&nbsp;it&nbsp;is&nbsp;a&nbsp;leading&nbsp;../../..&nbsp;prefix.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">out</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">lazybuf</span><span class="op">{</span><span class="ident">s</span><span class="op">:</span>&nbsp;<span class="ident">path</span><span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span><span class="op">,</span>&nbsp;<span class="ident">dotdot</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">rooted</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">out</span><span class="op">.</span><span class="builtinfunc">append</span><span class="op">(</span><span class="string">&#39;/&#39;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span><span class="op">,</span>&nbsp;<span class="ident">dotdot</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><span class="op">,</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">r</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">path</span><span class="op">[</span><span class="ident">r</span><span class="op">]</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;/&#39;</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;empty&nbsp;path&nbsp;element</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span><span class="op">++</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">path</span><span class="op">[</span><span class="ident">r</span><span class="op">]</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;.&#39;</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="op">(</span><span class="ident">r</span><span class="op">+</span><span class="num">1</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">path</span><span class="op">[</span><span class="ident">r</span><span class="op">+</span><span class="num">1</span><span class="op">]</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;/&#39;</span><span class="op">)</span><span class="op">:</span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;.&nbsp;element</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span><span class="op">++</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">path</span><span class="op">[</span><span class="ident">r</span><span class="op">]</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;.&#39;</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">path</span><span class="op">[</span><span class="ident">r</span><span class="op">+</span><span class="num">1</span><span class="op">]</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;.&#39;</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="op">(</span><span class="ident">r</span><span class="op">+</span><span class="num">2</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">path</span><span class="op">[</span><span class="ident">r</span><span class="op">+</span><span class="num">2</span><span class="op">]</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;/&#39;</span><span class="op">)</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;..&nbsp;element:&nbsp;remove&nbsp;to&nbsp;last&nbsp;/</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="num">2</span><br>
+<span class="lineno">100</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">out</span><span class="op">.</span><span class="ident">w</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="ident">dotdot</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;can&nbsp;backtrack</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">out</span><span class="op">.</span><span class="ident">w</span><span class="op">--</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">out</span><span class="op">.</span><span class="ident">w</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="ident">dotdot</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">out</span><span class="op">.</span><span class="ident">index</span><span class="op">(</span><span class="ident">out</span><span class="op">.</span><span class="ident">w</span><span class="op">)</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="string">&#39;/&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">out</span><span class="op">.</span><span class="ident">w</span><span class="op">--</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="op">!</span><span class="ident">rooted</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;cannot&nbsp;backtrack,&nbsp;but&nbsp;not&nbsp;rooted,&nbsp;so&nbsp;append&nbsp;..&nbsp;element.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">out</span><span class="op">.</span><span class="ident">w</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">110</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">out</span><span class="op">.</span><span class="builtinfunc">append</span><span class="op">(</span><span class="string">&#39;/&#39;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">out</span><span class="op">.</span><span class="builtinfunc">append</span><span class="op">(</span><span class="string">&#39;.&#39;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">out</span><span class="op">.</span><span class="builtinfunc">append</span><span class="op">(</span><span class="string">&#39;.&#39;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dotdot</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">out</span><span class="op">.</span><span class="ident">w</span><br>
+<span class="lineno">115</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">default</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;real&nbsp;path&nbsp;element.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;add&nbsp;slash&nbsp;if&nbsp;needed</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">rooted</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">out</span><span class="op">.</span><span class="ident">w</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">1</span>&nbsp;<span class="op">||</span>&nbsp;<span class="op">!</span><span class="ident">rooted</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">out</span><span class="op">.</span><span class="ident">w</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">120</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">out</span><span class="op">.</span><span class="builtinfunc">append</span><span class="op">(</span><span class="string">&#39;/&#39;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;copy&nbsp;element</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="op">;</span>&nbsp;<span class="ident">r</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">path</span><span class="op">[</span><span class="ident">r</span><span class="op">]</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="string">&#39;/&#39;</span><span class="op">;</span>&nbsp;<span class="ident">r</span><span class="op">++</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">out</span><span class="op">.</span><span class="builtinfunc">append</span><span class="op">(</span><span class="ident">path</span><span class="op">[</span><span class="ident">r</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno">125</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Turn&nbsp;empty&nbsp;string&nbsp;into&nbsp;&#34;.&#34;</span><br>
+<span class="lineno">130</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">out</span><span class="op">.</span><span class="ident">w</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="string">&#34;.&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">out</span><span class="op">.</span><span class="builtintype">string</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">135</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Split&nbsp;splits&nbsp;path&nbsp;immediately&nbsp;following&nbsp;the&nbsp;final&nbsp;slash.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;separating&nbsp;it&nbsp;into&nbsp;a&nbsp;directory&nbsp;and&nbsp;file&nbsp;name&nbsp;component.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;If&nbsp;there&nbsp;is&nbsp;no&nbsp;slash&nbsp;path,&nbsp;Split&nbsp;returns&nbsp;an&nbsp;empty&nbsp;dir&nbsp;and</span><br>
+<span class="lineno">140</span><span class="comment">//&nbsp;file&nbsp;set&nbsp;to&nbsp;path.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;returned&nbsp;values&nbsp;have&nbsp;the&nbsp;property&nbsp;that&nbsp;path&nbsp;=&nbsp;dir+file.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">Split</span><span class="op">(</span><span class="ident">path</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">dir</span><span class="op">,</span>&nbsp;<span class="ident">file</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">i</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">strings</span><span class="op">.</span><span class="ident">LastIndex</span><span class="op">(</span><span class="ident">path</span><span class="op">,</span>&nbsp;<span class="string">&#34;/&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">path</span><span class="op">[</span><span class="op">:</span><span class="ident">i</span><span class="op">+</span><span class="num">1</span><span class="op">]</span><span class="op">,</span>&nbsp;<span class="ident">path</span><span class="op">[</span><span class="ident">i</span><span class="op">+</span><span class="num">1</span><span class="op">:</span><span class="op">]</span><br>
+<span class="lineno">145</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Join&nbsp;joins&nbsp;any&nbsp;number&nbsp;of&nbsp;path&nbsp;elements&nbsp;into&nbsp;a&nbsp;single&nbsp;path,&nbsp;adding&nbsp;a</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;separating&nbsp;slash&nbsp;if&nbsp;necessary.&nbsp;The&nbsp;result&nbsp;is&nbsp;Cleaned;&nbsp;in&nbsp;particular,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;all&nbsp;empty&nbsp;strings&nbsp;are&nbsp;ignored.</span><br>
+<span class="lineno">150</span><span class="keyword">func</span>&nbsp;<span class="ident">Join</span><span class="op">(</span><span class="ident">elem</span>&nbsp;<span class="op">...</span><span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span><span class="op">,</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">elem</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="string">&#34;&#34;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">Clean</span><span class="op">(</span><span class="ident">strings</span><span class="op">.</span><span class="ident">Join</span><span class="op">(</span><span class="ident">elem</span><span class="op">[</span><span class="ident">i</span><span class="op">:</span><span class="op">]</span><span class="op">,</span>&nbsp;<span class="string">&#34;/&#34;</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">155</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="string">&#34;&#34;</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Ext&nbsp;returns&nbsp;the&nbsp;file&nbsp;name&nbsp;extension&nbsp;used&nbsp;by&nbsp;path.</span><br>
+<span class="lineno">160</span><span class="comment">//&nbsp;The&nbsp;extension&nbsp;is&nbsp;the&nbsp;suffix&nbsp;beginning&nbsp;at&nbsp;the&nbsp;final&nbsp;dot</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;in&nbsp;the&nbsp;final&nbsp;slash-separated&nbsp;element&nbsp;of&nbsp;path;</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;it&nbsp;is&nbsp;empty&nbsp;if&nbsp;there&nbsp;is&nbsp;no&nbsp;dot.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">Ext</span><span class="op">(</span><span class="ident">path</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">path</span><span class="op">)</span>&nbsp;<span class="op">-</span>&nbsp;<span class="num">1</span><span class="op">;</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">&gt;=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">path</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="string">&#39;/&#39;</span><span class="op">;</span>&nbsp;<span class="ident">i</span><span class="op">--</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">165</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">path</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;.&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">path</span><span class="op">[</span><span class="ident">i</span><span class="op">:</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="string">&#34;&#34;</span><br>
+<span class="lineno">170</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Base&nbsp;returns&nbsp;the&nbsp;last&nbsp;element&nbsp;of&nbsp;path.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Trailing&nbsp;slashes&nbsp;are&nbsp;removed&nbsp;before&nbsp;extracting&nbsp;the&nbsp;last&nbsp;element.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;If&nbsp;the&nbsp;path&nbsp;is&nbsp;empty,&nbsp;Base&nbsp;returns&nbsp;&#34;.&#34;.</span><br>
+<span class="lineno">175</span><span class="comment">//&nbsp;If&nbsp;the&nbsp;path&nbsp;consists&nbsp;entirely&nbsp;of&nbsp;slashes,&nbsp;Base&nbsp;returns&nbsp;&#34;/&#34;.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">Base</span><span class="op">(</span><span class="ident">path</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">path</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#34;&#34;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="string">&#34;.&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">180</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Strip&nbsp;trailing&nbsp;slashes.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">path</span><span class="op">)</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">path</span><span class="op">[</span><span class="builtinfunc">len</span><span class="op">(</span><span class="ident">path</span><span class="op">)</span><span class="op">-</span><span class="num">1</span><span class="op">]</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;/&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">path</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">path</span><span class="op">[</span><span class="num">0</span>&nbsp;<span class="op">:</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">path</span><span class="op">)</span><span class="op">-</span><span class="num">1</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Find&nbsp;the&nbsp;last&nbsp;element</span><br>
+<span class="lineno">185</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">strings</span><span class="op">.</span><span class="ident">LastIndex</span><span class="op">(</span><span class="ident">path</span><span class="op">,</span>&nbsp;<span class="string">&#34;/&#34;</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">&gt;=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">path</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">path</span><span class="op">[</span><span class="ident">i</span><span class="op">+</span><span class="num">1</span><span class="op">:</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;If&nbsp;empty&nbsp;now,&nbsp;it&nbsp;had&nbsp;only&nbsp;slashes.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">path</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#34;&#34;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">190</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="string">&#34;/&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">path</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">195</span><span class="comment">//&nbsp;IsAbs&nbsp;returns&nbsp;true&nbsp;if&nbsp;the&nbsp;path&nbsp;is&nbsp;absolute.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">IsAbs</span><span class="op">(</span><span class="ident">path</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">path</span><span class="op">)</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">path</span><span class="op">[</span><span class="num">0</span><span class="op">]</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;/&#39;</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">200</span><span class="comment">//&nbsp;Dir&nbsp;returns&nbsp;all&nbsp;but&nbsp;the&nbsp;last&nbsp;element&nbsp;of&nbsp;path,&nbsp;typically&nbsp;the&nbsp;path&#39;s&nbsp;directory.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;After&nbsp;dropping&nbsp;the&nbsp;final&nbsp;element&nbsp;using&nbsp;Split,&nbsp;the&nbsp;path&nbsp;is&nbsp;Cleaned&nbsp;and&nbsp;trailing</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;slashes&nbsp;are&nbsp;removed.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;If&nbsp;the&nbsp;path&nbsp;is&nbsp;empty,&nbsp;Dir&nbsp;returns&nbsp;&#34;.&#34;.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;If&nbsp;the&nbsp;path&nbsp;consists&nbsp;entirely&nbsp;of&nbsp;slashes&nbsp;followed&nbsp;by&nbsp;non-slash&nbsp;bytes,&nbsp;Dir</span><br>
+<span class="lineno">205</span><span class="comment">//&nbsp;returns&nbsp;a&nbsp;single&nbsp;slash.&nbsp;In&nbsp;any&nbsp;other&nbsp;case,&nbsp;the&nbsp;returned&nbsp;path&nbsp;does&nbsp;not&nbsp;end&nbsp;in&nbsp;a</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;slash.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">Dir</span><span class="op">(</span><span class="ident">path</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dir</span><span class="op">,</span>&nbsp;<span class="ident">_</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">Split</span><span class="op">(</span><span class="ident">path</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">Clean</span><span class="op">(</span><span class="ident">dir</span><span class="op">)</span><br>
+<span class="lineno">210</span><span class="op">}</span>
+</div>
+</body>
+</html>

@@ -1,0 +1,143 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2012&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">format</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;bytes&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;go/parser&#34;</span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;go/token&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;io/ioutil&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;strings&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;testing&#34;</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno">15</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">testfile</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">&#34;format_test.go&#34;</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">diff</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">,</span>&nbsp;<span class="ident">dst</span><span class="op">,</span>&nbsp;<span class="ident">src</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">line</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">offs</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="comment">//&nbsp;line&nbsp;offset</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="num">0</span><span class="op">;</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">dst</span><span class="op">)</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">src</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">i</span><span class="op">++</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">dst</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">src</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">d</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">s</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Errorf</span><span class="op">(</span><span class="string">&#34;dst:%d:&nbsp;%s\n&#34;</span><span class="op">,</span>&nbsp;<span class="ident">line</span><span class="op">,</span>&nbsp;<span class="ident">dst</span><span class="op">[</span><span class="ident">offs</span><span class="op">:</span><span class="ident">i</span><span class="op">+</span><span class="num">1</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Errorf</span><span class="op">(</span><span class="string">&#34;src:%d:&nbsp;%s\n&#34;</span><span class="op">,</span>&nbsp;<span class="ident">line</span><span class="op">,</span>&nbsp;<span class="ident">src</span><span class="op">[</span><span class="ident">offs</span><span class="op">:</span><span class="ident">i</span><span class="op">+</span><span class="num">1</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">s</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;\n&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">line</span><span class="op">++</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">offs</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">+</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">dst</span><span class="op">)</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">src</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Errorf</span><span class="op">(</span><span class="string">&#34;len(dst)&nbsp;=&nbsp;%d,&nbsp;len(src)&nbsp;=&nbsp;%d\nsrc&nbsp;=&nbsp;%q&#34;</span><span class="op">,</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">dst</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">src</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">src</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">TestNode</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">src</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">ioutil</span><span class="op">.</span><span class="ident">ReadFile</span><span class="op">(</span><span class="ident">testfile</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatal</span><span class="op">(</span><span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fset</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">token</span><span class="op">.</span><span class="ident">NewFileSet</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">file</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">parser</span><span class="op">.</span><span class="ident">ParseFile</span><span class="op">(</span><span class="ident">fset</span><span class="op">,</span>&nbsp;<span class="ident">testfile</span><span class="op">,</span>&nbsp;<span class="ident">src</span><span class="op">,</span>&nbsp;<span class="ident">parser</span><span class="op">.</span><span class="ident">ParseComments</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatal</span><span class="op">(</span><span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">50</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">buf</span>&nbsp;<span class="ident">bytes</span><span class="op">.</span><span class="ident">Buffer</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">Node</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">buf</span><span class="op">,</span>&nbsp;<span class="ident">fset</span><span class="op">,</span>&nbsp;<span class="ident">file</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatal</span><span class="op">(</span><span class="string">&#34;Node&nbsp;failed:&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">diff</span><span class="op">(</span><span class="ident">t</span><span class="op">,</span>&nbsp;<span class="ident">buf</span><span class="op">.</span><span class="ident">Bytes</span><span class="op">(</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">src</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">60</span><span class="keyword">func</span>&nbsp;<span class="ident">TestSource</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">src</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">ioutil</span><span class="op">.</span><span class="ident">ReadFile</span><span class="op">(</span><span class="ident">testfile</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatal</span><span class="op">(</span><span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">65</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">res</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">Source</span><span class="op">(</span><span class="ident">src</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatal</span><span class="op">(</span><span class="string">&#34;Source&nbsp;failed:&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">70</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">diff</span><span class="op">(</span><span class="ident">t</span><span class="op">,</span>&nbsp;<span class="ident">res</span><span class="op">,</span>&nbsp;<span class="ident">src</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Test&nbsp;cases&nbsp;that&nbsp;are&nbsp;expected&nbsp;to&nbsp;fail&nbsp;are&nbsp;marked&nbsp;by&nbsp;the&nbsp;prefix&nbsp;&#34;ERROR&#34;.</span><br>
+<span class="lineno">75</span><span class="keyword">var</span>&nbsp;<span class="ident">tests</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">string</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;declaration&nbsp;lists</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">`import&nbsp;&#34;go/format&#34;`</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;var&nbsp;x&nbsp;int&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;var&nbsp;x&nbsp;int\n\ntype&nbsp;T&nbsp;struct{}&#34;</span><span class="op">,</span><br>
+<span class="lineno">80</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;statement&nbsp;lists</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;x&nbsp;:=&nbsp;0&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;f(a,&nbsp;b,&nbsp;c)\nvar&nbsp;x&nbsp;int&nbsp;=&nbsp;f(1,&nbsp;2,&nbsp;3)&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;indentation,&nbsp;leading&nbsp;and&nbsp;trailing&nbsp;space</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;\tx&nbsp;:=&nbsp;0\n\tgo&nbsp;f()&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;\tx&nbsp;:=&nbsp;0\n\tgo&nbsp;f()\n\n\n&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;\n\t\t\n\n\tx&nbsp;:=&nbsp;0\n\tgo&nbsp;f()\n\n\n&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;\n\t\t\n\n\t\t\tx&nbsp;:=&nbsp;0\n\t\t\tgo&nbsp;f()\n\n\n&#34;</span><span class="op">,</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;\n\t\t\n\n\t\t\tx&nbsp;:=&nbsp;0\n\t\t\tconst&nbsp;s&nbsp;=&nbsp;`\nfoo\n`\n\n\n&#34;</span><span class="op">,</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;no&nbsp;indentation&nbsp;added&nbsp;inside&nbsp;raw&nbsp;strings</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;\n\t\t\n\n\t\t\tx&nbsp;:=&nbsp;0\n\t\t\tconst&nbsp;s&nbsp;=&nbsp;`\n\t\tfoo\n`\n\n\n&#34;</span><span class="op">,</span>&nbsp;<span class="comment">//&nbsp;no&nbsp;indentation&nbsp;removed&nbsp;inside&nbsp;raw&nbsp;strings</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;comments</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;i&nbsp;:=&nbsp;5&nbsp;/*&nbsp;Comment&nbsp;*/&#34;</span><span class="op">,</span>&nbsp;<span class="comment">//&nbsp;Issue&nbsp;5551.</span><br>
+<span class="lineno">95</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;erroneous&nbsp;programs</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;ERROR1&nbsp;+&nbsp;2&nbsp;+&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;ERRORx&nbsp;:=&nbsp;&nbsp;0&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">100</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">String</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">res</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">Source</span><span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">(</span><span class="ident">s</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="string">&#34;&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="builtintype">string</span><span class="op">(</span><span class="ident">res</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">TestPartial</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">110</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">src</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">tests</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">strings</span><span class="op">.</span><span class="ident">HasPrefix</span><span class="op">(</span><span class="ident">src</span><span class="op">,</span>&nbsp;<span class="string">&#34;ERROR&#34;</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;test&nbsp;expected&nbsp;to&nbsp;fail</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">src</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">src</span><span class="op">[</span><span class="num">5</span><span class="op">:</span><span class="op">]</span>&nbsp;<span class="comment">//&nbsp;remove&nbsp;ERROR&nbsp;prefix</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">res</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">String</span><span class="op">(</span><span class="ident">src</span><span class="op">)</span><br>
+<span class="lineno">115</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">res</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">src</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Errorf</span><span class="op">(</span><span class="string">&#34;formatting&nbsp;succeeded&nbsp;but&nbsp;was&nbsp;expected&nbsp;to&nbsp;fail:\n%q&#34;</span><span class="op">,</span>&nbsp;<span class="ident">src</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;test&nbsp;expected&nbsp;to&nbsp;succeed</span><br>
+<span class="lineno">120</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">res</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">String</span><span class="op">(</span><span class="ident">src</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Errorf</span><span class="op">(</span><span class="string">&#34;formatting&nbsp;failed&nbsp;(%s):\n%q&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">,</span>&nbsp;<span class="ident">src</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="keyword">if</span>&nbsp;<span class="ident">res</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">src</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Errorf</span><span class="op">(</span><span class="string">&#34;formatting&nbsp;incorrect:\nsource:&nbsp;%q\nresult:&nbsp;%q&#34;</span><span class="op">,</span>&nbsp;<span class="ident">src</span><span class="op">,</span>&nbsp;<span class="ident">res</span><span class="op">)</span><br>
+<span class="lineno">125</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

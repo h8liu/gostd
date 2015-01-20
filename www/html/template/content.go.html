@@ -1,0 +1,151 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2011&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">template</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;fmt&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;reflect&#34;</span><br>
+<span class="lineno">10</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Strings&nbsp;of&nbsp;content&nbsp;from&nbsp;a&nbsp;trusted&nbsp;source.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;CSS&nbsp;encapsulates&nbsp;known&nbsp;safe&nbsp;content&nbsp;that&nbsp;matches&nbsp;any&nbsp;of:</span><br>
+<span class="lineno">15</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;&nbsp;&nbsp;1.&nbsp;The&nbsp;CSS3&nbsp;stylesheet&nbsp;production,&nbsp;such&nbsp;as&nbsp;`p&nbsp;{&nbsp;color:&nbsp;purple&nbsp;}`.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;&nbsp;&nbsp;2.&nbsp;The&nbsp;CSS3&nbsp;rule&nbsp;production,&nbsp;such&nbsp;as&nbsp;`a[href=~&#34;https:&#34;].foo#bar`.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;&nbsp;&nbsp;3.&nbsp;CSS3&nbsp;declaration&nbsp;productions,&nbsp;such&nbsp;as&nbsp;`color:&nbsp;red;&nbsp;margin:&nbsp;2px`.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;&nbsp;&nbsp;4.&nbsp;The&nbsp;CSS3&nbsp;value&nbsp;production,&nbsp;such&nbsp;as&nbsp;`rgba(0,&nbsp;0,&nbsp;255,&nbsp;127)`.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;See&nbsp;http://www.w3.org/TR/css3-syntax/#parsing&nbsp;and</span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;https://web.archive.org/web/20090211114933/http://w3.org/TR/css3-syntax#style</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">CSS</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;HTML&nbsp;encapsulates&nbsp;a&nbsp;known&nbsp;safe&nbsp;HTML&nbsp;document&nbsp;fragment.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;It&nbsp;should&nbsp;not&nbsp;be&nbsp;used&nbsp;for&nbsp;HTML&nbsp;from&nbsp;a&nbsp;third-party,&nbsp;or&nbsp;HTML&nbsp;with</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;unclosed&nbsp;tags&nbsp;or&nbsp;comments.&nbsp;The&nbsp;outputs&nbsp;of&nbsp;a&nbsp;sound&nbsp;HTML&nbsp;sanitizer</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;and&nbsp;a&nbsp;template&nbsp;escaped&nbsp;by&nbsp;this&nbsp;package&nbsp;are&nbsp;fine&nbsp;for&nbsp;use&nbsp;with&nbsp;HTML.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">HTML</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;HTMLAttr&nbsp;encapsulates&nbsp;an&nbsp;HTML&nbsp;attribute&nbsp;from&nbsp;a&nbsp;trusted&nbsp;source,</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;for&nbsp;example,&nbsp;`&nbsp;dir=&#34;ltr&#34;`.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">HTMLAttr</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;JS&nbsp;encapsulates&nbsp;a&nbsp;known&nbsp;safe&nbsp;EcmaScript5&nbsp;Expression,&nbsp;for&nbsp;example,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;`(x&nbsp;+&nbsp;y&nbsp;*&nbsp;z())`.</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Template&nbsp;authors&nbsp;are&nbsp;responsible&nbsp;for&nbsp;ensuring&nbsp;that&nbsp;typed&nbsp;expressions</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;do&nbsp;not&nbsp;break&nbsp;the&nbsp;intended&nbsp;precedence&nbsp;and&nbsp;that&nbsp;there&nbsp;is&nbsp;no</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;statement/expression&nbsp;ambiguity&nbsp;as&nbsp;when&nbsp;passing&nbsp;an&nbsp;expression&nbsp;like</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;&#34;{&nbsp;foo:&nbsp;bar()&nbsp;}\n[&#39;foo&#39;]()&#34;,&nbsp;which&nbsp;is&nbsp;both&nbsp;a&nbsp;valid&nbsp;Expression&nbsp;and&nbsp;a</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;valid&nbsp;Program&nbsp;with&nbsp;a&nbsp;very&nbsp;different&nbsp;meaning.</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">JS</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;JSStr&nbsp;encapsulates&nbsp;a&nbsp;sequence&nbsp;of&nbsp;characters&nbsp;meant&nbsp;to&nbsp;be&nbsp;embedded</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;between&nbsp;quotes&nbsp;in&nbsp;a&nbsp;JavaScript&nbsp;expression.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;The&nbsp;string&nbsp;must&nbsp;match&nbsp;a&nbsp;series&nbsp;of&nbsp;StringCharacters:</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;&nbsp;&nbsp;StringCharacter&nbsp;::&nbsp;SourceCharacter&nbsp;but&nbsp;not&nbsp;`\`&nbsp;or&nbsp;LineTerminator</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;EscapeSequence</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Note&nbsp;that&nbsp;LineContinuations&nbsp;are&nbsp;not&nbsp;allowed.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;JSStr(&#34;foo\\nbar&#34;)&nbsp;is&nbsp;fine,&nbsp;but&nbsp;JSStr(&#34;foo\\\nbar&#34;)&nbsp;is&nbsp;not.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">JSStr</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno">50</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;URL&nbsp;encapsulates&nbsp;a&nbsp;known&nbsp;safe&nbsp;URL&nbsp;or&nbsp;URL&nbsp;substring&nbsp;(see&nbsp;RFC&nbsp;3986).</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;A&nbsp;URL&nbsp;like&nbsp;`javascript:checkThatFormNotEditedBeforeLeavingPage()`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;from&nbsp;a&nbsp;trusted&nbsp;source&nbsp;should&nbsp;go&nbsp;in&nbsp;the&nbsp;page,&nbsp;but&nbsp;by&nbsp;default&nbsp;dynamic</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;`javascript:`&nbsp;URLs&nbsp;are&nbsp;filtered&nbsp;out&nbsp;since&nbsp;they&nbsp;are&nbsp;a&nbsp;frequently</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;exploited&nbsp;injection&nbsp;vector.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">URL</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">contentType</span>&nbsp;<span class="builtintype">uint8</span><br>
+<span class="lineno">60</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">contentTypePlain</span>&nbsp;<span class="ident">contentType</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">iota</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">contentTypeCSS</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">contentTypeHTML</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">contentTypeHTMLAttr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">contentTypeJS</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">contentTypeJSStr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">contentTypeURL</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;contentTypeUnsafe&nbsp;is&nbsp;used&nbsp;in&nbsp;attr.go&nbsp;for&nbsp;values&nbsp;that&nbsp;affect&nbsp;how</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;embedded&nbsp;content&nbsp;and&nbsp;network&nbsp;messages&nbsp;are&nbsp;formed,&nbsp;vetted,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;or&nbsp;interpreted;&nbsp;or&nbsp;which&nbsp;credentials&nbsp;network&nbsp;messages&nbsp;carry.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">contentTypeUnsafe</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">75</span><span class="comment">//&nbsp;indirect&nbsp;returns&nbsp;the&nbsp;value,&nbsp;after&nbsp;dereferencing&nbsp;as&nbsp;many&nbsp;times</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;as&nbsp;necessary&nbsp;to&nbsp;reach&nbsp;the&nbsp;base&nbsp;type&nbsp;(or&nbsp;nil).</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">indirect</span><span class="op">(</span><span class="ident">a</span>&nbsp;<span class="keyword">interface</span><span class="op">{</span><span class="op">}</span><span class="op">)</span>&nbsp;<span class="keyword">interface</span><span class="op">{</span><span class="op">}</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">a</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">t</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">reflect</span><span class="op">.</span><span class="ident">TypeOf</span><span class="op">(</span><span class="ident">a</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">t</span><span class="op">.</span><span class="ident">Kind</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">reflect</span><span class="op">.</span><span class="ident">Ptr</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Avoid&nbsp;creating&nbsp;a&nbsp;reflect.Value&nbsp;if&nbsp;it&#39;s&nbsp;not&nbsp;a&nbsp;pointer.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">a</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">reflect</span><span class="op">.</span><span class="ident">ValueOf</span><span class="op">(</span><span class="ident">a</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">v</span><span class="op">.</span><span class="ident">Kind</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">reflect</span><span class="op">.</span><span class="ident">Ptr</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="op">!</span><span class="ident">v</span><span class="op">.</span><span class="ident">IsNil</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">v</span><span class="op">.</span><span class="ident">Elem</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">v</span><span class="op">.</span><span class="ident">Interface</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">90</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">errorType</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="ident">reflect</span><span class="op">.</span><span class="ident">TypeOf</span><span class="op">(</span><span class="op">(</span><span class="op">*</span><span class="builtintype">error</span><span class="op">)</span><span class="op">(</span><span class="ident">nil</span><span class="op">)</span><span class="op">)</span><span class="op">.</span><span class="ident">Elem</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fmtStringerType</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">reflect</span><span class="op">.</span><span class="ident">TypeOf</span><span class="op">(</span><span class="op">(</span><span class="op">*</span><span class="ident">fmt</span><span class="op">.</span><span class="ident">Stringer</span><span class="op">)</span><span class="op">(</span><span class="ident">nil</span><span class="op">)</span><span class="op">)</span><span class="op">.</span><span class="ident">Elem</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">95</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;indirectToStringerOrError&nbsp;returns&nbsp;the&nbsp;value,&nbsp;after&nbsp;dereferencing&nbsp;as&nbsp;many&nbsp;times</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;as&nbsp;necessary&nbsp;to&nbsp;reach&nbsp;the&nbsp;base&nbsp;type&nbsp;(or&nbsp;nil)&nbsp;or&nbsp;an&nbsp;implementation&nbsp;of&nbsp;fmt.Stringer</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;or&nbsp;error,</span><br>
+<span class="lineno">100</span><span class="keyword">func</span>&nbsp;<span class="ident">indirectToStringerOrError</span><span class="op">(</span><span class="ident">a</span>&nbsp;<span class="keyword">interface</span><span class="op">{</span><span class="op">}</span><span class="op">)</span>&nbsp;<span class="keyword">interface</span><span class="op">{</span><span class="op">}</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">a</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">reflect</span><span class="op">.</span><span class="ident">ValueOf</span><span class="op">(</span><span class="ident">a</span><span class="op">)</span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="op">!</span><span class="ident">v</span><span class="op">.</span><span class="ident">Type</span><span class="op">(</span><span class="op">)</span><span class="op">.</span><span class="ident">Implements</span><span class="op">(</span><span class="ident">fmtStringerType</span><span class="op">)</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="op">!</span><span class="ident">v</span><span class="op">.</span><span class="ident">Type</span><span class="op">(</span><span class="op">)</span><span class="op">.</span><span class="ident">Implements</span><span class="op">(</span><span class="ident">errorType</span><span class="op">)</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">v</span><span class="op">.</span><span class="ident">Kind</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">reflect</span><span class="op">.</span><span class="ident">Ptr</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="op">!</span><span class="ident">v</span><span class="op">.</span><span class="ident">IsNil</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">v</span><span class="op">.</span><span class="ident">Elem</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">v</span><span class="op">.</span><span class="ident">Interface</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">110</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;stringify&nbsp;converts&nbsp;its&nbsp;arguments&nbsp;to&nbsp;a&nbsp;string&nbsp;and&nbsp;the&nbsp;type&nbsp;of&nbsp;the&nbsp;content.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;All&nbsp;pointers&nbsp;are&nbsp;dereferenced,&nbsp;as&nbsp;in&nbsp;the&nbsp;text/template&nbsp;package.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">stringify</span><span class="op">(</span><span class="ident">args</span>&nbsp;<span class="op">...</span><span class="keyword">interface</span><span class="op">{</span><span class="op">}</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">contentType</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">args</span><span class="op">)</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">1</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">115</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="ident">s</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">indirect</span><span class="op">(</span><span class="ident">args</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="op">)</span><span class="op">.</span><span class="op">(</span><span class="keyword">type</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="builtintype">string</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">s</span><span class="op">,</span>&nbsp;<span class="ident">contentTypePlain</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">CSS</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="builtintype">string</span><span class="op">(</span><span class="ident">s</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">contentTypeCSS</span><br>
+<span class="lineno">120</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">HTML</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="builtintype">string</span><span class="op">(</span><span class="ident">s</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">contentTypeHTML</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">HTMLAttr</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="builtintype">string</span><span class="op">(</span><span class="ident">s</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">contentTypeHTMLAttr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">JS</span><span class="op">:</span><br>
+<span class="lineno">125</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="builtintype">string</span><span class="op">(</span><span class="ident">s</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">contentTypeJS</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">JSStr</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="builtintype">string</span><span class="op">(</span><span class="ident">s</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">contentTypeJSStr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">URL</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="builtintype">string</span><span class="op">(</span><span class="ident">s</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">contentTypeURL</span><br>
+<span class="lineno">130</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span><span class="op">,</span>&nbsp;<span class="ident">arg</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">args</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">args</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">indirectToStringerOrError</span><span class="op">(</span><span class="ident">arg</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">135</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">fmt</span><span class="op">.</span><span class="ident">Sprint</span><span class="op">(</span><span class="ident">args</span><span class="op">...</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">contentTypePlain</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

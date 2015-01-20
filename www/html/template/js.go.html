@@ -1,0 +1,377 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2011&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">template</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;bytes&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;encoding/json&#34;</span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;fmt&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;reflect&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;strings&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;unicode/utf8&#34;</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno">15</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;nextJSCtx&nbsp;returns&nbsp;the&nbsp;context&nbsp;that&nbsp;determines&nbsp;whether&nbsp;a&nbsp;slash&nbsp;after&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;given&nbsp;run&nbsp;of&nbsp;tokens&nbsp;starts&nbsp;a&nbsp;regular&nbsp;expression&nbsp;instead&nbsp;of&nbsp;a&nbsp;division</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;operator:&nbsp;/&nbsp;or&nbsp;/=.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">20</span><span class="comment">//&nbsp;This&nbsp;assumes&nbsp;that&nbsp;the&nbsp;token&nbsp;run&nbsp;does&nbsp;not&nbsp;include&nbsp;any&nbsp;string&nbsp;tokens,&nbsp;comment</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;tokens,&nbsp;regular&nbsp;expression&nbsp;literal&nbsp;tokens,&nbsp;or&nbsp;division&nbsp;operators.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;This&nbsp;fails&nbsp;on&nbsp;some&nbsp;valid&nbsp;but&nbsp;nonsensical&nbsp;JavaScript&nbsp;programs&nbsp;like</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&#34;x&nbsp;=&nbsp;++/foo/i&#34;&nbsp;which&nbsp;is&nbsp;quite&nbsp;different&nbsp;than&nbsp;&#34;x++/foo/i&#34;,&nbsp;but&nbsp;is&nbsp;not&nbsp;known&nbsp;to</span><br>
+<span class="lineno">25</span><span class="comment">//&nbsp;fail&nbsp;on&nbsp;any&nbsp;known&nbsp;useful&nbsp;programs.&nbsp;It&nbsp;is&nbsp;based&nbsp;on&nbsp;the&nbsp;draft</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;JavaScript&nbsp;2.0&nbsp;lexical&nbsp;grammar&nbsp;and&nbsp;requires&nbsp;one&nbsp;token&nbsp;of&nbsp;lookbehind:</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;http://www.mozilla.org/js/language/js20-2000-07/rationale/syntax.html</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">nextJSCtx</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="ident">preceding</span>&nbsp;<span class="ident">jsCtx</span><span class="op">)</span>&nbsp;<span class="ident">jsCtx</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">bytes</span><span class="op">.</span><span class="ident">TrimRight</span><span class="op">(</span><span class="ident">s</span><span class="op">,</span>&nbsp;<span class="string">&#34;\t\n\f\r&nbsp;\u2028\u2029&#34;</span><span class="op">)</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">s</span><span class="op">)</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">preceding</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;All&nbsp;cases&nbsp;below&nbsp;are&nbsp;in&nbsp;the&nbsp;single-byte&nbsp;UTF-8&nbsp;group.</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="ident">c</span><span class="op">,</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">s</span><span class="op">[</span><span class="builtinfunc">len</span><span class="op">(</span><span class="ident">s</span><span class="op">)</span><span class="op">-</span><span class="num">1</span><span class="op">]</span><span class="op">,</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">s</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="string">&#39;+&#39;</span><span class="op">,</span>&nbsp;<span class="string">&#39;-&#39;</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;++&nbsp;and&nbsp;--&nbsp;are&nbsp;not&nbsp;regexp&nbsp;preceders,&nbsp;but&nbsp;+&nbsp;and&nbsp;-&nbsp;are&nbsp;whether</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;they&nbsp;are&nbsp;used&nbsp;as&nbsp;infix&nbsp;or&nbsp;prefix&nbsp;operators.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">start</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="op">-</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Count&nbsp;the&nbsp;number&nbsp;of&nbsp;adjacent&nbsp;dashes&nbsp;or&nbsp;pluses.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">start</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">s</span><span class="op">[</span><span class="ident">start</span><span class="op">-</span><span class="num">1</span><span class="op">]</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">start</span><span class="op">--</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">(</span><span class="ident">n</span><span class="op">-</span><span class="ident">start</span><span class="op">)</span><span class="op">&amp;</span><span class="num">1</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">1</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Reached&nbsp;for&nbsp;trailing&nbsp;minus&nbsp;signs&nbsp;since&nbsp;&#34;---&#34;&nbsp;is&nbsp;the</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;same&nbsp;as&nbsp;&#34;--&nbsp;-&#34;.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">jsCtxRegexp</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">jsCtxDivOp</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="string">&#39;.&#39;</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Handle&nbsp;&#34;42.&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">1</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="string">&#39;0&#39;</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">s</span><span class="op">[</span><span class="ident">n</span><span class="op">-</span><span class="num">2</span><span class="op">]</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">s</span><span class="op">[</span><span class="ident">n</span><span class="op">-</span><span class="num">2</span><span class="op">]</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="string">&#39;9&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">jsCtxDivOp</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">jsCtxRegexp</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Suffixes&nbsp;for&nbsp;all&nbsp;punctuators&nbsp;from&nbsp;section&nbsp;7.7&nbsp;of&nbsp;the&nbsp;language&nbsp;spec</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;that&nbsp;only&nbsp;end&nbsp;binary&nbsp;operators&nbsp;not&nbsp;handled&nbsp;above.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="string">&#39;,&#39;</span><span class="op">,</span>&nbsp;<span class="string">&#39;&lt;&#39;</span><span class="op">,</span>&nbsp;<span class="string">&#39;&gt;&#39;</span><span class="op">,</span>&nbsp;<span class="string">&#39;=&#39;</span><span class="op">,</span>&nbsp;<span class="string">&#39;*&#39;</span><span class="op">,</span>&nbsp;<span class="string">&#39;%&#39;</span><span class="op">,</span>&nbsp;<span class="string">&#39;&amp;&#39;</span><span class="op">,</span>&nbsp;<span class="string">&#39;|&#39;</span><span class="op">,</span>&nbsp;<span class="string">&#39;^&#39;</span><span class="op">,</span>&nbsp;<span class="string">&#39;?&#39;</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">jsCtxRegexp</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Suffixes&nbsp;for&nbsp;all&nbsp;punctuators&nbsp;from&nbsp;section&nbsp;7.7&nbsp;of&nbsp;the&nbsp;language&nbsp;spec</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;that&nbsp;are&nbsp;prefix&nbsp;operators&nbsp;not&nbsp;handled&nbsp;above.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="string">&#39;!&#39;</span><span class="op">,</span>&nbsp;<span class="string">&#39;~&#39;</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">jsCtxRegexp</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Matches&nbsp;all&nbsp;the&nbsp;punctuators&nbsp;from&nbsp;section&nbsp;7.7&nbsp;of&nbsp;the&nbsp;language&nbsp;spec</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;that&nbsp;are&nbsp;open&nbsp;brackets&nbsp;not&nbsp;handled&nbsp;above.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="string">&#39;(&#39;</span><span class="op">,</span>&nbsp;<span class="string">&#39;[&#39;</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">jsCtxRegexp</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Matches&nbsp;all&nbsp;the&nbsp;punctuators&nbsp;from&nbsp;section&nbsp;7.7&nbsp;of&nbsp;the&nbsp;language&nbsp;spec</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;that&nbsp;precede&nbsp;expression&nbsp;starts.</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="string">&#39;:&#39;</span><span class="op">,</span>&nbsp;<span class="string">&#39;;&#39;</span><span class="op">,</span>&nbsp;<span class="string">&#39;{&#39;</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">jsCtxRegexp</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;CAVEAT:&nbsp;the&nbsp;close&nbsp;punctuators&nbsp;(&#39;}&#39;,&nbsp;&#39;]&#39;,&nbsp;&#39;)&#39;)&nbsp;precede&nbsp;div&nbsp;ops&nbsp;and</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;are&nbsp;handled&nbsp;in&nbsp;the&nbsp;default&nbsp;except&nbsp;for&nbsp;&#39;}&#39;&nbsp;which&nbsp;can&nbsp;precede&nbsp;a</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;division&nbsp;op&nbsp;as&nbsp;in</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;({&nbsp;valueOf:&nbsp;function&nbsp;()&nbsp;{&nbsp;return&nbsp;42&nbsp;}&nbsp;}&nbsp;/&nbsp;2</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;which&nbsp;is&nbsp;valid,&nbsp;but,&nbsp;in&nbsp;practice,&nbsp;developers&nbsp;don&#39;t&nbsp;divide&nbsp;object</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;literals,&nbsp;so&nbsp;our&nbsp;heuristic&nbsp;works&nbsp;well&nbsp;for&nbsp;code&nbsp;like</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;function&nbsp;()&nbsp;{&nbsp;...&nbsp;}&nbsp;&nbsp;/foo/.test(x)&nbsp;&amp;&amp;&nbsp;sideEffect();</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;The&nbsp;&#39;)&#39;&nbsp;punctuator&nbsp;can&nbsp;precede&nbsp;a&nbsp;regular&nbsp;expression&nbsp;as&nbsp;in</span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;(b)&nbsp;/foo/.test(x)&nbsp;&amp;&amp;&nbsp;...</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;but&nbsp;this&nbsp;is&nbsp;much&nbsp;less&nbsp;likely&nbsp;than</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(a&nbsp;+&nbsp;b)&nbsp;/&nbsp;c</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="string">&#39;}&#39;</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">jsCtxRegexp</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">default</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Look&nbsp;for&nbsp;an&nbsp;IdentifierName&nbsp;and&nbsp;see&nbsp;if&nbsp;it&nbsp;is&nbsp;a&nbsp;keyword&nbsp;that</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;can&nbsp;precede&nbsp;a&nbsp;regular&nbsp;expression.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">j</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">n</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">j</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">isJSIdentPart</span><span class="op">(</span><span class="builtintype">rune</span><span class="op">(</span><span class="ident">s</span><span class="op">[</span><span class="ident">j</span><span class="op">-</span><span class="num">1</span><span class="op">]</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">j</span><span class="op">--</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">regexpPrecederKeywords</span><span class="op">[</span><span class="builtintype">string</span><span class="op">(</span><span class="ident">s</span><span class="op">[</span><span class="ident">j</span><span class="op">:</span><span class="op">]</span><span class="op">)</span><span class="op">]</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">jsCtxRegexp</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Otherwise&nbsp;is&nbsp;a&nbsp;punctuator&nbsp;not&nbsp;listed&nbsp;above,&nbsp;or</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;a&nbsp;string&nbsp;which&nbsp;precedes&nbsp;a&nbsp;div&nbsp;op,&nbsp;or&nbsp;an&nbsp;identifier</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;which&nbsp;precedes&nbsp;a&nbsp;div&nbsp;op.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">jsCtxDivOp</span><br>
+<span class="lineno">100</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;regexpPrecederKeywords&nbsp;is&nbsp;a&nbsp;set&nbsp;of&nbsp;reserved&nbsp;JS&nbsp;keywords&nbsp;that&nbsp;can&nbsp;precede&nbsp;a</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;regular&nbsp;expression&nbsp;in&nbsp;JS&nbsp;source.</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">regexpPrecederKeywords</span>&nbsp;<span class="op">=</span>&nbsp;<span class="keyword">map</span><span class="op">[</span><span class="builtintype">string</span><span class="op">]</span><span class="builtintype">bool</span><span class="op">{</span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;break&#34;</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">true</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;case&#34;</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">true</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;continue&#34;</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;<span class="ident">true</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;delete&#34;</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">true</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;do&#34;</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">true</span><span class="op">,</span><br>
+<span class="lineno">110</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;else&#34;</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">true</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;finally&#34;</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">true</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;in&#34;</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">true</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;instanceof&#34;</span><span class="op">:</span>&nbsp;<span class="ident">true</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;return&#34;</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">true</span><span class="op">,</span><br>
+<span class="lineno">115</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;throw&#34;</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">true</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;try&#34;</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">true</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;typeof&#34;</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">true</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;void&#34;</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">true</span><span class="op">,</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">120</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">jsonMarshalType</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">reflect</span><span class="op">.</span><span class="ident">TypeOf</span><span class="op">(</span><span class="op">(</span><span class="op">*</span><span class="ident">json</span><span class="op">.</span><span class="ident">Marshaler</span><span class="op">)</span><span class="op">(</span><span class="ident">nil</span><span class="op">)</span><span class="op">)</span><span class="op">.</span><span class="ident">Elem</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;indirectToJSONMarshaler&nbsp;returns&nbsp;the&nbsp;value,&nbsp;after&nbsp;dereferencing&nbsp;as&nbsp;many&nbsp;times</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;as&nbsp;necessary&nbsp;to&nbsp;reach&nbsp;the&nbsp;base&nbsp;type&nbsp;(or&nbsp;nil)&nbsp;or&nbsp;an&nbsp;implementation&nbsp;of&nbsp;json.Marshal.</span><br>
+<span class="lineno">125</span><span class="keyword">func</span>&nbsp;<span class="ident">indirectToJSONMarshaler</span><span class="op">(</span><span class="ident">a</span>&nbsp;<span class="keyword">interface</span><span class="op">{</span><span class="op">}</span><span class="op">)</span>&nbsp;<span class="keyword">interface</span><span class="op">{</span><span class="op">}</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">reflect</span><span class="op">.</span><span class="ident">ValueOf</span><span class="op">(</span><span class="ident">a</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="op">!</span><span class="ident">v</span><span class="op">.</span><span class="ident">Type</span><span class="op">(</span><span class="op">)</span><span class="op">.</span><span class="ident">Implements</span><span class="op">(</span><span class="ident">jsonMarshalType</span><span class="op">)</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">v</span><span class="op">.</span><span class="ident">Kind</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">reflect</span><span class="op">.</span><span class="ident">Ptr</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="op">!</span><span class="ident">v</span><span class="op">.</span><span class="ident">IsNil</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">v</span><span class="op">.</span><span class="ident">Elem</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">130</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">v</span><span class="op">.</span><span class="ident">Interface</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;jsValEscaper&nbsp;escapes&nbsp;its&nbsp;inputs&nbsp;to&nbsp;a&nbsp;JS&nbsp;Expression&nbsp;(section&nbsp;11.14)&nbsp;that&nbsp;has</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;neither&nbsp;side-effects&nbsp;nor&nbsp;free&nbsp;variables&nbsp;outside&nbsp;(NaN,&nbsp;Infinity).</span><br>
+<span class="lineno">135</span><span class="keyword">func</span>&nbsp;<span class="ident">jsValEscaper</span><span class="op">(</span><span class="ident">args</span>&nbsp;<span class="op">...</span><span class="keyword">interface</span><span class="op">{</span><span class="op">}</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">a</span>&nbsp;<span class="keyword">interface</span><span class="op">{</span><span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">args</span><span class="op">)</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">1</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">a</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">indirectToJSONMarshaler</span><span class="op">(</span><span class="ident">args</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="ident">t</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">a</span><span class="op">.</span><span class="op">(</span><span class="keyword">type</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">140</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">JS</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="builtintype">string</span><span class="op">(</span><span class="ident">t</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">JSStr</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;TODO:&nbsp;normalize&nbsp;quotes.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="string">`&#34;`</span>&nbsp;<span class="op">+</span>&nbsp;<span class="builtintype">string</span><span class="op">(</span><span class="ident">t</span><span class="op">)</span>&nbsp;<span class="op">+</span>&nbsp;<span class="string">`&#34;`</span><br>
+<span class="lineno">145</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">json</span><span class="op">.</span><span class="ident">Marshaler</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Do&nbsp;not&nbsp;treat&nbsp;as&nbsp;a&nbsp;Stringer.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">fmt</span><span class="op">.</span><span class="ident">Stringer</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">a</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">t</span><span class="op">.</span><span class="ident">String</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">150</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span><span class="op">,</span>&nbsp;<span class="ident">arg</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">args</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">args</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">indirectToJSONMarshaler</span><span class="op">(</span><span class="ident">arg</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">a</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">fmt</span><span class="op">.</span><span class="ident">Sprint</span><span class="op">(</span><span class="ident">args</span><span class="op">...</span><span class="op">)</span><br>
+<span class="lineno">155</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;TODO:&nbsp;detect&nbsp;cycles&nbsp;before&nbsp;calling&nbsp;Marshal&nbsp;which&nbsp;loops&nbsp;infinitely&nbsp;on</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;cyclic&nbsp;data.&nbsp;This&nbsp;may&nbsp;be&nbsp;an&nbsp;unacceptable&nbsp;DoS&nbsp;risk.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">json</span><span class="op">.</span><span class="ident">Marshal</span><span class="op">(</span><span class="ident">a</span><span class="op">)</span><br>
+<span class="lineno">160</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Put&nbsp;a&nbsp;space&nbsp;before&nbsp;comment&nbsp;so&nbsp;that&nbsp;if&nbsp;it&nbsp;is&nbsp;flush&nbsp;against</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;a&nbsp;division&nbsp;operator&nbsp;it&nbsp;is&nbsp;not&nbsp;turned&nbsp;into&nbsp;a&nbsp;line&nbsp;comment:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;x/{{y}}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;turning&nbsp;into</span><br>
+<span class="lineno">165</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;x//*&nbsp;error&nbsp;marshalling&nbsp;y:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;second&nbsp;line&nbsp;of&nbsp;error&nbsp;message&nbsp;*/null</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">fmt</span><span class="op">.</span><span class="ident">Sprintf</span><span class="op">(</span><span class="string">&#34;&nbsp;/*&nbsp;%s&nbsp;*/null&nbsp;&#34;</span><span class="op">,</span>&nbsp;<span class="ident">strings</span><span class="op">.</span><span class="ident">Replace</span><span class="op">(</span><span class="ident">err</span><span class="op">.</span><span class="ident">Error</span><span class="op">(</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="string">&#34;*/&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;*&nbsp;/&#34;</span><span class="op">,</span>&nbsp;<span class="op">-</span><span class="num">1</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">170</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;TODO:&nbsp;maybe&nbsp;post-process&nbsp;output&nbsp;to&nbsp;prevent&nbsp;it&nbsp;from&nbsp;containing</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;&#34;&lt;!--&#34;,&nbsp;&#34;--&gt;&#34;,&nbsp;&#34;&lt;![CDATA[&#34;,&nbsp;&#34;]]&gt;&#34;,&nbsp;or&nbsp;&#34;&lt;/script&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;in&nbsp;case&nbsp;custom&nbsp;marshallers&nbsp;produce&nbsp;output&nbsp;containing&nbsp;those.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;TODO:&nbsp;Maybe&nbsp;abbreviate&nbsp;\u00ab&nbsp;to&nbsp;\xab&nbsp;to&nbsp;produce&nbsp;more&nbsp;compact&nbsp;output.</span><br>
+<span class="lineno">175</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">b</span><span class="op">)</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;In,&nbsp;`x=y/{{.}}*z`&nbsp;a&nbsp;json.Marshaler&nbsp;that&nbsp;produces&nbsp;&#34;&#34;&nbsp;should</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;not&nbsp;cause&nbsp;the&nbsp;output&nbsp;`x=y/*z`.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="string">&#34;&nbsp;null&nbsp;&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">180</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">first</span><span class="op">,</span>&nbsp;<span class="ident">_</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">utf8</span><span class="op">.</span><span class="ident">DecodeRune</span><span class="op">(</span><span class="ident">b</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">last</span><span class="op">,</span>&nbsp;<span class="ident">_</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">utf8</span><span class="op">.</span><span class="ident">DecodeLastRune</span><span class="op">(</span><span class="ident">b</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">buf</span>&nbsp;<span class="ident">bytes</span><span class="op">.</span><span class="ident">Buffer</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Prevent&nbsp;IdentifierNames&nbsp;and&nbsp;NumericLiterals&nbsp;from&nbsp;running&nbsp;into</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;keywords:&nbsp;in,&nbsp;instanceof,&nbsp;typeof,&nbsp;void</span><br>
+<span class="lineno">185</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pad</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">isJSIdentPart</span><span class="op">(</span><span class="ident">first</span><span class="op">)</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">isJSIdentPart</span><span class="op">(</span><span class="ident">last</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">pad</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">buf</span><span class="op">.</span><span class="ident">WriteByte</span><span class="op">(</span><span class="string">&#39;&nbsp;&#39;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">written</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno">190</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Make&nbsp;sure&nbsp;that&nbsp;json.Marshal&nbsp;escapes&nbsp;codepoints&nbsp;U+2028&nbsp;&amp;&nbsp;U+2029</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;so&nbsp;it&nbsp;falls&nbsp;within&nbsp;the&nbsp;subset&nbsp;of&nbsp;JSON&nbsp;which&nbsp;is&nbsp;valid&nbsp;JS.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="num">0</span><span class="op">;</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">b</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">rune</span><span class="op">,</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">utf8</span><span class="op">.</span><span class="ident">DecodeRune</span><span class="op">(</span><span class="ident">b</span><span class="op">[</span><span class="ident">i</span><span class="op">:</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">repl</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="string">&#34;&#34;</span><br>
+<span class="lineno">195</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtintype">rune</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0x2028</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">repl</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">`\u2028`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="keyword">if</span>&nbsp;<span class="builtintype">rune</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0x2029</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">repl</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">`\u2029`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">200</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">repl</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="string">&#34;&#34;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">buf</span><span class="op">.</span><span class="ident">Write</span><span class="op">(</span><span class="ident">b</span><span class="op">[</span><span class="ident">written</span><span class="op">:</span><span class="ident">i</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">buf</span><span class="op">.</span><span class="ident">WriteString</span><span class="op">(</span><span class="ident">repl</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">written</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">n</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">205</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">i</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="ident">n</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">buf</span><span class="op">.</span><span class="ident">Len</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">buf</span><span class="op">.</span><span class="ident">Write</span><span class="op">(</span><span class="ident">b</span><span class="op">[</span><span class="ident">written</span><span class="op">:</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">pad</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">210</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">buf</span><span class="op">.</span><span class="ident">WriteByte</span><span class="op">(</span><span class="string">&#39;&nbsp;&#39;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">buf</span><span class="op">.</span><span class="ident">Bytes</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="builtintype">string</span><span class="op">(</span><span class="ident">b</span><span class="op">)</span><br>
+<span class="lineno">215</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;jsStrEscaper&nbsp;produces&nbsp;a&nbsp;string&nbsp;that&nbsp;can&nbsp;be&nbsp;included&nbsp;between&nbsp;quotes&nbsp;in</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;JavaScript&nbsp;source,&nbsp;in&nbsp;JavaScript&nbsp;embedded&nbsp;in&nbsp;an&nbsp;HTML5&nbsp;&lt;script&gt;&nbsp;element,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;or&nbsp;in&nbsp;an&nbsp;HTML5&nbsp;event&nbsp;handler&nbsp;attribute&nbsp;such&nbsp;as&nbsp;onclick.</span><br>
+<span class="lineno">220</span><span class="keyword">func</span>&nbsp;<span class="ident">jsStrEscaper</span><span class="op">(</span><span class="ident">args</span>&nbsp;<span class="op">...</span><span class="keyword">interface</span><span class="op">{</span><span class="op">}</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">,</span>&nbsp;<span class="ident">t</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">stringify</span><span class="op">(</span><span class="ident">args</span><span class="op">...</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">t</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">contentTypeJSStr</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">replace</span><span class="op">(</span><span class="ident">s</span><span class="op">,</span>&nbsp;<span class="ident">jsStrNormReplacementTable</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">225</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">replace</span><span class="op">(</span><span class="ident">s</span><span class="op">,</span>&nbsp;<span class="ident">jsStrReplacementTable</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;jsRegexpEscaper&nbsp;behaves&nbsp;like&nbsp;jsStrEscaper&nbsp;but&nbsp;escapes&nbsp;regular&nbsp;expression</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;specials&nbsp;so&nbsp;the&nbsp;result&nbsp;is&nbsp;treated&nbsp;literally&nbsp;when&nbsp;included&nbsp;in&nbsp;a&nbsp;regular</span><br>
+<span class="lineno">230</span><span class="comment">//&nbsp;expression&nbsp;literal.&nbsp;/foo{{.X}}bar/&nbsp;matches&nbsp;the&nbsp;string&nbsp;&#34;foo&#34;&nbsp;followed&nbsp;by</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;the&nbsp;literal&nbsp;text&nbsp;of&nbsp;{{.X}}&nbsp;followed&nbsp;by&nbsp;the&nbsp;string&nbsp;&#34;bar&#34;.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">jsRegexpEscaper</span><span class="op">(</span><span class="ident">args</span>&nbsp;<span class="op">...</span><span class="keyword">interface</span><span class="op">{</span><span class="op">}</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">,</span>&nbsp;<span class="ident">_</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">stringify</span><span class="op">(</span><span class="ident">args</span><span class="op">...</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">replace</span><span class="op">(</span><span class="ident">s</span><span class="op">,</span>&nbsp;<span class="ident">jsRegexpReplacementTable</span><span class="op">)</span><br>
+<span class="lineno">235</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">s</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#34;&#34;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;/{{.X}}/&nbsp;should&nbsp;not&nbsp;produce&nbsp;a&nbsp;line&nbsp;comment&nbsp;when&nbsp;.X&nbsp;==&nbsp;&#34;&#34;.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="string">&#34;(?:)&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">s</span><br>
+<span class="lineno">240</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;replace&nbsp;replaces&nbsp;each&nbsp;rune&nbsp;r&nbsp;of&nbsp;s&nbsp;with&nbsp;replacementTable[r],&nbsp;provided&nbsp;that</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;r&nbsp;&lt;&nbsp;len(replacementTable).&nbsp;If&nbsp;replacementTable[r]&nbsp;is&nbsp;the&nbsp;empty&nbsp;string&nbsp;then</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;no&nbsp;replacement&nbsp;is&nbsp;made.</span><br>
+<span class="lineno">245</span><span class="comment">//&nbsp;It&nbsp;also&nbsp;replaces&nbsp;runes&nbsp;U+2028&nbsp;and&nbsp;U+2029&nbsp;with&nbsp;the&nbsp;raw&nbsp;strings&nbsp;`\u2028`&nbsp;and</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;`\u2029`.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">replace</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">replacementTable</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">b</span>&nbsp;<span class="ident">bytes</span><span class="op">.</span><span class="ident">Buffer</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">written</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno">250</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span><span class="op">,</span>&nbsp;<span class="ident">r</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">s</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">repl</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="builtintype">int</span><span class="op">(</span><span class="ident">r</span><span class="op">)</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">replacementTable</span><span class="op">)</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">replacementTable</span><span class="op">[</span><span class="ident">r</span><span class="op">]</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="string">&#34;&#34;</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">repl</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">replacementTable</span><span class="op">[</span><span class="ident">r</span><span class="op">]</span><br>
+<span class="lineno">255</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">r</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;\u2028&#39;</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">repl</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">`\u2028`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">r</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;\u2029&#39;</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">repl</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">`\u2029`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">default</span><span class="op">:</span><br>
+<span class="lineno">260</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">continue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span><span class="op">.</span><span class="ident">WriteString</span><span class="op">(</span><span class="ident">s</span><span class="op">[</span><span class="ident">written</span><span class="op">:</span><span class="ident">i</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span><span class="op">.</span><span class="ident">WriteString</span><span class="op">(</span><span class="ident">repl</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">written</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">utf8</span><span class="op">.</span><span class="ident">RuneLen</span><span class="op">(</span><span class="ident">r</span><span class="op">)</span><br>
+<span class="lineno">265</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">written</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">s</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span><span class="op">.</span><span class="ident">WriteString</span><span class="op">(</span><span class="ident">s</span><span class="op">[</span><span class="ident">written</span><span class="op">:</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno">270</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">b</span><span class="op">.</span><span class="ident">String</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">jsStrReplacementTable</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">string</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="num">0</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">`\0`</span><span class="op">,</span><br>
+<span class="lineno">275</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#39;\t&#39;</span><span class="op">:</span>&nbsp;<span class="string">`\t`</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#39;\n&#39;</span><span class="op">:</span>&nbsp;<span class="string">`\n`</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#39;\v&#39;</span><span class="op">:</span>&nbsp;<span class="string">`\x0b`</span><span class="op">,</span>&nbsp;<span class="comment">//&nbsp;&#34;\v&#34;&nbsp;==&nbsp;&#34;v&#34;&nbsp;on&nbsp;IE&nbsp;6.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#39;\f&#39;</span><span class="op">:</span>&nbsp;<span class="string">`\f`</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#39;\r&#39;</span><span class="op">:</span>&nbsp;<span class="string">`\r`</span><span class="op">,</span><br>
+<span class="lineno">280</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Encode&nbsp;HTML&nbsp;specials&nbsp;as&nbsp;hex&nbsp;so&nbsp;the&nbsp;output&nbsp;can&nbsp;be&nbsp;embedded</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;in&nbsp;HTML&nbsp;attributes&nbsp;without&nbsp;further&nbsp;encoding.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#39;&#34;&#39;</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">`\x22`</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#39;&amp;&#39;</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">`\x26`</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#39;\&#39;&#39;</span><span class="op">:</span>&nbsp;<span class="string">`\x27`</span><span class="op">,</span><br>
+<span class="lineno">285</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#39;+&#39;</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">`\x2b`</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#39;/&#39;</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">`\/`</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#39;&lt;&#39;</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">`\x3c`</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#39;&gt;&#39;</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">`\x3e`</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#39;\\&#39;</span><span class="op">:</span>&nbsp;<span class="string">`\\`</span><span class="op">,</span><br>
+<span class="lineno">290</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;jsStrNormReplacementTable&nbsp;is&nbsp;like&nbsp;jsStrReplacementTable&nbsp;but&nbsp;does&nbsp;not</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;overencode&nbsp;existing&nbsp;escapes&nbsp;since&nbsp;this&nbsp;table&nbsp;has&nbsp;no&nbsp;entry&nbsp;for&nbsp;`\`.</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">jsStrNormReplacementTable</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">string</span><span class="op">{</span><br>
+<span class="lineno">295</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="num">0</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">`\0`</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#39;\t&#39;</span><span class="op">:</span>&nbsp;<span class="string">`\t`</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#39;\n&#39;</span><span class="op">:</span>&nbsp;<span class="string">`\n`</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#39;\v&#39;</span><span class="op">:</span>&nbsp;<span class="string">`\x0b`</span><span class="op">,</span>&nbsp;<span class="comment">//&nbsp;&#34;\v&#34;&nbsp;==&nbsp;&#34;v&#34;&nbsp;on&nbsp;IE&nbsp;6.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#39;\f&#39;</span><span class="op">:</span>&nbsp;<span class="string">`\f`</span><span class="op">,</span><br>
+<span class="lineno">300</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#39;\r&#39;</span><span class="op">:</span>&nbsp;<span class="string">`\r`</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Encode&nbsp;HTML&nbsp;specials&nbsp;as&nbsp;hex&nbsp;so&nbsp;the&nbsp;output&nbsp;can&nbsp;be&nbsp;embedded</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;in&nbsp;HTML&nbsp;attributes&nbsp;without&nbsp;further&nbsp;encoding.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#39;&#34;&#39;</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">`\x22`</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#39;&amp;&#39;</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">`\x26`</span><span class="op">,</span><br>
+<span class="lineno">305</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#39;\&#39;&#39;</span><span class="op">:</span>&nbsp;<span class="string">`\x27`</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#39;+&#39;</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">`\x2b`</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#39;/&#39;</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">`\/`</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#39;&lt;&#39;</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">`\x3c`</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#39;&gt;&#39;</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">`\x3e`</span><span class="op">,</span><br>
+<span class="lineno">310</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">jsRegexpReplacementTable</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">string</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="num">0</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">`\0`</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#39;\t&#39;</span><span class="op">:</span>&nbsp;<span class="string">`\t`</span><span class="op">,</span><br>
+<span class="lineno">315</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#39;\n&#39;</span><span class="op">:</span>&nbsp;<span class="string">`\n`</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#39;\v&#39;</span><span class="op">:</span>&nbsp;<span class="string">`\x0b`</span><span class="op">,</span>&nbsp;<span class="comment">//&nbsp;&#34;\v&#34;&nbsp;==&nbsp;&#34;v&#34;&nbsp;on&nbsp;IE&nbsp;6.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#39;\f&#39;</span><span class="op">:</span>&nbsp;<span class="string">`\f`</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#39;\r&#39;</span><span class="op">:</span>&nbsp;<span class="string">`\r`</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Encode&nbsp;HTML&nbsp;specials&nbsp;as&nbsp;hex&nbsp;so&nbsp;the&nbsp;output&nbsp;can&nbsp;be&nbsp;embedded</span><br>
+<span class="lineno">320</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;in&nbsp;HTML&nbsp;attributes&nbsp;without&nbsp;further&nbsp;encoding.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#39;&#34;&#39;</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">`\x22`</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#39;$&#39;</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">`\$`</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#39;&amp;&#39;</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">`\x26`</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#39;\&#39;&#39;</span><span class="op">:</span>&nbsp;<span class="string">`\x27`</span><span class="op">,</span><br>
+<span class="lineno">325</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#39;(&#39;</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">`\(`</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#39;)&#39;</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">`\)`</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#39;*&#39;</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">`\*`</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#39;+&#39;</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">`\x2b`</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#39;-&#39;</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">`\-`</span><span class="op">,</span><br>
+<span class="lineno">330</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#39;.&#39;</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">`\.`</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#39;/&#39;</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">`\/`</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#39;&lt;&#39;</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">`\x3c`</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#39;&gt;&#39;</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">`\x3e`</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#39;?&#39;</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">`\?`</span><span class="op">,</span><br>
+<span class="lineno">335</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#39;[&#39;</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">`\[`</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#39;\\&#39;</span><span class="op">:</span>&nbsp;<span class="string">`\\`</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#39;]&#39;</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">`\]`</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#39;^&#39;</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">`\^`</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#39;{&#39;</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">`\{`</span><span class="op">,</span><br>
+<span class="lineno">340</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#39;|&#39;</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">`\|`</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#39;}&#39;</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">`\}`</span><span class="op">,</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;isJSIdentPart&nbsp;reports&nbsp;whether&nbsp;the&nbsp;given&nbsp;rune&nbsp;is&nbsp;a&nbsp;JS&nbsp;identifier&nbsp;part.</span><br>
+<span class="lineno">345</span><span class="comment">//&nbsp;It&nbsp;does&nbsp;not&nbsp;handle&nbsp;all&nbsp;the&nbsp;non-Latin&nbsp;letters,&nbsp;joiners,&nbsp;and&nbsp;combining&nbsp;marks,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;but&nbsp;it&nbsp;does&nbsp;handle&nbsp;every&nbsp;codepoint&nbsp;that&nbsp;can&nbsp;occur&nbsp;in&nbsp;a&nbsp;numeric&nbsp;literal&nbsp;or</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;a&nbsp;keyword.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">isJSIdentPart</span><span class="op">(</span><span class="ident">r</span>&nbsp;<span class="builtintype">rune</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">350</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">r</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;$&#39;</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="string">&#39;0&#39;</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">r</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">r</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="string">&#39;9&#39;</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="string">&#39;A&#39;</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">r</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">r</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="string">&#39;Z&#39;</span><span class="op">:</span><br>
+<span class="lineno">355</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">r</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;_&#39;</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="string">&#39;a&#39;</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">r</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">r</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="string">&#39;z&#39;</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno">360</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

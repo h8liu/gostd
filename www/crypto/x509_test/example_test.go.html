@@ -1,0 +1,106 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2014&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">x509_test</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;crypto/x509&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;encoding/pem&#34;</span><br>
+<span class="lineno">10</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">ExampleCertificate_Verify</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Verifying&nbsp;with&nbsp;a&nbsp;custom&nbsp;list&nbsp;of&nbsp;root&nbsp;certificates.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">15</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">const</span>&nbsp;<span class="ident">rootPEM</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">`<br>
+<span class="lineno"></span>-----BEGIN&nbsp;CERTIFICATE-----<br>
+<span class="lineno"></span>MIIEBDCCAuygAwIBAgIDAjppMA0GCSqGSIb3DQEBBQUAMEIxCzAJBgNVBAYTAlVT<br>
+<span class="lineno"></span>MRYwFAYDVQQKEw1HZW9UcnVzdCBJbmMuMRswGQYDVQQDExJHZW9UcnVzdCBHbG9i<br>
+<span class="lineno"></span>YWwgQ0EwHhcNMTMwNDA1MTUxNTU1WhcNMTUwNDA0MTUxNTU1WjBJMQswCQYDVQQG<br>
+<span class="lineno">20</span>EwJVUzETMBEGA1UEChMKR29vZ2xlIEluYzElMCMGA1UEAxMcR29vZ2xlIEludGVy<br>
+<span class="lineno"></span>bmV0IEF1dGhvcml0eSBHMjCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEB<br>
+<span class="lineno"></span>AJwqBHdc2FCROgajguDYUEi8iT/xGXAaiEZ+4I/F8YnOIe5a/mENtzJEiaB0C1NP<br>
+<span class="lineno"></span>VaTOgmKV7utZX8bhBYASxF6UP7xbSDj0U/ck5vuR6RXEz/RTDfRK/J9U3n2+oGtv<br>
+<span class="lineno"></span>h8DQUB8oMANA2ghzUWx//zo8pzcGjr1LEQTrfSTe5vn8MXH7lNVg8y5Kr0LSy+rE<br>
+<span class="lineno">25</span>ahqyzFPdFUuLH8gZYR/Nnag+YyuENWllhMgZxUYi+FOVvuOAShDGKuy6lyARxzmZ<br>
+<span class="lineno"></span>EASg8GF6lSWMTlJ14rbtCMoU/M4iarNOz0YDl5cDfsCx3nuvRTPPuj5xt970JSXC<br>
+<span class="lineno"></span>DTWJnZ37DhF5iR43xa+OcmkCAwEAAaOB+zCB+DAfBgNVHSMEGDAWgBTAephojYn7<br>
+<span class="lineno"></span>qwVkDBF9qn1luMrMTjAdBgNVHQ4EFgQUSt0GFhu89mi1dvWBtrtiGrpagS8wEgYD<br>
+<span class="lineno"></span>VR0TAQH/BAgwBgEB/wIBADAOBgNVHQ8BAf8EBAMCAQYwOgYDVR0fBDMwMTAvoC2g<br>
+<span class="lineno">30</span>K4YpaHR0cDovL2NybC5nZW90cnVzdC5jb20vY3Jscy9ndGdsb2JhbC5jcmwwPQYI<br>
+<span class="lineno"></span>KwYBBQUHAQEEMTAvMC0GCCsGAQUFBzABhiFodHRwOi8vZ3RnbG9iYWwtb2NzcC5n<br>
+<span class="lineno"></span>ZW90cnVzdC5jb20wFwYDVR0gBBAwDjAMBgorBgEEAdZ5AgUBMA0GCSqGSIb3DQEB<br>
+<span class="lineno"></span>BQUAA4IBAQA21waAESetKhSbOHezI6B1WLuxfoNCunLaHtiONgaX4PCVOzf9G0JY<br>
+<span class="lineno"></span>/iLIa704XtE7JW4S615ndkZAkNoUyHgN7ZVm2o6Gb4ChulYylYbc3GrKBIxbf/a/<br>
+<span class="lineno">35</span>zG+FA1jDaFETzf3I93k9mTXwVqO94FntT0QJo544evZG0R0SnU++0ED8Vf4GXjza<br>
+<span class="lineno"></span>HFa9llF7b1cq26KqltyMdMKVvvBulRP/F/A8rLIQjcxz++iPAsbw+zOzlTvjwsto<br>
+<span class="lineno"></span>WHPbqCRiOwY1nQ2pM714A5AuTHhdUDqB1O6gyHA43LL5Z/qHQF1hwFGPa4NrzQU6<br>
+<span class="lineno"></span>yuGnBXj8ytqU0CwIPX4WecigUCAkVDNx<br>
+<span class="lineno"></span>-----END&nbsp;CERTIFICATE-----`</span><br>
+<span class="lineno">40</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">const</span>&nbsp;<span class="ident">certPEM</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">`<br>
+<span class="lineno"></span>-----BEGIN&nbsp;CERTIFICATE-----<br>
+<span class="lineno"></span>MIIDujCCAqKgAwIBAgIIE31FZVaPXTUwDQYJKoZIhvcNAQEFBQAwSTELMAkGA1UE<br>
+<span class="lineno"></span>BhMCVVMxEzARBgNVBAoTCkdvb2dsZSBJbmMxJTAjBgNVBAMTHEdvb2dsZSBJbnRl<br>
+<span class="lineno">45</span>cm5ldCBBdXRob3JpdHkgRzIwHhcNMTQwMTI5MTMyNzQzWhcNMTQwNTI5MDAwMDAw<br>
+<span class="lineno"></span>WjBpMQswCQYDVQQGEwJVUzETMBEGA1UECAwKQ2FsaWZvcm5pYTEWMBQGA1UEBwwN<br>
+<span class="lineno"></span>TW91bnRhaW4gVmlldzETMBEGA1UECgwKR29vZ2xlIEluYzEYMBYGA1UEAwwPbWFp<br>
+<span class="lineno"></span>bC5nb29nbGUuY29tMFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAEfRrObuSW5T7q<br>
+<span class="lineno"></span>5CnSEqefEmtH4CCv6+5EckuriNr1CjfVvqzwfAhopXkLrq45EQm8vkmf7W96XJhC<br>
+<span class="lineno">50</span>7ZM0dYi1/qOCAU8wggFLMB0GA1UdJQQWMBQGCCsGAQUFBwMBBggrBgEFBQcDAjAa<br>
+<span class="lineno"></span>BgNVHREEEzARgg9tYWlsLmdvb2dsZS5jb20wCwYDVR0PBAQDAgeAMGgGCCsGAQUF<br>
+<span class="lineno"></span>BwEBBFwwWjArBggrBgEFBQcwAoYfaHR0cDovL3BraS5nb29nbGUuY29tL0dJQUcy<br>
+<span class="lineno"></span>LmNydDArBggrBgEFBQcwAYYfaHR0cDovL2NsaWVudHMxLmdvb2dsZS5jb20vb2Nz<br>
+<span class="lineno"></span>cDAdBgNVHQ4EFgQUiJxtimAuTfwb+aUtBn5UYKreKvMwDAYDVR0TAQH/BAIwADAf<br>
+<span class="lineno">55</span>BgNVHSMEGDAWgBRK3QYWG7z2aLV29YG2u2IaulqBLzAXBgNVHSAEEDAOMAwGCisG<br>
+<span class="lineno"></span>AQQB1nkCBQEwMAYDVR0fBCkwJzAloCOgIYYfaHR0cDovL3BraS5nb29nbGUuY29t<br>
+<span class="lineno"></span>L0dJQUcyLmNybDANBgkqhkiG9w0BAQUFAAOCAQEAH6RYHxHdcGpMpFE3oxDoFnP+<br>
+<span class="lineno"></span>gtuBCHan2yE2GRbJ2Cw8Lw0MmuKqHlf9RSeYfd3BXeKkj1qO6TVKwCh+0HdZk283<br>
+<span class="lineno"></span>TZZyzmEOyclm3UGFYe82P/iDFt+CeQ3NpmBg+GoaVCuWAARJN/KfglbLyyYygcQq<br>
+<span class="lineno">60</span>0SgeDh8dRKUiaW3HQSoYvTvdTuqzwK4CXsr3b5/dAOY8uMuG/IAR3FgwTbZ1dtoW<br>
+<span class="lineno"></span>RvOTa8hYiU6A475WuZKyEHcwnGYe57u2I2KbMgcKjPniocj4QzgYsVAVKW3IwaOh<br>
+<span class="lineno"></span>yE+vPxsiUkvQHdO2fojCkY8jg70jxM+gu59tPDNbw3Uh/2Ij310FgTHsnGQMyA==<br>
+<span class="lineno"></span>-----END&nbsp;CERTIFICATE-----`</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;First,&nbsp;create&nbsp;the&nbsp;set&nbsp;of&nbsp;root&nbsp;certificates.&nbsp;For&nbsp;this&nbsp;example&nbsp;we&nbsp;only</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;have&nbsp;one.&nbsp;It&#39;s&nbsp;also&nbsp;possible&nbsp;to&nbsp;omit&nbsp;this&nbsp;in&nbsp;order&nbsp;to&nbsp;use&nbsp;the</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;default&nbsp;root&nbsp;set&nbsp;of&nbsp;the&nbsp;current&nbsp;operating&nbsp;system.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">roots</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">x509</span><span class="op">.</span><span class="ident">NewCertPool</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ok</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">roots</span><span class="op">.</span><span class="ident">AppendCertsFromPEM</span><span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">(</span><span class="ident">rootPEM</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">ok</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">panic</span><span class="op">(</span><span class="string">&#34;failed&nbsp;to&nbsp;parse&nbsp;root&nbsp;certificate&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">block</span><span class="op">,</span>&nbsp;<span class="ident">_</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">pem</span><span class="op">.</span><span class="ident">Decode</span><span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">(</span><span class="ident">certPEM</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">block</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">panic</span><span class="op">(</span><span class="string">&#34;failed&nbsp;to&nbsp;parse&nbsp;certificate&nbsp;PEM&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">cert</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">x509</span><span class="op">.</span><span class="ident">ParseCertificate</span><span class="op">(</span><span class="ident">block</span><span class="op">.</span><span class="ident">Bytes</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">panic</span><span class="op">(</span><span class="string">&#34;failed&nbsp;to&nbsp;parse&nbsp;certificate:&nbsp;&#34;</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">err</span><span class="op">.</span><span class="ident">Error</span><span class="op">(</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">opts</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">x509</span><span class="op">.</span><span class="ident">VerifyOptions</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">DNSName</span><span class="op">:</span>&nbsp;<span class="string">&#34;mail.google.com&#34;</span><span class="op">,</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Roots</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;<span class="ident">roots</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">cert</span><span class="op">.</span><span class="ident">Verify</span><span class="op">(</span><span class="ident">opts</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">panic</span><span class="op">(</span><span class="string">&#34;failed&nbsp;to&nbsp;verify&nbsp;certificate:&nbsp;&#34;</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">err</span><span class="op">.</span><span class="ident">Error</span><span class="op">(</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

@@ -1,0 +1,302 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2011&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">time</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;sync&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;syscall&#34;</span><br>
+<span class="lineno">10</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;A&nbsp;Location&nbsp;maps&nbsp;time&nbsp;instants&nbsp;to&nbsp;the&nbsp;zone&nbsp;in&nbsp;use&nbsp;at&nbsp;that&nbsp;time.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Typically,&nbsp;the&nbsp;Location&nbsp;represents&nbsp;the&nbsp;collection&nbsp;of&nbsp;time&nbsp;offsets</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;in&nbsp;use&nbsp;in&nbsp;a&nbsp;geographical&nbsp;area,&nbsp;such&nbsp;as&nbsp;CEST&nbsp;and&nbsp;CET&nbsp;for&nbsp;central&nbsp;Europe.</span><br>
+<span class="lineno">15</span><span class="keyword">type</span>&nbsp;<span class="ident">Location</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">name</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">zone</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="ident">zone</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tx</span>&nbsp;&nbsp;&nbsp;<span class="op">[</span><span class="op">]</span><span class="ident">zoneTrans</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Most&nbsp;lookups&nbsp;will&nbsp;be&nbsp;for&nbsp;the&nbsp;current&nbsp;time.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;To&nbsp;avoid&nbsp;the&nbsp;binary&nbsp;search&nbsp;through&nbsp;tx,&nbsp;keep&nbsp;a</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;static&nbsp;one-element&nbsp;cache&nbsp;that&nbsp;gives&nbsp;the&nbsp;correct</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;zone&nbsp;for&nbsp;the&nbsp;time&nbsp;when&nbsp;the&nbsp;Location&nbsp;was&nbsp;created.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;if&nbsp;cacheStart&nbsp;&lt;=&nbsp;t&nbsp;&lt;=&nbsp;cacheEnd,</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;lookup&nbsp;can&nbsp;return&nbsp;cacheZone.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;The&nbsp;units&nbsp;for&nbsp;cacheStart&nbsp;and&nbsp;cacheEnd&nbsp;are&nbsp;seconds</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;since&nbsp;January&nbsp;1,&nbsp;1970&nbsp;UTC,&nbsp;to&nbsp;match&nbsp;the&nbsp;argument</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;to&nbsp;lookup.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">cacheStart</span>&nbsp;<span class="ident">int64</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">cacheEnd</span>&nbsp;&nbsp;&nbsp;<span class="ident">int64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">cacheZone</span>&nbsp;&nbsp;<span class="op">*</span><span class="ident">zone</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;A&nbsp;zone&nbsp;represents&nbsp;a&nbsp;single&nbsp;time&nbsp;zone&nbsp;such&nbsp;as&nbsp;CEST&nbsp;or&nbsp;CET.</span><br>
+<span class="lineno">35</span><span class="keyword">type</span>&nbsp;<span class="ident">zone</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">name</span>&nbsp;&nbsp;&nbsp;<span class="builtintype">string</span>&nbsp;<span class="comment">//&nbsp;abbreviated&nbsp;name,&nbsp;&#34;CET&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">offset</span>&nbsp;<span class="builtintype">int</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;seconds&nbsp;east&nbsp;of&nbsp;UTC</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">isDST</span>&nbsp;&nbsp;<span class="builtintype">bool</span>&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;is&nbsp;this&nbsp;zone&nbsp;Daylight&nbsp;Savings&nbsp;Time?</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">40</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;A&nbsp;zoneTrans&nbsp;represents&nbsp;a&nbsp;single&nbsp;time&nbsp;zone&nbsp;transition.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">zoneTrans</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">when</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">int64</span>&nbsp;<span class="comment">//&nbsp;transition&nbsp;time,&nbsp;in&nbsp;seconds&nbsp;since&nbsp;1970&nbsp;GMT</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">index</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">uint8</span>&nbsp;<span class="comment">//&nbsp;the&nbsp;index&nbsp;of&nbsp;the&nbsp;zone&nbsp;that&nbsp;goes&nbsp;into&nbsp;effect&nbsp;at&nbsp;that&nbsp;time</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">isstd</span><span class="op">,</span>&nbsp;<span class="ident">isutc</span>&nbsp;<span class="builtintype">bool</span>&nbsp;&nbsp;<span class="comment">//&nbsp;ignored&nbsp;-&nbsp;no&nbsp;idea&nbsp;what&nbsp;these&nbsp;mean</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;alpha&nbsp;and&nbsp;omega&nbsp;are&nbsp;the&nbsp;beginning&nbsp;and&nbsp;end&nbsp;of&nbsp;time&nbsp;for&nbsp;zone</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;transitions.</span><br>
+<span class="lineno">50</span><span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alpha</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">-</span><span class="num">1</span>&nbsp;<span class="op">&lt;&lt;</span>&nbsp;<span class="num">63</span>&nbsp;&nbsp;<span class="comment">//&nbsp;math.MinInt64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">omega</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><span class="op">&lt;&lt;</span><span class="num">63</span>&nbsp;<span class="op">-</span>&nbsp;<span class="num">1</span>&nbsp;<span class="comment">//&nbsp;math.MaxInt64</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">55</span><span class="comment">//&nbsp;UTC&nbsp;represents&nbsp;Universal&nbsp;Coordinated&nbsp;Time&nbsp;(UTC).</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">UTC</span>&nbsp;<span class="op">*</span><span class="ident">Location</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">&amp;</span><span class="ident">utcLoc</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;utcLoc&nbsp;is&nbsp;separate&nbsp;so&nbsp;that&nbsp;get&nbsp;can&nbsp;refer&nbsp;to&nbsp;&amp;utcLoc</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;and&nbsp;ensure&nbsp;that&nbsp;it&nbsp;never&nbsp;returns&nbsp;a&nbsp;nil&nbsp;*Location,</span><br>
+<span class="lineno">60</span><span class="comment">//&nbsp;even&nbsp;if&nbsp;a&nbsp;badly&nbsp;behaved&nbsp;client&nbsp;has&nbsp;changed&nbsp;UTC.</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">utcLoc</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">Location</span><span class="op">{</span><span class="ident">name</span><span class="op">:</span>&nbsp;<span class="string">&#34;UTC&#34;</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Local&nbsp;represents&nbsp;the&nbsp;system&#39;s&nbsp;local&nbsp;time&nbsp;zone.</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">Local</span>&nbsp;<span class="op">*</span><span class="ident">Location</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">&amp;</span><span class="ident">localLoc</span><br>
+<span class="lineno">65</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;localLoc&nbsp;is&nbsp;separate&nbsp;so&nbsp;that&nbsp;initLocal&nbsp;can&nbsp;initialize</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;it&nbsp;even&nbsp;if&nbsp;a&nbsp;client&nbsp;has&nbsp;changed&nbsp;Local.</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">localLoc</span>&nbsp;<span class="ident">Location</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">localOnce</span>&nbsp;<span class="ident">sync</span><span class="op">.</span><span class="ident">Once</span><br>
+<span class="lineno">70</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">l</span>&nbsp;<span class="op">*</span><span class="ident">Location</span><span class="op">)</span>&nbsp;<span class="ident">get</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">Location</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">l</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="op">&amp;</span><span class="ident">utcLoc</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">l</span>&nbsp;<span class="op">==</span>&nbsp;<span class="op">&amp;</span><span class="ident">localLoc</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">localOnce</span><span class="op">.</span><span class="ident">Do</span><span class="op">(</span><span class="ident">initLocal</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">l</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">80</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;String&nbsp;returns&nbsp;a&nbsp;descriptive&nbsp;name&nbsp;for&nbsp;the&nbsp;time&nbsp;zone&nbsp;information,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;corresponding&nbsp;to&nbsp;the&nbsp;argument&nbsp;to&nbsp;LoadLocation.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">l</span>&nbsp;<span class="op">*</span><span class="ident">Location</span><span class="op">)</span>&nbsp;<span class="ident">String</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">l</span><span class="op">.</span><span class="ident">get</span><span class="op">(</span><span class="op">)</span><span class="op">.</span><span class="ident">name</span><br>
+<span class="lineno">85</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;FixedZone&nbsp;returns&nbsp;a&nbsp;Location&nbsp;that&nbsp;always&nbsp;uses</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;the&nbsp;given&nbsp;zone&nbsp;name&nbsp;and&nbsp;offset&nbsp;(seconds&nbsp;east&nbsp;of&nbsp;UTC).</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">FixedZone</span><span class="op">(</span><span class="ident">name</span>&nbsp;<span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">offset</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">Location</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">l</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">&amp;</span><span class="ident">Location</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">name</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">name</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">zone</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">[</span><span class="op">]</span><span class="ident">zone</span><span class="op">{</span><span class="op">{</span><span class="ident">name</span><span class="op">,</span>&nbsp;<span class="ident">offset</span><span class="op">,</span>&nbsp;<span class="ident">false</span><span class="op">}</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tx</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">[</span><span class="op">]</span><span class="ident">zoneTrans</span><span class="op">{</span><span class="op">{</span><span class="ident">alpha</span><span class="op">,</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">false</span><span class="op">,</span>&nbsp;<span class="ident">false</span><span class="op">}</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">cacheStart</span><span class="op">:</span>&nbsp;<span class="ident">alpha</span><span class="op">,</span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">cacheEnd</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;<span class="ident">omega</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">l</span><span class="op">.</span><span class="ident">cacheZone</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">&amp;</span><span class="ident">l</span><span class="op">.</span><span class="ident">zone</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">l</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">100</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;lookup&nbsp;returns&nbsp;information&nbsp;about&nbsp;the&nbsp;time&nbsp;zone&nbsp;in&nbsp;use&nbsp;at&nbsp;an</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;instant&nbsp;in&nbsp;time&nbsp;expressed&nbsp;as&nbsp;seconds&nbsp;since&nbsp;January&nbsp;1,&nbsp;1970&nbsp;00:00:00&nbsp;UTC.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;returned&nbsp;information&nbsp;gives&nbsp;the&nbsp;name&nbsp;of&nbsp;the&nbsp;zone&nbsp;(such&nbsp;as&nbsp;&#34;CET&#34;),</span><br>
+<span class="lineno">105</span><span class="comment">//&nbsp;the&nbsp;start&nbsp;and&nbsp;end&nbsp;times&nbsp;bracketing&nbsp;sec&nbsp;when&nbsp;that&nbsp;zone&nbsp;is&nbsp;in&nbsp;effect,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;the&nbsp;offset&nbsp;in&nbsp;seconds&nbsp;east&nbsp;of&nbsp;UTC&nbsp;(such&nbsp;as&nbsp;-5*60*60),&nbsp;and&nbsp;whether</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;the&nbsp;daylight&nbsp;savings&nbsp;is&nbsp;being&nbsp;observed&nbsp;at&nbsp;that&nbsp;time.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">l</span>&nbsp;<span class="op">*</span><span class="ident">Location</span><span class="op">)</span>&nbsp;<span class="ident">lookup</span><span class="op">(</span><span class="ident">sec</span>&nbsp;<span class="ident">int64</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">name</span>&nbsp;<span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">offset</span>&nbsp;<span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">isDST</span>&nbsp;<span class="builtintype">bool</span><span class="op">,</span>&nbsp;<span class="ident">start</span><span class="op">,</span>&nbsp;<span class="ident">end</span>&nbsp;<span class="ident">int64</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">l</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">l</span><span class="op">.</span><span class="ident">get</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">110</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">l</span><span class="op">.</span><span class="ident">zone</span><span class="op">)</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">name</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">&#34;UTC&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">offset</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">isDST</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno">115</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">start</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">alpha</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">end</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">omega</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">120</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">zone</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">l</span><span class="op">.</span><span class="ident">cacheZone</span><span class="op">;</span>&nbsp;<span class="ident">zone</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">l</span><span class="op">.</span><span class="ident">cacheStart</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">sec</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">sec</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">l</span><span class="op">.</span><span class="ident">cacheEnd</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">name</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">zone</span><span class="op">.</span><span class="ident">name</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">offset</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">zone</span><span class="op">.</span><span class="ident">offset</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">isDST</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">zone</span><span class="op">.</span><span class="ident">isDST</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">start</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">l</span><span class="op">.</span><span class="ident">cacheStart</span><br>
+<span class="lineno">125</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">end</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">l</span><span class="op">.</span><span class="ident">cacheEnd</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">l</span><span class="op">.</span><span class="ident">tx</span><span class="op">)</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">sec</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">l</span><span class="op">.</span><span class="ident">tx</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="op">.</span><span class="ident">when</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">130</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">zone</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">&amp;</span><span class="ident">l</span><span class="op">.</span><span class="ident">zone</span><span class="op">[</span><span class="ident">l</span><span class="op">.</span><span class="ident">lookupFirstZone</span><span class="op">(</span><span class="op">)</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">name</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">zone</span><span class="op">.</span><span class="ident">name</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">offset</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">zone</span><span class="op">.</span><span class="ident">offset</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">isDST</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">zone</span><span class="op">.</span><span class="ident">isDST</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">start</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">alpha</span><br>
+<span class="lineno">135</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">l</span><span class="op">.</span><span class="ident">tx</span><span class="op">)</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">end</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">l</span><span class="op">.</span><span class="ident">tx</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="op">.</span><span class="ident">when</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">end</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">omega</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">140</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Binary&nbsp;search&nbsp;for&nbsp;entry&nbsp;with&nbsp;largest&nbsp;time&nbsp;&lt;=&nbsp;sec.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Not&nbsp;using&nbsp;sort.Search&nbsp;to&nbsp;avoid&nbsp;dependencies.</span><br>
+<span class="lineno">145</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tx</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">l</span><span class="op">.</span><span class="ident">tx</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">end</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">omega</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">lo</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">hi</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">tx</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">hi</span><span class="op">-</span><span class="ident">lo</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">1</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">150</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">m</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">lo</span>&nbsp;<span class="op">+</span>&nbsp;<span class="op">(</span><span class="ident">hi</span><span class="op">-</span><span class="ident">lo</span><span class="op">)</span><span class="op">/</span><span class="num">2</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">lim</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">tx</span><span class="op">[</span><span class="ident">m</span><span class="op">]</span><span class="op">.</span><span class="ident">when</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">sec</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">lim</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">end</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">lim</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">hi</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">m</span><br>
+<span class="lineno">155</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">lo</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">m</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">zone</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">&amp;</span><span class="ident">l</span><span class="op">.</span><span class="ident">zone</span><span class="op">[</span><span class="ident">tx</span><span class="op">[</span><span class="ident">lo</span><span class="op">]</span><span class="op">.</span><span class="ident">index</span><span class="op">]</span><br>
+<span class="lineno">160</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">name</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">zone</span><span class="op">.</span><span class="ident">name</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">offset</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">zone</span><span class="op">.</span><span class="ident">offset</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">isDST</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">zone</span><span class="op">.</span><span class="ident">isDST</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">start</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">tx</span><span class="op">[</span><span class="ident">lo</span><span class="op">]</span><span class="op">.</span><span class="ident">when</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;end&nbsp;=&nbsp;maintained&nbsp;during&nbsp;the&nbsp;search</span><br>
+<span class="lineno">165</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;lookupFirstZone&nbsp;returns&nbsp;the&nbsp;index&nbsp;of&nbsp;the&nbsp;time&nbsp;zone&nbsp;to&nbsp;use&nbsp;for&nbsp;times</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;before&nbsp;the&nbsp;first&nbsp;transition&nbsp;time,&nbsp;or&nbsp;when&nbsp;there&nbsp;are&nbsp;no&nbsp;transition</span><br>
+<span class="lineno">170</span><span class="comment">//&nbsp;times.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;reference&nbsp;implementation&nbsp;in&nbsp;localtime.c&nbsp;from</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;http://www.iana.org/time-zones/repository/releases/tzcode2013g.tar.gz</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;implements&nbsp;the&nbsp;following&nbsp;algorithm&nbsp;for&nbsp;these&nbsp;cases:</span><br>
+<span class="lineno">175</span><span class="comment">//&nbsp;1)&nbsp;If&nbsp;the&nbsp;first&nbsp;zone&nbsp;is&nbsp;unused&nbsp;by&nbsp;the&nbsp;transitions,&nbsp;use&nbsp;it.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;2)&nbsp;Otherwise,&nbsp;if&nbsp;there&nbsp;are&nbsp;transition&nbsp;times,&nbsp;and&nbsp;the&nbsp;first</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;transition&nbsp;is&nbsp;to&nbsp;a&nbsp;zone&nbsp;in&nbsp;daylight&nbsp;time,&nbsp;find&nbsp;the&nbsp;first</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;non-daylight-time&nbsp;zone&nbsp;before&nbsp;and&nbsp;closest&nbsp;to&nbsp;the&nbsp;first&nbsp;transition</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;zone.</span><br>
+<span class="lineno">180</span><span class="comment">//&nbsp;3)&nbsp;Otherwise,&nbsp;use&nbsp;the&nbsp;first&nbsp;zone&nbsp;that&nbsp;is&nbsp;not&nbsp;daylight&nbsp;time,&nbsp;if</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;there&nbsp;is&nbsp;one.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;4)&nbsp;Otherwise,&nbsp;use&nbsp;the&nbsp;first&nbsp;zone.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">l</span>&nbsp;<span class="op">*</span><span class="ident">Location</span><span class="op">)</span>&nbsp;<span class="ident">lookupFirstZone</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Case&nbsp;1.</span><br>
+<span class="lineno">185</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">l</span><span class="op">.</span><span class="ident">firstZoneUsed</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Case&nbsp;2.</span><br>
+<span class="lineno">190</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">l</span><span class="op">.</span><span class="ident">tx</span><span class="op">)</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">l</span><span class="op">.</span><span class="ident">zone</span><span class="op">[</span><span class="ident">l</span><span class="op">.</span><span class="ident">tx</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="op">.</span><span class="ident">index</span><span class="op">]</span><span class="op">.</span><span class="ident">isDST</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">zi</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtintype">int</span><span class="op">(</span><span class="ident">l</span><span class="op">.</span><span class="ident">tx</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="op">.</span><span class="ident">index</span><span class="op">)</span>&nbsp;<span class="op">-</span>&nbsp;<span class="num">1</span><span class="op">;</span>&nbsp;<span class="ident">zi</span>&nbsp;<span class="op">&gt;=</span>&nbsp;<span class="num">0</span><span class="op">;</span>&nbsp;<span class="ident">zi</span><span class="op">--</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">l</span><span class="op">.</span><span class="ident">zone</span><span class="op">[</span><span class="ident">zi</span><span class="op">]</span><span class="op">.</span><span class="ident">isDST</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">zi</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">195</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Case&nbsp;3.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">zi</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">l</span><span class="op">.</span><span class="ident">zone</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">200</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">l</span><span class="op">.</span><span class="ident">zone</span><span class="op">[</span><span class="ident">zi</span><span class="op">]</span><span class="op">.</span><span class="ident">isDST</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">zi</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">205</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Case&nbsp;4.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;firstZoneUsed&nbsp;returns&nbsp;whether&nbsp;the&nbsp;first&nbsp;zone&nbsp;is&nbsp;used&nbsp;by&nbsp;some</span><br>
+<span class="lineno">210</span><span class="comment">//&nbsp;transition.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">l</span>&nbsp;<span class="op">*</span><span class="ident">Location</span><span class="op">)</span>&nbsp;<span class="ident">firstZoneUsed</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">tx</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">l</span><span class="op">.</span><span class="ident">tx</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">tx</span><span class="op">.</span><span class="ident">index</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno">215</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">220</span><span class="comment">//&nbsp;lookupName&nbsp;returns&nbsp;information&nbsp;about&nbsp;the&nbsp;time&nbsp;zone&nbsp;with</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;the&nbsp;given&nbsp;name&nbsp;(such&nbsp;as&nbsp;&#34;EST&#34;)&nbsp;at&nbsp;the&nbsp;given&nbsp;pseudo-Unix&nbsp;time</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;(what&nbsp;the&nbsp;given&nbsp;time&nbsp;of&nbsp;day&nbsp;would&nbsp;be&nbsp;in&nbsp;UTC).</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">l</span>&nbsp;<span class="op">*</span><span class="ident">Location</span><span class="op">)</span>&nbsp;<span class="ident">lookupName</span><span class="op">(</span><span class="ident">name</span>&nbsp;<span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">unix</span>&nbsp;<span class="ident">int64</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">offset</span>&nbsp;<span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">isDST</span>&nbsp;<span class="builtintype">bool</span><span class="op">,</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="builtintype">bool</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">l</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">l</span><span class="op">.</span><span class="ident">get</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">225</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;First&nbsp;try&nbsp;for&nbsp;a&nbsp;zone&nbsp;with&nbsp;the&nbsp;right&nbsp;name&nbsp;that&nbsp;was&nbsp;actually</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;in&nbsp;effect&nbsp;at&nbsp;the&nbsp;given&nbsp;time.&nbsp;(In&nbsp;Sydney,&nbsp;Australia,&nbsp;both&nbsp;standard</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;and&nbsp;daylight-savings&nbsp;time&nbsp;are&nbsp;abbreviated&nbsp;&#34;EST&#34;.&nbsp;Using&nbsp;the</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;offset&nbsp;helps&nbsp;us&nbsp;pick&nbsp;the&nbsp;right&nbsp;one&nbsp;for&nbsp;the&nbsp;given&nbsp;time.</span><br>
+<span class="lineno">230</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;It&#39;s&nbsp;not&nbsp;perfect:&nbsp;during&nbsp;the&nbsp;backward&nbsp;transition&nbsp;we&nbsp;might&nbsp;pick</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;either&nbsp;one.)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">l</span><span class="op">.</span><span class="ident">zone</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">zone</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">&amp;</span><span class="ident">l</span><span class="op">.</span><span class="ident">zone</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">zone</span><span class="op">.</span><span class="ident">name</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">name</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">235</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nam</span><span class="op">,</span>&nbsp;<span class="ident">offset</span><span class="op">,</span>&nbsp;<span class="ident">isDST</span><span class="op">,</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">_</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">l</span><span class="op">.</span><span class="ident">lookup</span><span class="op">(</span><span class="ident">unix</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">int64</span><span class="op">(</span><span class="ident">zone</span><span class="op">.</span><span class="ident">offset</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">nam</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">zone</span><span class="op">.</span><span class="ident">name</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">offset</span><span class="op">,</span>&nbsp;<span class="ident">isDST</span><span class="op">,</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">240</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Otherwise&nbsp;fall&nbsp;back&nbsp;to&nbsp;an&nbsp;ordinary&nbsp;name&nbsp;match.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">l</span><span class="op">.</span><span class="ident">zone</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">zone</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">&amp;</span><span class="ident">l</span><span class="op">.</span><span class="ident">zone</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><br>
+<span class="lineno">245</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">zone</span><span class="op">.</span><span class="ident">name</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">name</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">zone</span><span class="op">.</span><span class="ident">offset</span><span class="op">,</span>&nbsp;<span class="ident">zone</span><span class="op">.</span><span class="ident">isDST</span><span class="op">,</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">250</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Otherwise,&nbsp;give&nbsp;up.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;NOTE(rsc):&nbsp;Eventually&nbsp;we&nbsp;will&nbsp;need&nbsp;to&nbsp;accept&nbsp;the&nbsp;POSIX&nbsp;TZ&nbsp;environment</span><br>
+<span class="lineno">255</span><span class="comment">//&nbsp;syntax&nbsp;too,&nbsp;but&nbsp;I&nbsp;don&#39;t&nbsp;feel&nbsp;like&nbsp;implementing&nbsp;it&nbsp;today.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">zoneinfo</span><span class="op">,</span>&nbsp;<span class="ident">_</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">syscall</span><span class="op">.</span><span class="ident">Getenv</span><span class="op">(</span><span class="string">&#34;ZONEINFO&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;LoadLocation&nbsp;returns&nbsp;the&nbsp;Location&nbsp;with&nbsp;the&nbsp;given&nbsp;name.</span><br>
+<span class="lineno">260</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;If&nbsp;the&nbsp;name&nbsp;is&nbsp;&#34;&#34;&nbsp;or&nbsp;&#34;UTC&#34;,&nbsp;LoadLocation&nbsp;returns&nbsp;UTC.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;If&nbsp;the&nbsp;name&nbsp;is&nbsp;&#34;Local&#34;,&nbsp;LoadLocation&nbsp;returns&nbsp;Local.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Otherwise,&nbsp;the&nbsp;name&nbsp;is&nbsp;taken&nbsp;to&nbsp;be&nbsp;a&nbsp;location&nbsp;name&nbsp;corresponding&nbsp;to&nbsp;a&nbsp;file</span><br>
+<span class="lineno">265</span><span class="comment">//&nbsp;in&nbsp;the&nbsp;IANA&nbsp;Time&nbsp;Zone&nbsp;database,&nbsp;such&nbsp;as&nbsp;&#34;America/New_York&#34;.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;time&nbsp;zone&nbsp;database&nbsp;needed&nbsp;by&nbsp;LoadLocation&nbsp;may&nbsp;not&nbsp;be</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;present&nbsp;on&nbsp;all&nbsp;systems,&nbsp;especially&nbsp;non-Unix&nbsp;systems.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;LoadLocation&nbsp;looks&nbsp;in&nbsp;the&nbsp;directory&nbsp;or&nbsp;uncompressed&nbsp;zip&nbsp;file</span><br>
+<span class="lineno">270</span><span class="comment">//&nbsp;named&nbsp;by&nbsp;the&nbsp;ZONEINFO&nbsp;environment&nbsp;variable,&nbsp;if&nbsp;any,&nbsp;then&nbsp;looks&nbsp;in</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;known&nbsp;installation&nbsp;locations&nbsp;on&nbsp;Unix&nbsp;systems,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;and&nbsp;finally&nbsp;looks&nbsp;in&nbsp;$GOROOT/lib/time/zoneinfo.zip.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">LoadLocation</span><span class="op">(</span><span class="ident">name</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="op">*</span><span class="ident">Location</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">name</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#34;&#34;</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">name</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#34;UTC&#34;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">275</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">UTC</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">name</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#34;Local&#34;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">Local</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">280</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">zoneinfo</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="string">&#34;&#34;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">z</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">loadZoneFile</span><span class="op">(</span><span class="ident">zoneinfo</span><span class="op">,</span>&nbsp;<span class="ident">name</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">z</span><span class="op">.</span><span class="ident">name</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">name</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">z</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">285</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">loadLocation</span><span class="op">(</span><span class="ident">name</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

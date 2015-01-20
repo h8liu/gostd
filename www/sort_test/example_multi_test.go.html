@@ -1,0 +1,146 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2013&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">sort_test</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;fmt&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;sort&#34;</span><br>
+<span class="lineno">10</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;A&nbsp;Change&nbsp;is&nbsp;a&nbsp;record&nbsp;of&nbsp;source&nbsp;code&nbsp;changes,&nbsp;recording&nbsp;user,&nbsp;language,&nbsp;and&nbsp;delta&nbsp;size.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">Change</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">user</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno">15</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">language</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">lines</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">int</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">lessFunc</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="ident">p1</span><span class="op">,</span>&nbsp;<span class="ident">p2</span>&nbsp;<span class="op">*</span><span class="ident">Change</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span><br>
+<span class="lineno">20</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;multiSorter&nbsp;implements&nbsp;the&nbsp;Sort&nbsp;interface,&nbsp;sorting&nbsp;the&nbsp;changes&nbsp;within.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">multiSorter</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">changes</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="ident">Change</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">less</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">[</span><span class="op">]</span><span class="ident">lessFunc</span><br>
+<span class="lineno">25</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Sort&nbsp;sorts&nbsp;the&nbsp;argument&nbsp;slice&nbsp;according&nbsp;to&nbsp;the&nbsp;less&nbsp;functions&nbsp;passed&nbsp;to&nbsp;OrderedBy.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">ms</span>&nbsp;<span class="op">*</span><span class="ident">multiSorter</span><span class="op">)</span>&nbsp;<span class="ident">Sort</span><span class="op">(</span><span class="ident">changes</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="ident">Change</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ms</span><span class="op">.</span><span class="ident">changes</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">changes</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sort</span><span class="op">.</span><span class="ident">Sort</span><span class="op">(</span><span class="ident">ms</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;OrderedBy&nbsp;returns&nbsp;a&nbsp;Sorter&nbsp;that&nbsp;sorts&nbsp;using&nbsp;the&nbsp;less&nbsp;functions,&nbsp;in&nbsp;order.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Call&nbsp;its&nbsp;Sort&nbsp;method&nbsp;to&nbsp;sort&nbsp;the&nbsp;data.</span><br>
+<span class="lineno">35</span><span class="keyword">func</span>&nbsp;<span class="ident">OrderedBy</span><span class="op">(</span><span class="ident">less</span>&nbsp;<span class="op">...</span><span class="ident">lessFunc</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">multiSorter</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="op">&amp;</span><span class="ident">multiSorter</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">less</span><span class="op">:</span>&nbsp;<span class="ident">less</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">40</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Len&nbsp;is&nbsp;part&nbsp;of&nbsp;sort.Interface.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">ms</span>&nbsp;<span class="op">*</span><span class="ident">multiSorter</span><span class="op">)</span>&nbsp;<span class="ident">Len</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">ms</span><span class="op">.</span><span class="ident">changes</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">45</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Swap&nbsp;is&nbsp;part&nbsp;of&nbsp;sort.Interface.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">ms</span>&nbsp;<span class="op">*</span><span class="ident">multiSorter</span><span class="op">)</span>&nbsp;<span class="ident">Swap</span><span class="op">(</span><span class="ident">i</span><span class="op">,</span>&nbsp;<span class="ident">j</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ms</span><span class="op">.</span><span class="ident">changes</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><span class="op">,</span>&nbsp;<span class="ident">ms</span><span class="op">.</span><span class="ident">changes</span><span class="op">[</span><span class="ident">j</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">ms</span><span class="op">.</span><span class="ident">changes</span><span class="op">[</span><span class="ident">j</span><span class="op">]</span><span class="op">,</span>&nbsp;<span class="ident">ms</span><span class="op">.</span><span class="ident">changes</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">50</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Less&nbsp;is&nbsp;part&nbsp;of&nbsp;sort.Interface.&nbsp;It&nbsp;is&nbsp;implemented&nbsp;by&nbsp;looping&nbsp;along&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;less&nbsp;functions&nbsp;until&nbsp;it&nbsp;finds&nbsp;a&nbsp;comparison&nbsp;that&nbsp;is&nbsp;either&nbsp;Less&nbsp;or</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;!Less.&nbsp;Note&nbsp;that&nbsp;it&nbsp;can&nbsp;call&nbsp;the&nbsp;less&nbsp;functions&nbsp;twice&nbsp;per&nbsp;call.&nbsp;We</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;could&nbsp;change&nbsp;the&nbsp;functions&nbsp;to&nbsp;return&nbsp;-1,&nbsp;0,&nbsp;1&nbsp;and&nbsp;reduce&nbsp;the</span><br>
+<span class="lineno">55</span><span class="comment">//&nbsp;number&nbsp;of&nbsp;calls&nbsp;for&nbsp;greater&nbsp;efficiency:&nbsp;an&nbsp;exercise&nbsp;for&nbsp;the&nbsp;reader.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">ms</span>&nbsp;<span class="op">*</span><span class="ident">multiSorter</span><span class="op">)</span>&nbsp;<span class="ident">Less</span><span class="op">(</span><span class="ident">i</span><span class="op">,</span>&nbsp;<span class="ident">j</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">,</span>&nbsp;<span class="ident">q</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">&amp;</span><span class="ident">ms</span><span class="op">.</span><span class="ident">changes</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><span class="op">,</span>&nbsp;<span class="op">&amp;</span><span class="ident">ms</span><span class="op">.</span><span class="ident">changes</span><span class="op">[</span><span class="ident">j</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Try&nbsp;all&nbsp;but&nbsp;the&nbsp;last&nbsp;comparison.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">k</span>&nbsp;<span class="builtintype">int</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">k</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><span class="op">;</span>&nbsp;<span class="ident">k</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">ms</span><span class="op">.</span><span class="ident">less</span><span class="op">)</span><span class="op">-</span><span class="num">1</span><span class="op">;</span>&nbsp;<span class="ident">k</span><span class="op">++</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">less</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">ms</span><span class="op">.</span><span class="ident">less</span><span class="op">[</span><span class="ident">k</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">less</span><span class="op">(</span><span class="ident">p</span><span class="op">,</span>&nbsp;<span class="ident">q</span><span class="op">)</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;p&nbsp;&lt;&nbsp;q,&nbsp;so&nbsp;we&nbsp;have&nbsp;a&nbsp;decision.</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">less</span><span class="op">(</span><span class="ident">q</span><span class="op">,</span>&nbsp;<span class="ident">p</span><span class="op">)</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;p&nbsp;&gt;&nbsp;q,&nbsp;so&nbsp;we&nbsp;have&nbsp;a&nbsp;decision.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;p&nbsp;==&nbsp;q;&nbsp;try&nbsp;the&nbsp;next&nbsp;comparison.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;All&nbsp;comparisons&nbsp;to&nbsp;here&nbsp;said&nbsp;&#34;equal&#34;,&nbsp;so&nbsp;just&nbsp;return&nbsp;whatever</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;the&nbsp;final&nbsp;comparison&nbsp;reports.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">ms</span><span class="op">.</span><span class="ident">less</span><span class="op">[</span><span class="ident">k</span><span class="op">]</span><span class="op">(</span><span class="ident">p</span><span class="op">,</span>&nbsp;<span class="ident">q</span><span class="op">)</span><br>
+<span class="lineno">75</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">changes</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="ident">Change</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;gri&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;Go&#34;</span><span class="op">,</span>&nbsp;<span class="num">100</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;ken&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;C&#34;</span><span class="op">,</span>&nbsp;<span class="num">150</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;glenda&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;Go&#34;</span><span class="op">,</span>&nbsp;<span class="num">200</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;rsc&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;Go&#34;</span><span class="op">,</span>&nbsp;<span class="num">200</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;r&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;Go&#34;</span><span class="op">,</span>&nbsp;<span class="num">100</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;ken&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;Go&#34;</span><span class="op">,</span>&nbsp;<span class="num">200</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;dmr&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;C&#34;</span><span class="op">,</span>&nbsp;<span class="num">100</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;r&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;C&#34;</span><span class="op">,</span>&nbsp;<span class="num">150</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;gri&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;Smalltalk&#34;</span><span class="op">,</span>&nbsp;<span class="num">80</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ExampleMultiKeys&nbsp;demonstrates&nbsp;a&nbsp;technique&nbsp;for&nbsp;sorting&nbsp;a&nbsp;struct&nbsp;type&nbsp;using&nbsp;different</span><br>
+<span class="lineno">90</span><span class="comment">//&nbsp;sets&nbsp;of&nbsp;multiple&nbsp;fields&nbsp;in&nbsp;the&nbsp;comparison.&nbsp;We&nbsp;chain&nbsp;together&nbsp;&#34;Less&#34;&nbsp;functions,&nbsp;each&nbsp;of</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;which&nbsp;compares&nbsp;a&nbsp;single&nbsp;field.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">Example_sortMultiKeys</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Closures&nbsp;that&nbsp;order&nbsp;the&nbsp;Change&nbsp;structure.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">user</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="ident">c1</span><span class="op">,</span>&nbsp;<span class="ident">c2</span>&nbsp;<span class="op">*</span><span class="ident">Change</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">c1</span><span class="op">.</span><span class="ident">user</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">c2</span><span class="op">.</span><span class="ident">user</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">language</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="ident">c1</span><span class="op">,</span>&nbsp;<span class="ident">c2</span>&nbsp;<span class="op">*</span><span class="ident">Change</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">c1</span><span class="op">.</span><span class="ident">language</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">c2</span><span class="op">.</span><span class="ident">language</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">100</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">increasingLines</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="ident">c1</span><span class="op">,</span>&nbsp;<span class="ident">c2</span>&nbsp;<span class="op">*</span><span class="ident">Change</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">c1</span><span class="op">.</span><span class="ident">lines</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">c2</span><span class="op">.</span><span class="ident">lines</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">decreasingLines</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="ident">c1</span><span class="op">,</span>&nbsp;<span class="ident">c2</span>&nbsp;<span class="op">*</span><span class="ident">Change</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">c1</span><span class="op">.</span><span class="ident">lines</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="ident">c2</span><span class="op">.</span><span class="ident">lines</span>&nbsp;<span class="comment">//&nbsp;Note:&nbsp;&gt;&nbsp;orders&nbsp;downwards.</span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Simple&nbsp;use:&nbsp;Sort&nbsp;by&nbsp;user.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">OrderedBy</span><span class="op">(</span><span class="ident">user</span><span class="op">)</span><span class="op">.</span><span class="ident">Sort</span><span class="op">(</span><span class="ident">changes</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fmt</span><span class="op">.</span><span class="ident">Println</span><span class="op">(</span><span class="string">&#34;By&nbsp;user:&#34;</span><span class="op">,</span>&nbsp;<span class="ident">changes</span><span class="op">)</span><br>
+<span class="lineno">110</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;More&nbsp;examples.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">OrderedBy</span><span class="op">(</span><span class="ident">user</span><span class="op">,</span>&nbsp;<span class="ident">increasingLines</span><span class="op">)</span><span class="op">.</span><span class="ident">Sort</span><span class="op">(</span><span class="ident">changes</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fmt</span><span class="op">.</span><span class="ident">Println</span><span class="op">(</span><span class="string">&#34;By&nbsp;user,&lt;lines:&#34;</span><span class="op">,</span>&nbsp;<span class="ident">changes</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">115</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">OrderedBy</span><span class="op">(</span><span class="ident">user</span><span class="op">,</span>&nbsp;<span class="ident">decreasingLines</span><span class="op">)</span><span class="op">.</span><span class="ident">Sort</span><span class="op">(</span><span class="ident">changes</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fmt</span><span class="op">.</span><span class="ident">Println</span><span class="op">(</span><span class="string">&#34;By&nbsp;user,&gt;lines:&#34;</span><span class="op">,</span>&nbsp;<span class="ident">changes</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">OrderedBy</span><span class="op">(</span><span class="ident">language</span><span class="op">,</span>&nbsp;<span class="ident">increasingLines</span><span class="op">)</span><span class="op">.</span><span class="ident">Sort</span><span class="op">(</span><span class="ident">changes</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fmt</span><span class="op">.</span><span class="ident">Println</span><span class="op">(</span><span class="string">&#34;By&nbsp;language,&lt;lines:&#34;</span><span class="op">,</span>&nbsp;<span class="ident">changes</span><span class="op">)</span><br>
+<span class="lineno">120</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">OrderedBy</span><span class="op">(</span><span class="ident">language</span><span class="op">,</span>&nbsp;<span class="ident">increasingLines</span><span class="op">,</span>&nbsp;<span class="ident">user</span><span class="op">)</span><span class="op">.</span><span class="ident">Sort</span><span class="op">(</span><span class="ident">changes</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fmt</span><span class="op">.</span><span class="ident">Println</span><span class="op">(</span><span class="string">&#34;By&nbsp;language,&lt;lines,user:&#34;</span><span class="op">,</span>&nbsp;<span class="ident">changes</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Output:</span><br>
+<span class="lineno">125</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;By&nbsp;user:&nbsp;[{dmr&nbsp;C&nbsp;100}&nbsp;{glenda&nbsp;Go&nbsp;200}&nbsp;{gri&nbsp;Smalltalk&nbsp;80}&nbsp;{gri&nbsp;Go&nbsp;100}&nbsp;{ken&nbsp;Go&nbsp;200}&nbsp;{ken&nbsp;C&nbsp;150}&nbsp;{r&nbsp;Go&nbsp;100}&nbsp;{r&nbsp;C&nbsp;150}&nbsp;{rsc&nbsp;Go&nbsp;200}]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;By&nbsp;user,&lt;lines:&nbsp;[{dmr&nbsp;C&nbsp;100}&nbsp;{glenda&nbsp;Go&nbsp;200}&nbsp;{gri&nbsp;Smalltalk&nbsp;80}&nbsp;{gri&nbsp;Go&nbsp;100}&nbsp;{ken&nbsp;C&nbsp;150}&nbsp;{ken&nbsp;Go&nbsp;200}&nbsp;{r&nbsp;Go&nbsp;100}&nbsp;{r&nbsp;C&nbsp;150}&nbsp;{rsc&nbsp;Go&nbsp;200}]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;By&nbsp;user,&gt;lines:&nbsp;[{dmr&nbsp;C&nbsp;100}&nbsp;{glenda&nbsp;Go&nbsp;200}&nbsp;{gri&nbsp;Go&nbsp;100}&nbsp;{gri&nbsp;Smalltalk&nbsp;80}&nbsp;{ken&nbsp;Go&nbsp;200}&nbsp;{ken&nbsp;C&nbsp;150}&nbsp;{r&nbsp;C&nbsp;150}&nbsp;{r&nbsp;Go&nbsp;100}&nbsp;{rsc&nbsp;Go&nbsp;200}]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;By&nbsp;language,&lt;lines:&nbsp;[{dmr&nbsp;C&nbsp;100}&nbsp;{ken&nbsp;C&nbsp;150}&nbsp;{r&nbsp;C&nbsp;150}&nbsp;{gri&nbsp;Go&nbsp;100}&nbsp;{r&nbsp;Go&nbsp;100}&nbsp;{ken&nbsp;Go&nbsp;200}&nbsp;{glenda&nbsp;Go&nbsp;200}&nbsp;{rsc&nbsp;Go&nbsp;200}&nbsp;{gri&nbsp;Smalltalk&nbsp;80}]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;By&nbsp;language,&lt;lines,user:&nbsp;[{dmr&nbsp;C&nbsp;100}&nbsp;{ken&nbsp;C&nbsp;150}&nbsp;{r&nbsp;C&nbsp;150}&nbsp;{gri&nbsp;Go&nbsp;100}&nbsp;{r&nbsp;Go&nbsp;100}&nbsp;{glenda&nbsp;Go&nbsp;200}&nbsp;{ken&nbsp;Go&nbsp;200}&nbsp;{rsc&nbsp;Go&nbsp;200}&nbsp;{gri&nbsp;Smalltalk&nbsp;80}]</span><br>
+<span class="lineno">130</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

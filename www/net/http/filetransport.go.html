@@ -1,0 +1,138 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2011&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">http</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;fmt&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;io&#34;</span><br>
+<span class="lineno">10</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;fileTransport&nbsp;implements&nbsp;RoundTripper&nbsp;for&nbsp;the&nbsp;&#39;file&#39;&nbsp;protocol.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">fileTransport</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fh</span>&nbsp;<span class="ident">fileHandler</span><br>
+<span class="lineno">15</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;NewFileTransport&nbsp;returns&nbsp;a&nbsp;new&nbsp;RoundTripper,&nbsp;serving&nbsp;the&nbsp;provided</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;FileSystem.&nbsp;The&nbsp;returned&nbsp;RoundTripper&nbsp;ignores&nbsp;the&nbsp;URL&nbsp;host&nbsp;in&nbsp;its</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;incoming&nbsp;requests,&nbsp;as&nbsp;well&nbsp;as&nbsp;most&nbsp;other&nbsp;properties&nbsp;of&nbsp;the</span><br>
+<span class="lineno">20</span><span class="comment">//&nbsp;request.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;typical&nbsp;use&nbsp;case&nbsp;for&nbsp;NewFileTransport&nbsp;is&nbsp;to&nbsp;register&nbsp;the&nbsp;&#34;file&#34;</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;protocol&nbsp;with&nbsp;a&nbsp;Transport,&nbsp;as&nbsp;in:</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">25</span><span class="comment">//&nbsp;&nbsp;&nbsp;t&nbsp;:=&nbsp;&amp;http.Transport{}</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;t.RegisterProtocol(&#34;file&#34;,&nbsp;http.NewFileTransport(http.Dir(&#34;/&#34;)))</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;c&nbsp;:=&nbsp;&amp;http.Client{Transport:&nbsp;t}</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;res,&nbsp;err&nbsp;:=&nbsp;c.Get(&#34;file:///etc/passwd&#34;)</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;...</span><br>
+<span class="lineno">30</span><span class="keyword">func</span>&nbsp;<span class="ident">NewFileTransport</span><span class="op">(</span><span class="ident">fs</span>&nbsp;<span class="ident">FileSystem</span><span class="op">)</span>&nbsp;<span class="ident">RoundTripper</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">fileTransport</span><span class="op">{</span><span class="ident">fileHandler</span><span class="op">{</span><span class="ident">fs</span><span class="op">}</span><span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">t</span>&nbsp;<span class="ident">fileTransport</span><span class="op">)</span>&nbsp;<span class="ident">RoundTrip</span><span class="op">(</span><span class="ident">req</span>&nbsp;<span class="op">*</span><span class="ident">Request</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">resp</span>&nbsp;<span class="op">*</span><span class="ident">Response</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;We&nbsp;start&nbsp;ServeHTTP&nbsp;in&nbsp;a&nbsp;goroutine,&nbsp;which&nbsp;may&nbsp;take&nbsp;a&nbsp;long</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;time&nbsp;if&nbsp;the&nbsp;file&nbsp;is&nbsp;large.&nbsp;&nbsp;The&nbsp;newPopulateResponseWriter</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;call&nbsp;returns&nbsp;a&nbsp;channel&nbsp;which&nbsp;either&nbsp;ServeHTTP&nbsp;or&nbsp;finish()</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;sends&nbsp;our&nbsp;*Response&nbsp;on,&nbsp;once&nbsp;the&nbsp;*Response&nbsp;itself&nbsp;has&nbsp;been</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;populated&nbsp;(even&nbsp;if&nbsp;the&nbsp;body&nbsp;itself&nbsp;is&nbsp;still&nbsp;being</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;written&nbsp;to&nbsp;the&nbsp;res.Body,&nbsp;a&nbsp;pipe)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">rw</span><span class="op">,</span>&nbsp;<span class="ident">resc</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">newPopulateResponseWriter</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">go</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">fh</span><span class="op">.</span><span class="ident">ServeHTTP</span><span class="op">(</span><span class="ident">rw</span><span class="op">,</span>&nbsp;<span class="ident">req</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">rw</span><span class="op">.</span><span class="ident">finish</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="op">&lt;-</span><span class="ident">resc</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">newPopulateResponseWriter</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="op">*</span><span class="ident">populateResponse</span><span class="op">,</span>&nbsp;<span class="op">&lt;-</span><span class="keyword">chan</span>&nbsp;<span class="op">*</span><span class="ident">Response</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pr</span><span class="op">,</span>&nbsp;<span class="ident">pw</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">Pipe</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">rw</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">&amp;</span><span class="ident">populateResponse</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ch</span><span class="op">:</span>&nbsp;<span class="builtinfunc">make</span><span class="op">(</span><span class="keyword">chan</span>&nbsp;<span class="op">*</span><span class="ident">Response</span><span class="op">)</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pw</span><span class="op">:</span>&nbsp;<span class="ident">pw</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">res</span><span class="op">:</span>&nbsp;<span class="op">&amp;</span><span class="ident">Response</span><span class="op">{</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Proto</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;HTTP/1.0&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ProtoMajor</span><span class="op">:</span>&nbsp;<span class="num">1</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Header</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtinfunc">make</span><span class="op">(</span><span class="ident">Header</span><span class="op">)</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Close</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">true</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Body</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">pr</span><span class="op">,</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">rw</span><span class="op">,</span>&nbsp;<span class="ident">rw</span><span class="op">.</span><span class="ident">ch</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">65</span><span class="comment">//&nbsp;populateResponse&nbsp;is&nbsp;a&nbsp;ResponseWriter&nbsp;that&nbsp;populates&nbsp;the&nbsp;*Response</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;in&nbsp;res,&nbsp;and&nbsp;writes&nbsp;its&nbsp;body&nbsp;to&nbsp;a&nbsp;pipe&nbsp;connected&nbsp;to&nbsp;the&nbsp;response</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;body.&nbsp;Once&nbsp;writes&nbsp;begin&nbsp;or&nbsp;finish()&nbsp;is&nbsp;called,&nbsp;the&nbsp;response&nbsp;is&nbsp;sent</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;on&nbsp;ch.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">populateResponse</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">res</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">*</span><span class="ident">Response</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ch</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">chan</span>&nbsp;<span class="op">*</span><span class="ident">Response</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">wroteHeader</span>&nbsp;&nbsp;<span class="builtintype">bool</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">hasContent</span>&nbsp;&nbsp;&nbsp;<span class="builtintype">bool</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sentResponse</span>&nbsp;<span class="builtintype">bool</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pw</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">*</span><span class="ident">io</span><span class="op">.</span><span class="ident">PipeWriter</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">pr</span>&nbsp;<span class="op">*</span><span class="ident">populateResponse</span><span class="op">)</span>&nbsp;<span class="ident">finish</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">pr</span><span class="op">.</span><span class="ident">wroteHeader</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pr</span><span class="op">.</span><span class="ident">WriteHeader</span><span class="op">(</span><span class="num">500</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">pr</span><span class="op">.</span><span class="ident">sentResponse</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pr</span><span class="op">.</span><span class="ident">sendResponse</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pr</span><span class="op">.</span><span class="ident">pw</span><span class="op">.</span><span class="ident">Close</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">pr</span>&nbsp;<span class="op">*</span><span class="ident">populateResponse</span><span class="op">)</span>&nbsp;<span class="ident">sendResponse</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">pr</span><span class="op">.</span><span class="ident">sentResponse</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pr</span><span class="op">.</span><span class="ident">sentResponse</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">pr</span><span class="op">.</span><span class="ident">hasContent</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pr</span><span class="op">.</span><span class="ident">res</span><span class="op">.</span><span class="ident">ContentLength</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">-</span><span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pr</span><span class="op">.</span><span class="ident">ch</span>&nbsp;<span class="op">&lt;-</span>&nbsp;<span class="ident">pr</span><span class="op">.</span><span class="ident">res</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">100</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">pr</span>&nbsp;<span class="op">*</span><span class="ident">populateResponse</span><span class="op">)</span>&nbsp;<span class="ident">Header</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="ident">Header</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">pr</span><span class="op">.</span><span class="ident">res</span><span class="op">.</span><span class="ident">Header</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">pr</span>&nbsp;<span class="op">*</span><span class="ident">populateResponse</span><span class="op">)</span>&nbsp;<span class="ident">WriteHeader</span><span class="op">(</span><span class="ident">code</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">pr</span><span class="op">.</span><span class="ident">wroteHeader</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pr</span><span class="op">.</span><span class="ident">wroteHeader</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">110</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pr</span><span class="op">.</span><span class="ident">res</span><span class="op">.</span><span class="ident">StatusCode</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">code</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pr</span><span class="op">.</span><span class="ident">res</span><span class="op">.</span><span class="ident">Status</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">fmt</span><span class="op">.</span><span class="ident">Sprintf</span><span class="op">(</span><span class="string">&#34;%d&nbsp;%s&#34;</span><span class="op">,</span>&nbsp;<span class="ident">code</span><span class="op">,</span>&nbsp;<span class="ident">StatusText</span><span class="op">(</span><span class="ident">code</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">pr</span>&nbsp;<span class="op">*</span><span class="ident">populateResponse</span><span class="op">)</span>&nbsp;<span class="ident">Write</span><span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">n</span>&nbsp;<span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">115</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">pr</span><span class="op">.</span><span class="ident">wroteHeader</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pr</span><span class="op">.</span><span class="ident">WriteHeader</span><span class="op">(</span><span class="ident">StatusOK</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pr</span><span class="op">.</span><span class="ident">hasContent</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">pr</span><span class="op">.</span><span class="ident">sentResponse</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">120</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pr</span><span class="op">.</span><span class="ident">sendResponse</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">pr</span><span class="op">.</span><span class="ident">pw</span><span class="op">.</span><span class="ident">Write</span><span class="op">(</span><span class="ident">p</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

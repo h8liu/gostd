@@ -1,0 +1,352 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2011&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="comment">//&nbsp;Package&nbsp;csv&nbsp;reads&nbsp;and&nbsp;writes&nbsp;comma-separated&nbsp;values&nbsp;(CSV)&nbsp;files.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;A&nbsp;csv&nbsp;file&nbsp;contains&nbsp;zero&nbsp;or&nbsp;more&nbsp;records&nbsp;of&nbsp;one&nbsp;or&nbsp;more&nbsp;fields&nbsp;per&nbsp;record.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Each&nbsp;record&nbsp;is&nbsp;separated&nbsp;by&nbsp;the&nbsp;newline&nbsp;character.&nbsp;The&nbsp;final&nbsp;record&nbsp;may</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;optionally&nbsp;be&nbsp;followed&nbsp;by&nbsp;a&nbsp;newline&nbsp;character.</span><br>
+<span class="lineno">10</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspfield1,field2,field3</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;White&nbsp;space&nbsp;is&nbsp;considered&nbsp;part&nbsp;of&nbsp;a&nbsp;field.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">15</span><span class="comment">//&nbsp;Carriage&nbsp;returns&nbsp;before&nbsp;newline&nbsp;characters&nbsp;are&nbsp;silently&nbsp;removed.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Blank&nbsp;lines&nbsp;are&nbsp;ignored.&nbsp;&nbsp;A&nbsp;line&nbsp;with&nbsp;only&nbsp;whitespace&nbsp;characters&nbsp;(excluding</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;the&nbsp;ending&nbsp;newline&nbsp;character)&nbsp;is&nbsp;not&nbsp;considered&nbsp;a&nbsp;blank&nbsp;line.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">20</span><span class="comment">//&nbsp;Fields&nbsp;which&nbsp;start&nbsp;and&nbsp;stop&nbsp;with&nbsp;the&nbsp;quote&nbsp;character&nbsp;&#34;&nbsp;are&nbsp;called</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;quoted-fields.&nbsp;&nbsp;The&nbsp;beginning&nbsp;and&nbsp;ending&nbsp;quote&nbsp;are&nbsp;not&nbsp;part&nbsp;of&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;field.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;source:</span><br>
+<span class="lineno">25</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspnormal&nbsp;string,&#34;quoted-field&#34;</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;results&nbsp;in&nbsp;the&nbsp;fields</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">30</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp{`normal&nbsp;string`,&nbsp;`quoted-field`}</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Within&nbsp;a&nbsp;quoted-field&nbsp;a&nbsp;quote&nbsp;character&nbsp;followed&nbsp;by&nbsp;a&nbsp;second&nbsp;quote</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;character&nbsp;is&nbsp;considered&nbsp;a&nbsp;single&nbsp;quote.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">35</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp&#34;the&nbsp;&#34;&#34;word&#34;&#34;&nbsp;is&nbsp;true&#34;,&#34;a&nbsp;&#34;&#34;quoted-field&#34;&#34;&#34;</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;results&nbsp;in</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp{`the&nbsp;&#34;word&#34;&nbsp;is&nbsp;true`,&nbsp;`a&nbsp;&#34;quoted-field&#34;`}</span><br>
+<span class="lineno">40</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Newlines&nbsp;and&nbsp;commas&nbsp;may&nbsp;be&nbsp;included&nbsp;in&nbsp;a&nbsp;quoted-field</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp&#34;Multi-line</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspfield&#34;,&#34;comma&nbsp;is&nbsp;,&#34;</span><br>
+<span class="lineno">45</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;results&nbsp;in</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp{`Multi-line</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspfield`,&nbsp;`comma&nbsp;is&nbsp;,`}</span><br>
+<span class="lineno">50</span><span class="keyword">package</span>&nbsp;<span class="ident">csv</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;bufio&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;bytes&#34;</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;errors&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;fmt&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;io&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;unicode&#34;</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno">60</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;A&nbsp;ParseError&nbsp;is&nbsp;returned&nbsp;for&nbsp;parsing&nbsp;errors.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;first&nbsp;line&nbsp;is&nbsp;1.&nbsp;&nbsp;The&nbsp;first&nbsp;column&nbsp;is&nbsp;0.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">ParseError</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Line</span>&nbsp;&nbsp;&nbsp;<span class="builtintype">int</span>&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;Line&nbsp;where&nbsp;the&nbsp;error&nbsp;occurred</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Column</span>&nbsp;<span class="builtintype">int</span>&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;Column&nbsp;(rune&nbsp;index)&nbsp;where&nbsp;the&nbsp;error&nbsp;occurred</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Err</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">error</span>&nbsp;<span class="comment">//&nbsp;The&nbsp;actual&nbsp;error</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">e</span>&nbsp;<span class="op">*</span><span class="ident">ParseError</span><span class="op">)</span>&nbsp;<span class="ident">Error</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">fmt</span><span class="op">.</span><span class="ident">Sprintf</span><span class="op">(</span><span class="string">&#34;line&nbsp;%d,&nbsp;column&nbsp;%d:&nbsp;%s&#34;</span><span class="op">,</span>&nbsp;<span class="ident">e</span><span class="op">.</span><span class="ident">Line</span><span class="op">,</span>&nbsp;<span class="ident">e</span><span class="op">.</span><span class="ident">Column</span><span class="op">,</span>&nbsp;<span class="ident">e</span><span class="op">.</span><span class="ident">Err</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;These&nbsp;are&nbsp;the&nbsp;errors&nbsp;that&nbsp;can&nbsp;be&nbsp;returned&nbsp;in&nbsp;ParseError.Error</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ErrTrailingComma</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">errors</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="string">&#34;extra&nbsp;delimiter&nbsp;at&nbsp;end&nbsp;of&nbsp;line&#34;</span><span class="op">)</span>&nbsp;<span class="comment">//&nbsp;no&nbsp;longer&nbsp;used</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ErrBareQuote</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="ident">errors</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="string">&#34;bare&nbsp;\&#34;&nbsp;in&nbsp;non-quoted-field&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ErrQuote</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="ident">errors</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="string">&#34;extraneous&nbsp;\&#34;&nbsp;in&nbsp;field&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ErrFieldCount</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="ident">errors</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="string">&#34;wrong&nbsp;number&nbsp;of&nbsp;fields&nbsp;in&nbsp;line&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno">80</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;A&nbsp;Reader&nbsp;reads&nbsp;records&nbsp;from&nbsp;a&nbsp;CSV-encoded&nbsp;file.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;As&nbsp;returned&nbsp;by&nbsp;NewReader,&nbsp;a&nbsp;Reader&nbsp;expects&nbsp;input&nbsp;conforming&nbsp;to&nbsp;RFC&nbsp;4180.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;exported&nbsp;fields&nbsp;can&nbsp;be&nbsp;changed&nbsp;to&nbsp;customize&nbsp;the&nbsp;details&nbsp;before&nbsp;the</span><br>
+<span class="lineno">85</span><span class="comment">//&nbsp;first&nbsp;call&nbsp;to&nbsp;Read&nbsp;or&nbsp;ReadAll.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Comma&nbsp;is&nbsp;the&nbsp;field&nbsp;delimiter.&nbsp;&nbsp;It&nbsp;defaults&nbsp;to&nbsp;&#39;,&#39;.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Comment,&nbsp;if&nbsp;not&nbsp;0,&nbsp;is&nbsp;the&nbsp;comment&nbsp;character.&nbsp;Lines&nbsp;beginning&nbsp;with&nbsp;the</span><br>
+<span class="lineno">90</span><span class="comment">//&nbsp;Comment&nbsp;character&nbsp;are&nbsp;ignored.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;If&nbsp;FieldsPerRecord&nbsp;is&nbsp;positive,&nbsp;Read&nbsp;requires&nbsp;each&nbsp;record&nbsp;to</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;have&nbsp;the&nbsp;given&nbsp;number&nbsp;of&nbsp;fields.&nbsp;&nbsp;If&nbsp;FieldsPerRecord&nbsp;is&nbsp;0,&nbsp;Read&nbsp;sets&nbsp;it&nbsp;to</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;the&nbsp;number&nbsp;of&nbsp;fields&nbsp;in&nbsp;the&nbsp;first&nbsp;record,&nbsp;so&nbsp;that&nbsp;future&nbsp;records&nbsp;must</span><br>
+<span class="lineno">95</span><span class="comment">//&nbsp;have&nbsp;the&nbsp;same&nbsp;field&nbsp;count.&nbsp;&nbsp;If&nbsp;FieldsPerRecord&nbsp;is&nbsp;negative,&nbsp;no&nbsp;check&nbsp;is</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;made&nbsp;and&nbsp;records&nbsp;may&nbsp;have&nbsp;a&nbsp;variable&nbsp;number&nbsp;of&nbsp;fields.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;If&nbsp;LazyQuotes&nbsp;is&nbsp;true,&nbsp;a&nbsp;quote&nbsp;may&nbsp;appear&nbsp;in&nbsp;an&nbsp;unquoted&nbsp;field&nbsp;and&nbsp;a</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;non-doubled&nbsp;quote&nbsp;may&nbsp;appear&nbsp;in&nbsp;a&nbsp;quoted&nbsp;field.</span><br>
+<span class="lineno">100</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;If&nbsp;TrimLeadingSpace&nbsp;is&nbsp;true,&nbsp;leading&nbsp;white&nbsp;space&nbsp;in&nbsp;a&nbsp;field&nbsp;is&nbsp;ignored.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">Reader</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Comma</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">rune</span>&nbsp;<span class="comment">//&nbsp;field&nbsp;delimiter&nbsp;(set&nbsp;to&nbsp;&#39;,&#39;&nbsp;by&nbsp;NewReader)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Comment</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">rune</span>&nbsp;<span class="comment">//&nbsp;comment&nbsp;character&nbsp;for&nbsp;start&nbsp;of&nbsp;line</span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">FieldsPerRecord</span>&nbsp;&nbsp;<span class="builtintype">int</span>&nbsp;&nbsp;<span class="comment">//&nbsp;number&nbsp;of&nbsp;expected&nbsp;fields&nbsp;per&nbsp;record</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">LazyQuotes</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="comment">//&nbsp;allow&nbsp;lazy&nbsp;quotes</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">TrailingComma</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="comment">//&nbsp;ignored;&nbsp;here&nbsp;for&nbsp;backwards&nbsp;compatibility</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">TrimLeadingSpace</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="comment">//&nbsp;trim&nbsp;leading&nbsp;space</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">line</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">int</span><br>
+<span class="lineno">110</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">column</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">int</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">*</span><span class="ident">bufio</span><span class="op">.</span><span class="ident">Reader</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">field</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">bytes</span><span class="op">.</span><span class="ident">Buffer</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">115</span><span class="comment">//&nbsp;NewReader&nbsp;returns&nbsp;a&nbsp;new&nbsp;Reader&nbsp;that&nbsp;reads&nbsp;from&nbsp;r.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">NewReader</span><span class="op">(</span><span class="ident">r</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">Reader</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">Reader</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="op">&amp;</span><span class="ident">Reader</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Comma</span><span class="op">:</span>&nbsp;<span class="string">&#39;,&#39;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">bufio</span><span class="op">.</span><span class="ident">NewReader</span><span class="op">(</span><span class="ident">r</span><span class="op">)</span><span class="op">,</span><br>
+<span class="lineno">120</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;error&nbsp;creates&nbsp;a&nbsp;new&nbsp;ParseError&nbsp;based&nbsp;on&nbsp;err.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">r</span>&nbsp;<span class="op">*</span><span class="ident">Reader</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span><span class="op">(</span><span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">125</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="op">&amp;</span><span class="ident">ParseError</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Line</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">line</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Column</span><span class="op">:</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">column</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Err</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">err</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">130</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Read&nbsp;reads&nbsp;one&nbsp;record&nbsp;from&nbsp;r.&nbsp;&nbsp;The&nbsp;record&nbsp;is&nbsp;a&nbsp;slice&nbsp;of&nbsp;strings&nbsp;with&nbsp;each</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;string&nbsp;representing&nbsp;one&nbsp;field.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">r</span>&nbsp;<span class="op">*</span><span class="ident">Reader</span><span class="op">)</span>&nbsp;<span class="ident">Read</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">record</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">135</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">record</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">parseRecord</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">record</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">break</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">140</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">145</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">FieldsPerRecord</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">record</span><span class="op">)</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">FieldsPerRecord</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span><span class="op">.</span><span class="ident">column</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="comment">//&nbsp;report&nbsp;at&nbsp;start&nbsp;of&nbsp;record</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">record</span><span class="op">,</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="builtintype">error</span><span class="op">(</span><span class="ident">ErrFieldCount</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">150</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="keyword">if</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">FieldsPerRecord</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span><span class="op">.</span><span class="ident">FieldsPerRecord</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">record</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">record</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">155</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ReadAll&nbsp;reads&nbsp;all&nbsp;the&nbsp;remaining&nbsp;records&nbsp;from&nbsp;r.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Each&nbsp;record&nbsp;is&nbsp;a&nbsp;slice&nbsp;of&nbsp;fields.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;A&nbsp;successful&nbsp;call&nbsp;returns&nbsp;err&nbsp;==&nbsp;nil,&nbsp;not&nbsp;err&nbsp;==&nbsp;EOF.&nbsp;Because&nbsp;ReadAll&nbsp;is</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;defined&nbsp;to&nbsp;read&nbsp;until&nbsp;EOF,&nbsp;it&nbsp;does&nbsp;not&nbsp;treat&nbsp;end&nbsp;of&nbsp;file&nbsp;as&nbsp;an&nbsp;error&nbsp;to&nbsp;be</span><br>
+<span class="lineno">160</span><span class="comment">//&nbsp;reported.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">r</span>&nbsp;<span class="op">*</span><span class="ident">Reader</span><span class="op">)</span>&nbsp;<span class="ident">ReadAll</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">records</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="op">[</span><span class="op">]</span><span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">record</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">Read</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">EOF</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">165</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">records</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">170</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">records</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">append</span><span class="op">(</span><span class="ident">records</span><span class="op">,</span>&nbsp;<span class="ident">record</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;readRune&nbsp;reads&nbsp;one&nbsp;rune&nbsp;from&nbsp;r,&nbsp;folding&nbsp;\r\n&nbsp;to&nbsp;\n&nbsp;and&nbsp;keeping&nbsp;track</span><br>
+<span class="lineno">175</span><span class="comment">//&nbsp;of&nbsp;how&nbsp;far&nbsp;into&nbsp;the&nbsp;line&nbsp;we&nbsp;have&nbsp;read.&nbsp;&nbsp;r.column&nbsp;will&nbsp;point&nbsp;to&nbsp;the&nbsp;start</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;of&nbsp;this&nbsp;rune,&nbsp;not&nbsp;the&nbsp;end&nbsp;of&nbsp;this&nbsp;rune.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">r</span>&nbsp;<span class="op">*</span><span class="ident">Reader</span><span class="op">)</span>&nbsp;<span class="ident">readRune</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="builtintype">rune</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r1</span><span class="op">,</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">r</span><span class="op">.</span><span class="ident">ReadRune</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">180</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Handle&nbsp;\r\n&nbsp;here.&nbsp;&nbsp;We&nbsp;make&nbsp;the&nbsp;simplifying&nbsp;assumption&nbsp;that</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;anytime&nbsp;\r&nbsp;is&nbsp;followed&nbsp;by&nbsp;\n&nbsp;that&nbsp;it&nbsp;can&nbsp;be&nbsp;folded&nbsp;to&nbsp;\n.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;We&nbsp;will&nbsp;not&nbsp;detect&nbsp;files&nbsp;which&nbsp;contain&nbsp;both&nbsp;\r\n&nbsp;and&nbsp;bare&nbsp;\n.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">r1</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;\r&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r1</span><span class="op">,</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">r</span><span class="op">.</span><span class="ident">ReadRune</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">185</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">r1</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="string">&#39;\n&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span><span class="op">.</span><span class="ident">r</span><span class="op">.</span><span class="ident">UnreadRune</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r1</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">&#39;\r&#39;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">190</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span><span class="op">.</span><span class="ident">column</span><span class="op">++</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">r1</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">195</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;skip&nbsp;reads&nbsp;runes&nbsp;up&nbsp;to&nbsp;and&nbsp;including&nbsp;the&nbsp;rune&nbsp;delim&nbsp;or&nbsp;until&nbsp;error.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">r</span>&nbsp;<span class="op">*</span><span class="ident">Reader</span><span class="op">)</span>&nbsp;<span class="ident">skip</span><span class="op">(</span><span class="ident">delim</span>&nbsp;<span class="builtintype">rune</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r1</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">readRune</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">200</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">r1</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">delim</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno">205</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;parseRecord&nbsp;reads&nbsp;and&nbsp;parses&nbsp;a&nbsp;single&nbsp;csv&nbsp;record&nbsp;from&nbsp;r.</span><br>
+<span class="lineno">210</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">r</span>&nbsp;<span class="op">*</span><span class="ident">Reader</span><span class="op">)</span>&nbsp;<span class="ident">parseRecord</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">fields</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Each&nbsp;record&nbsp;starts&nbsp;on&nbsp;a&nbsp;new&nbsp;line.&nbsp;&nbsp;We&nbsp;increment&nbsp;our&nbsp;line</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;number&nbsp;(lines&nbsp;start&nbsp;at&nbsp;1,&nbsp;not&nbsp;0)&nbsp;and&nbsp;set&nbsp;column&nbsp;to&nbsp;-1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;so&nbsp;as&nbsp;we&nbsp;increment&nbsp;in&nbsp;readRune&nbsp;it&nbsp;points&nbsp;to&nbsp;the&nbsp;character&nbsp;we&nbsp;read.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span><span class="op">.</span><span class="ident">line</span><span class="op">++</span><br>
+<span class="lineno">215</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span><span class="op">.</span><span class="ident">column</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">-</span><span class="num">1</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Peek&nbsp;at&nbsp;the&nbsp;first&nbsp;rune.&nbsp;&nbsp;If&nbsp;it&nbsp;is&nbsp;an&nbsp;error&nbsp;we&nbsp;are&nbsp;done.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;If&nbsp;we&nbsp;are&nbsp;support&nbsp;comments&nbsp;and&nbsp;it&nbsp;is&nbsp;the&nbsp;comment&nbsp;character</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;then&nbsp;skip&nbsp;to&nbsp;the&nbsp;end&nbsp;of&nbsp;line.</span><br>
+<span class="lineno">220</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r1</span><span class="op">,</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">r</span><span class="op">.</span><span class="ident">ReadRune</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">225</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">Comment</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">r1</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">Comment</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">skip</span><span class="op">(</span><span class="string">&#39;\n&#39;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span><span class="op">.</span><span class="ident">r</span><span class="op">.</span><span class="ident">UnreadRune</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">230</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;At&nbsp;this&nbsp;point&nbsp;we&nbsp;have&nbsp;at&nbsp;least&nbsp;one&nbsp;field.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">haveField</span><span class="op">,</span>&nbsp;<span class="ident">delim</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">parseField</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">haveField</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">235</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fields</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">append</span><span class="op">(</span><span class="ident">fields</span><span class="op">,</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">field</span><span class="op">.</span><span class="ident">String</span><span class="op">(</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">delim</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;\n&#39;</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">EOF</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">fields</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">240</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">245</span><span class="comment">//&nbsp;parseField&nbsp;parses&nbsp;the&nbsp;next&nbsp;field&nbsp;in&nbsp;the&nbsp;record.&nbsp;&nbsp;The&nbsp;read&nbsp;field&nbsp;is</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;located&nbsp;in&nbsp;r.field.&nbsp;&nbsp;Delim&nbsp;is&nbsp;the&nbsp;first&nbsp;character&nbsp;not&nbsp;part&nbsp;of&nbsp;the&nbsp;field</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;(r.Comma&nbsp;or&nbsp;&#39;\n&#39;).</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">r</span>&nbsp;<span class="op">*</span><span class="ident">Reader</span><span class="op">)</span>&nbsp;<span class="ident">parseField</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">haveField</span>&nbsp;<span class="builtintype">bool</span><span class="op">,</span>&nbsp;<span class="ident">delim</span>&nbsp;<span class="builtintype">rune</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span><span class="op">.</span><span class="ident">field</span><span class="op">.</span><span class="ident">Reset</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">250</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r1</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">readRune</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">TrimLeadingSpace</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">r1</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="string">&#39;\n&#39;</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">unicode</span><span class="op">.</span><span class="ident">IsSpace</span><span class="op">(</span><span class="ident">r1</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r1</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">readRune</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">255</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">EOF</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">column</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">true</span><span class="op">,</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">260</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">false</span><span class="op">,</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="ident">r1</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">Comma</span><span class="op">:</span><br>
+<span class="lineno">265</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;will&nbsp;check&nbsp;below</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="string">&#39;\n&#39;</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;We&nbsp;are&nbsp;a&nbsp;trailing&nbsp;empty&nbsp;field&nbsp;or&nbsp;a&nbsp;blank&nbsp;line</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">column</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">270</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">false</span><span class="op">,</span>&nbsp;<span class="ident">r1</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">true</span><span class="op">,</span>&nbsp;<span class="ident">r1</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="string">&#39;&#34;&#39;</span><span class="op">:</span><br>
+<span class="lineno">275</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;quoted&nbsp;field</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Quoted</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r1</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">readRune</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">280</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">EOF</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">LazyQuotes</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">true</span><span class="op">,</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">false</span><span class="op">,</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="builtintype">error</span><span class="op">(</span><span class="ident">ErrQuote</span><span class="op">)</span><br>
+<span class="lineno">285</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">false</span><span class="op">,</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="ident">r1</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="string">&#39;&#34;&#39;</span><span class="op">:</span><br>
+<span class="lineno">290</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r1</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">readRune</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">r1</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">Comma</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">break</span>&nbsp;<span class="ident">Quoted</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">r1</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;\n&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">295</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">true</span><span class="op">,</span>&nbsp;<span class="ident">r1</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">r1</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="string">&#39;&#34;&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">r</span><span class="op">.</span><span class="ident">LazyQuotes</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span><span class="op">.</span><span class="ident">column</span><span class="op">--</span><br>
+<span class="lineno">300</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">false</span><span class="op">,</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="builtintype">error</span><span class="op">(</span><span class="ident">ErrQuote</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;accept&nbsp;the&nbsp;bare&nbsp;quote</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span><span class="op">.</span><span class="ident">field</span><span class="op">.</span><span class="ident">WriteRune</span><span class="op">(</span><span class="string">&#39;&#34;&#39;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">305</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="string">&#39;\n&#39;</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span><span class="op">.</span><span class="ident">line</span><span class="op">++</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span><span class="op">.</span><span class="ident">column</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">-</span><span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span><span class="op">.</span><span class="ident">field</span><span class="op">.</span><span class="ident">WriteRune</span><span class="op">(</span><span class="ident">r1</span><span class="op">)</span><br>
+<span class="lineno">310</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">default</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;unquoted&nbsp;field</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">315</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span><span class="op">.</span><span class="ident">field</span><span class="op">.</span><span class="ident">WriteRune</span><span class="op">(</span><span class="ident">r1</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r1</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">readRune</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">r1</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">Comma</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">break</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">320</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">r1</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;\n&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">true</span><span class="op">,</span>&nbsp;<span class="ident">r1</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">r</span><span class="op">.</span><span class="ident">LazyQuotes</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">r1</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;&#34;&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">false</span><span class="op">,</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="builtintype">error</span><span class="op">(</span><span class="ident">ErrBareQuote</span><span class="op">)</span><br>
+<span class="lineno">325</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">330</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">EOF</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">true</span><span class="op">,</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">false</span><span class="op">,</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">335</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">true</span><span class="op">,</span>&nbsp;<span class="ident">r1</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

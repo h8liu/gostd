@@ -1,0 +1,86 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2011&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">template_test</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;log&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;os&#34;</span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;text/template&#34;</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">ExampleTemplate</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Define&nbsp;a&nbsp;template.</span><br>
+<span class="lineno">15</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">const</span>&nbsp;<span class="ident">letter</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">`<br>
+<span class="lineno"></span>Dear&nbsp;{{.Name}},<br>
+<span class="lineno"></span>{{if&nbsp;.Attended}}<br>
+<span class="lineno"></span>It&nbsp;was&nbsp;a&nbsp;pleasure&nbsp;to&nbsp;see&nbsp;you&nbsp;at&nbsp;the&nbsp;wedding.{{else}}<br>
+<span class="lineno"></span>It&nbsp;is&nbsp;a&nbsp;shame&nbsp;you&nbsp;couldn&#39;t&nbsp;make&nbsp;it&nbsp;to&nbsp;the&nbsp;wedding.{{end}}<br>
+<span class="lineno">20</span>{{with&nbsp;.Gift}}Thank&nbsp;you&nbsp;for&nbsp;the&nbsp;lovely&nbsp;{{.}}.<br>
+<span class="lineno"></span>{{end}}<br>
+<span class="lineno"></span>Best&nbsp;wishes,<br>
+<span class="lineno"></span>Josie<br>
+<span class="lineno"></span>`</span><br>
+<span class="lineno">25</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Prepare&nbsp;some&nbsp;data&nbsp;to&nbsp;insert&nbsp;into&nbsp;the&nbsp;template.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">type</span>&nbsp;<span class="ident">Recipient</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Name</span><span class="op">,</span>&nbsp;<span class="ident">Gift</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Attended</span>&nbsp;&nbsp;&nbsp;<span class="builtintype">bool</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">recipients</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="ident">Recipient</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;Aunt&nbsp;Mildred&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;bone&nbsp;china&nbsp;tea&nbsp;set&#34;</span><span class="op">,</span>&nbsp;<span class="ident">true</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;Uncle&nbsp;John&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;moleskin&nbsp;pants&#34;</span><span class="op">,</span>&nbsp;<span class="ident">false</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;Cousin&nbsp;Rodney&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;&#34;</span><span class="op">,</span>&nbsp;<span class="ident">false</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Create&nbsp;a&nbsp;new&nbsp;template&nbsp;and&nbsp;parse&nbsp;the&nbsp;letter&nbsp;into&nbsp;it.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">template</span><span class="op">.</span><span class="ident">Must</span><span class="op">(</span><span class="ident">template</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="string">&#34;letter&#34;</span><span class="op">)</span><span class="op">.</span><span class="ident">Parse</span><span class="op">(</span><span class="ident">letter</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Execute&nbsp;the&nbsp;template&nbsp;for&nbsp;each&nbsp;recipient.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">r</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">recipients</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">t</span><span class="op">.</span><span class="ident">Execute</span><span class="op">(</span><span class="ident">os</span><span class="op">.</span><span class="ident">Stdout</span><span class="op">,</span>&nbsp;<span class="ident">r</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">log</span><span class="op">.</span><span class="ident">Println</span><span class="op">(</span><span class="string">&#34;executing&nbsp;template:&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Output:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Dear&nbsp;Aunt&nbsp;Mildred,</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;It&nbsp;was&nbsp;a&nbsp;pleasure&nbsp;to&nbsp;see&nbsp;you&nbsp;at&nbsp;the&nbsp;wedding.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Thank&nbsp;you&nbsp;for&nbsp;the&nbsp;lovely&nbsp;bone&nbsp;china&nbsp;tea&nbsp;set.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Best&nbsp;wishes,</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Josie</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Dear&nbsp;Uncle&nbsp;John,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;It&nbsp;is&nbsp;a&nbsp;shame&nbsp;you&nbsp;couldn&#39;t&nbsp;make&nbsp;it&nbsp;to&nbsp;the&nbsp;wedding.</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Thank&nbsp;you&nbsp;for&nbsp;the&nbsp;lovely&nbsp;moleskin&nbsp;pants.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Best&nbsp;wishes,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Josie</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Dear&nbsp;Cousin&nbsp;Rodney,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;It&nbsp;is&nbsp;a&nbsp;shame&nbsp;you&nbsp;couldn&#39;t&nbsp;make&nbsp;it&nbsp;to&nbsp;the&nbsp;wedding.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Best&nbsp;wishes,</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Josie</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

@@ -1,0 +1,145 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2011&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">math</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">/*<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspFloating-point&nbsp;tangent.<br>
+<span class="lineno"></span>*/</span><br>
+<span class="lineno">10</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;original&nbsp;C&nbsp;code,&nbsp;the&nbsp;long&nbsp;comment,&nbsp;and&nbsp;the&nbsp;constants</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;below&nbsp;were&nbsp;from&nbsp;http://netlib.sandia.gov/cephes/cmath/sin.c,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;available&nbsp;from&nbsp;http://www.netlib.org/cephes/cmath.tgz.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;go&nbsp;code&nbsp;is&nbsp;a&nbsp;simplified&nbsp;version&nbsp;of&nbsp;the&nbsp;original&nbsp;C.</span><br>
+<span class="lineno">15</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;tan.c</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Circular&nbsp;tangent</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">20</span><span class="comment">//&nbsp;SYNOPSIS:</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;double&nbsp;x,&nbsp;y,&nbsp;tan();</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;y&nbsp;=&nbsp;tan(&nbsp;x&nbsp;);</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">25</span><span class="comment">//&nbsp;DESCRIPTION:</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Returns&nbsp;the&nbsp;circular&nbsp;tangent&nbsp;of&nbsp;the&nbsp;radian&nbsp;argument&nbsp;x.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Range&nbsp;reduction&nbsp;is&nbsp;modulo&nbsp;pi/4.&nbsp;&nbsp;A&nbsp;rational&nbsp;function</span><br>
+<span class="lineno">30</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;x&nbsp;+&nbsp;x**3&nbsp;P(x**2)/Q(x**2)</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;is&nbsp;employed&nbsp;in&nbsp;the&nbsp;basic&nbsp;interval&nbsp;[0,&nbsp;pi/4].</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ACCURACY:</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Relative&nbsp;error:</span><br>
+<span class="lineno">35</span><span class="comment">//&nbsp;arithmetic&nbsp;&nbsp;&nbsp;domain&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;trials&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;peak&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;rms</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;DEC&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;+-1.07e9&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;44000&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;4.1e-17&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1.0e-17</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;IEEE&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;+-1.07e9&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;30000&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2.9e-16&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;8.1e-17</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Partial&nbsp;loss&nbsp;of&nbsp;accuracy&nbsp;begins&nbsp;to&nbsp;occur&nbsp;at&nbsp;x&nbsp;=&nbsp;2**30&nbsp;=&nbsp;1.074e9.&nbsp;&nbsp;The&nbsp;loss</span><br>
+<span class="lineno">40</span><span class="comment">//&nbsp;is&nbsp;not&nbsp;gradual,&nbsp;but&nbsp;jumps&nbsp;suddenly&nbsp;to&nbsp;about&nbsp;1&nbsp;part&nbsp;in&nbsp;10e7.&nbsp;&nbsp;Results&nbsp;may</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;be&nbsp;meaningless&nbsp;for&nbsp;x&nbsp;&gt;&nbsp;2**49&nbsp;=&nbsp;5.6e14.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;[Accuracy&nbsp;loss&nbsp;statement&nbsp;from&nbsp;sin.go&nbsp;comments.]</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Cephes&nbsp;Math&nbsp;Library&nbsp;Release&nbsp;2.8:&nbsp;&nbsp;June,&nbsp;2000</span><br>
+<span class="lineno">45</span><span class="comment">//&nbsp;Copyright&nbsp;1984,&nbsp;1987,&nbsp;1989,&nbsp;1992,&nbsp;2000&nbsp;by&nbsp;Stephen&nbsp;L.&nbsp;Moshier</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;readme&nbsp;file&nbsp;at&nbsp;http://netlib.sandia.gov/cephes/&nbsp;says:</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;Some&nbsp;software&nbsp;in&nbsp;this&nbsp;archive&nbsp;may&nbsp;be&nbsp;from&nbsp;the&nbsp;book&nbsp;_Methods&nbsp;and</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Programs&nbsp;for&nbsp;Mathematical&nbsp;Functions_&nbsp;(Prentice-Hall&nbsp;or&nbsp;Simon&nbsp;&amp;&nbsp;Schuster</span><br>
+<span class="lineno">50</span><span class="comment">//&nbsp;International,&nbsp;1989)&nbsp;or&nbsp;from&nbsp;the&nbsp;Cephes&nbsp;Mathematical&nbsp;Library,&nbsp;a</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;commercial&nbsp;product.&nbsp;In&nbsp;either&nbsp;event,&nbsp;it&nbsp;is&nbsp;copyrighted&nbsp;by&nbsp;the&nbsp;author.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;What&nbsp;you&nbsp;see&nbsp;here&nbsp;may&nbsp;be&nbsp;used&nbsp;freely&nbsp;but&nbsp;it&nbsp;comes&nbsp;with&nbsp;no&nbsp;support&nbsp;or</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;guarantee.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">55</span><span class="comment">//&nbsp;&nbsp;&nbsp;The&nbsp;two&nbsp;known&nbsp;misprints&nbsp;in&nbsp;the&nbsp;book&nbsp;are&nbsp;repaired&nbsp;here&nbsp;in&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;source&nbsp;listings&nbsp;for&nbsp;the&nbsp;gamma&nbsp;function&nbsp;and&nbsp;the&nbsp;incomplete&nbsp;beta</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;integral.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;Stephen&nbsp;L.&nbsp;Moshier</span><br>
+<span class="lineno">60</span><span class="comment">//&nbsp;&nbsp;&nbsp;moshier@na-net.ornl.gov</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;tan&nbsp;coefficients</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">_tanP</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">[</span><span class="op">...</span><span class="op">]</span><span class="builtintype">float64</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">-</span><span class="num">1.30936939181383777646E4</span><span class="op">,</span>&nbsp;<span class="comment">//&nbsp;0xc0c992d8d24f3f38</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="num">1.15351664838587416140E6</span><span class="op">,</span>&nbsp;&nbsp;<span class="comment">//&nbsp;0x413199eca5fc9ddd</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">-</span><span class="num">1.79565251976484877988E7</span><span class="op">,</span>&nbsp;<span class="comment">//&nbsp;0xc1711fead3299176</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">_tanQ</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">[</span><span class="op">...</span><span class="op">]</span><span class="builtintype">float64</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="num">1.00000000000000000000E0</span><span class="op">,</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="num">1.36812963470692954678E4</span><span class="op">,</span>&nbsp;&nbsp;<span class="comment">//0x40cab8a5eeb36572</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">-</span><span class="num">1.32089234440210967447E6</span><span class="op">,</span>&nbsp;<span class="comment">//0xc13427bc582abc96</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="num">2.50083801823357915839E7</span><span class="op">,</span>&nbsp;&nbsp;<span class="comment">//0x4177d98fc2ead8ef</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">-</span><span class="num">5.38695755929454629881E7</span><span class="op">,</span>&nbsp;<span class="comment">//0xc189afe03cbe5a31</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">75</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Tan&nbsp;returns&nbsp;the&nbsp;tangent&nbsp;of&nbsp;the&nbsp;radian&nbsp;argument&nbsp;x.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Special&nbsp;cases&nbsp;are:</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspTan(±0)&nbsp;=&nbsp;±0</span><br>
+<span class="lineno">80</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspTan(±Inf)&nbsp;=&nbsp;NaN</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspTan(NaN)&nbsp;=&nbsp;NaN</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">Tan</span><span class="op">(</span><span class="ident">x</span>&nbsp;<span class="builtintype">float64</span><span class="op">)</span>&nbsp;<span class="builtintype">float64</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">tan</span><span class="op">(</span><span class="ident">x</span>&nbsp;<span class="builtintype">float64</span><span class="op">)</span>&nbsp;<span class="builtintype">float64</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">PI4A</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">7.85398125648498535156E-1</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;0x3fe921fb40000000,&nbsp;Pi/4&nbsp;split&nbsp;into&nbsp;three&nbsp;parts</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">PI4B</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">3.77489470793079817668E-8</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;0x3e64442d00000000,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">PI4C</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">2.69515142907905952645E-15</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;0x3ce8469898cc5170,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">M4PI</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1.273239544735162542821171882678754627704620361328125</span>&nbsp;<span class="comment">//&nbsp;4/pi</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;special&nbsp;cases</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">IsNaN</span><span class="op">(</span><span class="ident">x</span><span class="op">)</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="comment">//&nbsp;return&nbsp;±0&nbsp;||&nbsp;NaN()</span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">IsInf</span><span class="op">(</span><span class="ident">x</span><span class="op">,</span>&nbsp;<span class="num">0</span><span class="op">)</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">NaN</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;make&nbsp;argument&nbsp;positive&nbsp;but&nbsp;save&nbsp;the&nbsp;sign</span><br>
+<span class="lineno">100</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sign</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">x</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">-</span><span class="ident">x</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sign</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">105</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">j</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">int64</span><span class="op">(</span><span class="ident">x</span>&nbsp;<span class="op">*</span>&nbsp;<span class="ident">M4PI</span><span class="op">)</span>&nbsp;<span class="comment">//&nbsp;integer&nbsp;part&nbsp;of&nbsp;x/(Pi/4),&nbsp;as&nbsp;integer&nbsp;for&nbsp;tests&nbsp;on&nbsp;the&nbsp;phase&nbsp;angle</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">y</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtintype">float64</span><span class="op">(</span><span class="ident">j</span><span class="op">)</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;integer&nbsp;part&nbsp;of&nbsp;x/(Pi/4),&nbsp;as&nbsp;float</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">/*&nbsp;map&nbsp;zeros&nbsp;and&nbsp;singularities&nbsp;to&nbsp;origin&nbsp;*/</span><br>
+<span class="lineno">110</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">j</span><span class="op">&amp;</span><span class="num">1</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">1</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">j</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">y</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">115</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">z</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">(</span><span class="op">(</span><span class="ident">x</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">y</span><span class="op">*</span><span class="ident">PI4A</span><span class="op">)</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">y</span><span class="op">*</span><span class="ident">PI4B</span><span class="op">)</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">y</span><span class="op">*</span><span class="ident">PI4C</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">zz</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">z</span>&nbsp;<span class="op">*</span>&nbsp;<span class="ident">z</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">zz</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">1e-14</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">y</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">z</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">z</span><span class="op">*</span><span class="op">(</span><span class="ident">zz</span><span class="op">*</span><span class="op">(</span><span class="op">(</span><span class="op">(</span><span class="ident">_tanP</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="op">*</span><span class="ident">zz</span><span class="op">)</span><span class="op">+</span><span class="ident">_tanP</span><span class="op">[</span><span class="num">1</span><span class="op">]</span><span class="op">)</span><span class="op">*</span><span class="ident">zz</span><span class="op">+</span><span class="ident">_tanP</span><span class="op">[</span><span class="num">2</span><span class="op">]</span><span class="op">)</span><span class="op">/</span><span class="op">(</span><span class="op">(</span><span class="op">(</span><span class="op">(</span><span class="ident">zz</span><span class="op">+</span><span class="ident">_tanQ</span><span class="op">[</span><span class="num">1</span><span class="op">]</span><span class="op">)</span><span class="op">*</span><span class="ident">zz</span><span class="op">+</span><span class="ident">_tanQ</span><span class="op">[</span><span class="num">2</span><span class="op">]</span><span class="op">)</span><span class="op">*</span><span class="ident">zz</span><span class="op">+</span><span class="ident">_tanQ</span><span class="op">[</span><span class="num">3</span><span class="op">]</span><span class="op">)</span><span class="op">*</span><span class="ident">zz</span><span class="op">+</span><span class="ident">_tanQ</span><span class="op">[</span><span class="num">4</span><span class="op">]</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno">120</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">y</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">z</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">j</span><span class="op">&amp;</span><span class="num">2</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">2</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">y</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">-</span><span class="num">1</span>&nbsp;<span class="op">/</span>&nbsp;<span class="ident">y</span><br>
+<span class="lineno">125</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">sign</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">y</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">-</span><span class="ident">y</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">y</span><br>
+<span class="lineno">130</span><span class="op">}</span>
+</div>
+</body>
+</html>

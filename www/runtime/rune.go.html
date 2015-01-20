@@ -1,0 +1,234 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">/*<br>
+<span class="lineno"></span>&nbsp;*&nbsp;The&nbsp;authors&nbsp;of&nbsp;this&nbsp;software&nbsp;are&nbsp;Rob&nbsp;Pike&nbsp;and&nbsp;Ken&nbsp;Thompson.<br>
+<span class="lineno"></span>&nbsp;*&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Copyright&nbsp;(c)&nbsp;2002&nbsp;by&nbsp;Lucent&nbsp;Technologies.<br>
+<span class="lineno"></span>&nbsp;*&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Portions&nbsp;Copyright&nbsp;2009&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.<br>
+<span class="lineno">5</span>&nbsp;*&nbsp;Permission&nbsp;to&nbsp;use,&nbsp;copy,&nbsp;modify,&nbsp;and&nbsp;distribute&nbsp;this&nbsp;software&nbsp;for&nbsp;any<br>
+<span class="lineno"></span>&nbsp;*&nbsp;purpose&nbsp;without&nbsp;fee&nbsp;is&nbsp;hereby&nbsp;granted,&nbsp;provided&nbsp;that&nbsp;this&nbsp;entire&nbsp;notice<br>
+<span class="lineno"></span>&nbsp;*&nbsp;is&nbsp;included&nbsp;in&nbsp;all&nbsp;copies&nbsp;of&nbsp;any&nbsp;software&nbsp;which&nbsp;is&nbsp;or&nbsp;includes&nbsp;a&nbsp;copy<br>
+<span class="lineno"></span>&nbsp;*&nbsp;or&nbsp;modification&nbsp;of&nbsp;this&nbsp;software&nbsp;and&nbsp;in&nbsp;all&nbsp;copies&nbsp;of&nbsp;the&nbsp;supporting<br>
+<span class="lineno"></span>&nbsp;*&nbsp;documentation&nbsp;for&nbsp;such&nbsp;software.<br>
+<span class="lineno">10</span>&nbsp;*&nbsp;THIS&nbsp;SOFTWARE&nbsp;IS&nbsp;BEING&nbsp;PROVIDED&nbsp;&#34;AS&nbsp;IS&#34;,&nbsp;WITHOUT&nbsp;ANY&nbsp;EXPRESS&nbsp;OR&nbsp;IMPLIED<br>
+<span class="lineno"></span>&nbsp;*&nbsp;WARRANTY.&nbsp;&nbsp;IN&nbsp;PARTICULAR,&nbsp;NEITHER&nbsp;THE&nbsp;AUTHORS&nbsp;NOR&nbsp;LUCENT&nbsp;TECHNOLOGIES&nbsp;MAKE&nbsp;ANY<br>
+<span class="lineno"></span>&nbsp;*&nbsp;REPRESENTATION&nbsp;OR&nbsp;WARRANTY&nbsp;OF&nbsp;ANY&nbsp;KIND&nbsp;CONCERNING&nbsp;THE&nbsp;MERCHANTABILITY<br>
+<span class="lineno"></span>&nbsp;*&nbsp;OF&nbsp;THIS&nbsp;SOFTWARE&nbsp;OR&nbsp;ITS&nbsp;FITNESS&nbsp;FOR&nbsp;ANY&nbsp;PARTICULAR&nbsp;PURPOSE.<br>
+<span class="lineno"></span>&nbsp;*/</span><br>
+<span class="lineno">15</span><br>
+<span class="lineno"></span><span class="comment">/*<br>
+<span class="lineno"></span>&nbsp;*&nbsp;This&nbsp;code&nbsp;is&nbsp;copied,&nbsp;with&nbsp;slight&nbsp;editing&nbsp;due&nbsp;to&nbsp;type&nbsp;differences,<br>
+<span class="lineno"></span>&nbsp;*&nbsp;from&nbsp;a&nbsp;subset&nbsp;of&nbsp;../lib9/utf/rune.c<br>
+<span class="lineno"></span>&nbsp;*/</span><br>
+<span class="lineno">20</span><br>
+<span class="lineno"></span><span class="keyword">package</span>&nbsp;<span class="ident">runtime</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">bit1</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">7</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">bitx</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">6</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">bit2</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">5</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">bit3</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">4</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">bit4</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">3</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">bit5</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">2</span><br>
+<span class="lineno">30</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t1</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">(</span><span class="op">(</span><span class="num">1</span>&nbsp;<span class="op">&lt;&lt;</span>&nbsp;<span class="op">(</span><span class="ident">bit1</span>&nbsp;<span class="op">+</span>&nbsp;<span class="num">1</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">-</span>&nbsp;<span class="num">1</span><span class="op">)</span>&nbsp;<span class="op">^</span>&nbsp;<span class="num">0xFF</span>&nbsp;<span class="comment">/*&nbsp;0000&nbsp;0000&nbsp;*/</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tx</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">(</span><span class="op">(</span><span class="num">1</span>&nbsp;<span class="op">&lt;&lt;</span>&nbsp;<span class="op">(</span><span class="ident">bitx</span>&nbsp;<span class="op">+</span>&nbsp;<span class="num">1</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">-</span>&nbsp;<span class="num">1</span><span class="op">)</span>&nbsp;<span class="op">^</span>&nbsp;<span class="num">0xFF</span>&nbsp;<span class="comment">/*&nbsp;1000&nbsp;0000&nbsp;*/</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t2</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">(</span><span class="op">(</span><span class="num">1</span>&nbsp;<span class="op">&lt;&lt;</span>&nbsp;<span class="op">(</span><span class="ident">bit2</span>&nbsp;<span class="op">+</span>&nbsp;<span class="num">1</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">-</span>&nbsp;<span class="num">1</span><span class="op">)</span>&nbsp;<span class="op">^</span>&nbsp;<span class="num">0xFF</span>&nbsp;<span class="comment">/*&nbsp;1100&nbsp;0000&nbsp;*/</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t3</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">(</span><span class="op">(</span><span class="num">1</span>&nbsp;<span class="op">&lt;&lt;</span>&nbsp;<span class="op">(</span><span class="ident">bit3</span>&nbsp;<span class="op">+</span>&nbsp;<span class="num">1</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">-</span>&nbsp;<span class="num">1</span><span class="op">)</span>&nbsp;<span class="op">^</span>&nbsp;<span class="num">0xFF</span>&nbsp;<span class="comment">/*&nbsp;1110&nbsp;0000&nbsp;*/</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t4</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">(</span><span class="op">(</span><span class="num">1</span>&nbsp;<span class="op">&lt;&lt;</span>&nbsp;<span class="op">(</span><span class="ident">bit4</span>&nbsp;<span class="op">+</span>&nbsp;<span class="num">1</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">-</span>&nbsp;<span class="num">1</span><span class="op">)</span>&nbsp;<span class="op">^</span>&nbsp;<span class="num">0xFF</span>&nbsp;<span class="comment">/*&nbsp;1111&nbsp;0000&nbsp;*/</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t5</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">(</span><span class="op">(</span><span class="num">1</span>&nbsp;<span class="op">&lt;&lt;</span>&nbsp;<span class="op">(</span><span class="ident">bit5</span>&nbsp;<span class="op">+</span>&nbsp;<span class="num">1</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">-</span>&nbsp;<span class="num">1</span><span class="op">)</span>&nbsp;<span class="op">^</span>&nbsp;<span class="num">0xFF</span>&nbsp;<span class="comment">/*&nbsp;1111&nbsp;1000&nbsp;*/</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">rune1</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">(</span><span class="num">1</span>&nbsp;<span class="op">&lt;&lt;</span>&nbsp;<span class="op">(</span><span class="ident">bit1</span>&nbsp;<span class="op">+</span>&nbsp;<span class="num">0</span><span class="op">*</span><span class="ident">bitx</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">-</span>&nbsp;<span class="num">1</span>&nbsp;<span class="comment">/*&nbsp;0000&nbsp;0000&nbsp;0111&nbsp;1111&nbsp;*/</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">rune2</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">(</span><span class="num">1</span>&nbsp;<span class="op">&lt;&lt;</span>&nbsp;<span class="op">(</span><span class="ident">bit2</span>&nbsp;<span class="op">+</span>&nbsp;<span class="num">1</span><span class="op">*</span><span class="ident">bitx</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">-</span>&nbsp;<span class="num">1</span>&nbsp;<span class="comment">/*&nbsp;0000&nbsp;0111&nbsp;1111&nbsp;1111&nbsp;*/</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">rune3</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">(</span><span class="num">1</span>&nbsp;<span class="op">&lt;&lt;</span>&nbsp;<span class="op">(</span><span class="ident">bit3</span>&nbsp;<span class="op">+</span>&nbsp;<span class="num">2</span><span class="op">*</span><span class="ident">bitx</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">-</span>&nbsp;<span class="num">1</span>&nbsp;<span class="comment">/*&nbsp;1111&nbsp;1111&nbsp;1111&nbsp;1111&nbsp;*/</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">rune4</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">(</span><span class="num">1</span>&nbsp;<span class="op">&lt;&lt;</span>&nbsp;<span class="op">(</span><span class="ident">bit4</span>&nbsp;<span class="op">+</span>&nbsp;<span class="num">3</span><span class="op">*</span><span class="ident">bitx</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">-</span>&nbsp;<span class="num">1</span>&nbsp;<span class="comment">/*&nbsp;0001&nbsp;1111&nbsp;1111&nbsp;1111&nbsp;1111&nbsp;1111&nbsp;*/</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">maskx</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">(</span><span class="num">1</span>&nbsp;<span class="op">&lt;&lt;</span>&nbsp;<span class="ident">bitx</span><span class="op">)</span>&nbsp;<span class="op">-</span>&nbsp;<span class="num">1</span>&nbsp;<span class="comment">/*&nbsp;0011&nbsp;1111&nbsp;*/</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">testx</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">maskx</span>&nbsp;<span class="op">^</span>&nbsp;<span class="num">0xFF</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">/*&nbsp;1100&nbsp;0000&nbsp;*/</span><br>
+<span class="lineno">45</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">runeerror</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0xFFFD</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">runeself</span>&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">0x80</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">surrogateMin</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0xD800</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">surrogateMax</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0xDFFF</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">bad</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">runeerror</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">runemax</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0x10FFFF</span>&nbsp;<span class="comment">/*&nbsp;maximum&nbsp;rune&nbsp;value&nbsp;*/</span><br>
+<span class="lineno">55</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">/*<br>
+<span class="lineno"></span>&nbsp;*&nbsp;Modified&nbsp;by&nbsp;Wei-Hwa&nbsp;Huang,&nbsp;Google&nbsp;Inc.,&nbsp;on&nbsp;2004-09-24<br>
+<span class="lineno"></span>&nbsp;*&nbsp;This&nbsp;is&nbsp;a&nbsp;slower&nbsp;but&nbsp;&#34;safe&#34;&nbsp;version&nbsp;of&nbsp;the&nbsp;old&nbsp;chartorune<br>
+<span class="lineno">60</span>&nbsp;*&nbsp;that&nbsp;works&nbsp;on&nbsp;strings&nbsp;that&nbsp;are&nbsp;not&nbsp;necessarily&nbsp;null-terminated.<br>
+<span class="lineno"></span>&nbsp;*<br>
+<span class="lineno"></span>&nbsp;*&nbsp;If&nbsp;you&nbsp;know&nbsp;for&nbsp;sure&nbsp;that&nbsp;your&nbsp;string&nbsp;is&nbsp;null-terminated,<br>
+<span class="lineno"></span>&nbsp;*&nbsp;chartorune&nbsp;will&nbsp;be&nbsp;a&nbsp;bit&nbsp;faster.<br>
+<span class="lineno"></span>&nbsp;*<br>
+<span class="lineno">65</span>&nbsp;*&nbsp;It&nbsp;is&nbsp;guaranteed&nbsp;not&nbsp;to&nbsp;attempt&nbsp;to&nbsp;access&nbsp;&#34;length&#34;<br>
+<span class="lineno"></span>&nbsp;*&nbsp;past&nbsp;the&nbsp;incoming&nbsp;pointer.&nbsp;&nbsp;This&nbsp;is&nbsp;to&nbsp;avoid<br>
+<span class="lineno"></span>&nbsp;*&nbsp;possible&nbsp;access&nbsp;violations.&nbsp;&nbsp;If&nbsp;the&nbsp;string&nbsp;appears&nbsp;to&nbsp;be<br>
+<span class="lineno"></span>&nbsp;*&nbsp;well-formed&nbsp;but&nbsp;incomplete&nbsp;(i.e.,&nbsp;to&nbsp;get&nbsp;the&nbsp;whole&nbsp;Rune<br>
+<span class="lineno"></span>&nbsp;*&nbsp;we&#39;d&nbsp;need&nbsp;to&nbsp;read&nbsp;past&nbsp;str+length)&nbsp;then&nbsp;we&#39;ll&nbsp;set&nbsp;the&nbsp;Rune<br>
+<span class="lineno">70</span>&nbsp;*&nbsp;to&nbsp;Bad&nbsp;and&nbsp;return&nbsp;0.<br>
+<span class="lineno"></span>&nbsp;*<br>
+<span class="lineno"></span>&nbsp;*&nbsp;Note&nbsp;that&nbsp;if&nbsp;we&nbsp;have&nbsp;decoding&nbsp;problems&nbsp;for&nbsp;other<br>
+<span class="lineno"></span>&nbsp;*&nbsp;reasons,&nbsp;we&nbsp;return&nbsp;1&nbsp;instead&nbsp;of&nbsp;0.<br>
+<span class="lineno"></span>&nbsp;*/</span><br>
+<span class="lineno">75</span><span class="keyword">func</span>&nbsp;<span class="ident">charntorune</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="builtintype">rune</span><span class="op">,</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">/*&nbsp;When&nbsp;we&#39;re&nbsp;not&nbsp;allowed&nbsp;to&nbsp;read&nbsp;anything&nbsp;*/</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">s</span><span class="op">)</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">bad</span><span class="op">,</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">80</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">/*<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;*&nbsp;one&nbsp;character&nbsp;sequence&nbsp;(7-bit&nbsp;value)<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;*&nbsp;&nbsp;&nbsp;&nbsp00000-0007F&nbsp;=&gt;&nbsp;T1<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;*/</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">s</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">tx</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="builtintype">rune</span><span class="op">(</span><span class="ident">c</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;If&nbsp;we&nbsp;can&#39;t&nbsp;read&nbsp;more&nbsp;than&nbsp;one&nbsp;character&nbsp;we&nbsp;must&nbsp;stop</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">s</span><span class="op">)</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="num">1</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">bad</span><span class="op">,</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">/*<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;*&nbsp;two&nbsp;character&nbsp;sequence&nbsp;(11-bit&nbsp;value)<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;*&nbsp;&nbsp;&nbsp;&nbsp0080-07FF&nbsp;=&gt;&nbsp;t2&nbsp;tx<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;*/</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c1</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">s</span><span class="op">[</span><span class="num">1</span><span class="op">]</span>&nbsp;<span class="op">^</span>&nbsp;<span class="ident">tx</span><br>
+<span class="lineno">100</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">(</span><span class="ident">c1</span>&nbsp;<span class="op">&amp;</span>&nbsp;<span class="ident">testx</span><span class="op">)</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">bad</span><span class="op">,</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">t3</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">t2</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">bad</span><span class="op">,</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">l</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">(</span><span class="op">(</span><span class="builtintype">rune</span><span class="op">(</span><span class="ident">c</span><span class="op">)</span>&nbsp;<span class="op">&lt;&lt;</span>&nbsp;<span class="ident">bitx</span><span class="op">)</span>&nbsp;<span class="op">|</span>&nbsp;<span class="builtintype">rune</span><span class="op">(</span><span class="ident">c1</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">&amp;</span>&nbsp;<span class="ident">rune2</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">l</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">rune1</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">bad</span><span class="op">,</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno">110</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">l</span><span class="op">,</span>&nbsp;<span class="num">2</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;If&nbsp;we&nbsp;can&#39;t&nbsp;read&nbsp;more&nbsp;than&nbsp;two&nbsp;characters&nbsp;we&nbsp;must&nbsp;stop</span><br>
+<span class="lineno">115</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">s</span><span class="op">)</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="num">2</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">bad</span><span class="op">,</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">/*<br>
+<span class="lineno">120</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;*&nbsp;three&nbsp;character&nbsp;sequence&nbsp;(16-bit&nbsp;value)<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;*&nbsp;&nbsp;&nbsp;&nbsp0800-FFFF&nbsp;=&gt;&nbsp;t3&nbsp;tx&nbsp;tx<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;*/</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c2</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">s</span><span class="op">[</span><span class="num">2</span><span class="op">]</span>&nbsp;<span class="op">^</span>&nbsp;<span class="ident">tx</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">(</span><span class="ident">c2</span>&nbsp;<span class="op">&amp;</span>&nbsp;<span class="ident">testx</span><span class="op">)</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">125</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">bad</span><span class="op">,</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">t4</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">l</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">(</span><span class="op">(</span><span class="op">(</span><span class="op">(</span><span class="builtintype">rune</span><span class="op">(</span><span class="ident">c</span><span class="op">)</span>&nbsp;<span class="op">&lt;&lt;</span>&nbsp;<span class="ident">bitx</span><span class="op">)</span>&nbsp;<span class="op">|</span>&nbsp;<span class="builtintype">rune</span><span class="op">(</span><span class="ident">c1</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">&lt;&lt;</span>&nbsp;<span class="ident">bitx</span><span class="op">)</span>&nbsp;<span class="op">|</span>&nbsp;<span class="builtintype">rune</span><span class="op">(</span><span class="ident">c2</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">&amp;</span>&nbsp;<span class="ident">rune3</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">l</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">rune2</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">130</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">bad</span><span class="op">,</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">surrogateMin</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">l</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">l</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">surrogateMax</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">bad</span><span class="op">,</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">135</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">l</span><span class="op">,</span>&nbsp;<span class="num">3</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">s</span><span class="op">)</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="num">3</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">bad</span><span class="op">,</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno">140</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">/*<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;*&nbsp;four&nbsp;character&nbsp;sequence&nbsp;(21-bit&nbsp;value)<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;*&nbsp;&nbsp;&nbsp;&nbsp10000-1FFFFF&nbsp;=&gt;&nbsp;t4&nbsp;tx&nbsp;tx&nbsp;tx<br>
+<span class="lineno">145</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;*/</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c3</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">s</span><span class="op">[</span><span class="num">3</span><span class="op">]</span>&nbsp;<span class="op">^</span>&nbsp;<span class="ident">tx</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">(</span><span class="ident">c3</span>&nbsp;<span class="op">&amp;</span>&nbsp;<span class="ident">testx</span><span class="op">)</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">bad</span><span class="op">,</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">150</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">t5</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">l</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">(</span><span class="op">(</span><span class="op">(</span><span class="op">(</span><span class="op">(</span><span class="op">(</span><span class="builtintype">rune</span><span class="op">(</span><span class="ident">c</span><span class="op">)</span>&nbsp;<span class="op">&lt;&lt;</span>&nbsp;<span class="ident">bitx</span><span class="op">)</span>&nbsp;<span class="op">|</span>&nbsp;<span class="builtintype">rune</span><span class="op">(</span><span class="ident">c1</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">&lt;&lt;</span>&nbsp;<span class="ident">bitx</span><span class="op">)</span>&nbsp;<span class="op">|</span>&nbsp;<span class="builtintype">rune</span><span class="op">(</span><span class="ident">c2</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">&lt;&lt;</span>&nbsp;<span class="ident">bitx</span><span class="op">)</span>&nbsp;<span class="op">|</span>&nbsp;<span class="builtintype">rune</span><span class="op">(</span><span class="ident">c3</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">&amp;</span>&nbsp;<span class="ident">rune4</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">l</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">rune3</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">l</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="ident">runemax</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">bad</span><span class="op">,</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">155</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">l</span><span class="op">,</span>&nbsp;<span class="num">4</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Support&nbsp;for&nbsp;5-byte&nbsp;or&nbsp;longer&nbsp;UTF-8&nbsp;would&nbsp;go&nbsp;here,&nbsp;but</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;since&nbsp;we&nbsp;don&#39;t&nbsp;have&nbsp;that,&nbsp;we&#39;ll&nbsp;just&nbsp;return&nbsp;bad.</span><br>
+<span class="lineno">160</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">bad</span><span class="op">,</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;runetochar&nbsp;converts&nbsp;r&nbsp;to&nbsp;bytes&nbsp;and&nbsp;writes&nbsp;the&nbsp;result&nbsp;to&nbsp;str.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;returns&nbsp;the&nbsp;number&nbsp;of&nbsp;bytes&nbsp;generated.</span><br>
+<span class="lineno">165</span><span class="keyword">func</span>&nbsp;<span class="ident">runetochar</span><span class="op">(</span><span class="ident">str</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="ident">r</span>&nbsp;<span class="builtintype">rune</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">/*&nbsp;runes&nbsp;are&nbsp;signed,&nbsp;so&nbsp;convert&nbsp;to&nbsp;unsigned&nbsp;for&nbsp;range&nbsp;check.&nbsp;*/</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtintype">uint32</span><span class="op">(</span><span class="ident">r</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">/*<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;*&nbsp;one&nbsp;character&nbsp;sequence<br>
+<span class="lineno">170</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;*&nbsp;&nbsp;&nbsp;&nbsp00000-0007F&nbsp;=&gt;&nbsp;00-7F<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;*/</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">rune1</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">str</span><span class="op">[</span><span class="num">0</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtintype">byte</span><span class="op">(</span><span class="ident">c</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno">175</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">/*<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;*&nbsp;two&nbsp;character&nbsp;sequence<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;*&nbsp;&nbsp;&nbsp;&nbsp0080-07FF&nbsp;=&gt;&nbsp;t2&nbsp;tx<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;*/</span><br>
+<span class="lineno">180</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">rune2</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">str</span><span class="op">[</span><span class="num">0</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtintype">byte</span><span class="op">(</span><span class="ident">t2</span>&nbsp;<span class="op">|</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">&gt;&gt;</span>&nbsp;<span class="op">(</span><span class="num">1</span>&nbsp;<span class="op">*</span>&nbsp;<span class="ident">bitx</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">str</span><span class="op">[</span><span class="num">1</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtintype">byte</span><span class="op">(</span><span class="ident">tx</span>&nbsp;<span class="op">|</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">&amp;</span>&nbsp;<span class="ident">maskx</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">2</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">185</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">/*<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;*&nbsp;If&nbsp;the&nbsp;rune&nbsp;is&nbsp;out&nbsp;of&nbsp;range&nbsp;or&nbsp;a&nbsp;surrogate&nbsp;half,&nbsp;convert&nbsp;it&nbsp;to&nbsp;the&nbsp;error&nbsp;rune.<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;*&nbsp;Do&nbsp;this&nbsp;test&nbsp;here&nbsp;because&nbsp;the&nbsp;error&nbsp;rune&nbsp;encodes&nbsp;to&nbsp;three&nbsp;bytes.<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;*&nbsp;Doing&nbsp;it&nbsp;earlier&nbsp;would&nbsp;duplicate&nbsp;work,&nbsp;since&nbsp;an&nbsp;out&nbsp;of&nbsp;range<br>
+<span class="lineno">190</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;*&nbsp;rune&nbsp;wouldn&#39;t&nbsp;have&nbsp;fit&nbsp;in&nbsp;one&nbsp;or&nbsp;two&nbsp;bytes.<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;*/</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="ident">runemax</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">runeerror</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">195</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">surrogateMin</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">surrogateMax</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">runeerror</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">/*<br>
+<span class="lineno">200</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;*&nbsp;three&nbsp;character&nbsp;sequence<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;*&nbsp;&nbsp;&nbsp;&nbsp0800-FFFF&nbsp;=&gt;&nbsp;t3&nbsp;tx&nbsp;tx<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;*/</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">rune3</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">str</span><span class="op">[</span><span class="num">0</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtintype">byte</span><span class="op">(</span><span class="ident">t3</span>&nbsp;<span class="op">|</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">&gt;&gt;</span>&nbsp;<span class="op">(</span><span class="num">2</span>&nbsp;<span class="op">*</span>&nbsp;<span class="ident">bitx</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno">205</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">str</span><span class="op">[</span><span class="num">1</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtintype">byte</span><span class="op">(</span><span class="ident">tx</span>&nbsp;<span class="op">|</span>&nbsp;<span class="op">(</span><span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">&gt;&gt;</span>&nbsp;<span class="op">(</span><span class="num">1</span>&nbsp;<span class="op">*</span>&nbsp;<span class="ident">bitx</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">&amp;</span>&nbsp;<span class="ident">maskx</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">str</span><span class="op">[</span><span class="num">2</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtintype">byte</span><span class="op">(</span><span class="ident">tx</span>&nbsp;<span class="op">|</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">&amp;</span>&nbsp;<span class="ident">maskx</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">3</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">210</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">/*<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;*&nbsp;four&nbsp;character&nbsp;sequence&nbsp;(21-bit&nbsp;value)<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;*&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;10000-1FFFFF&nbsp;=&gt;&nbsp;t4&nbsp;tx&nbsp;tx&nbsp;tx<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;*/</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">str</span><span class="op">[</span><span class="num">0</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtintype">byte</span><span class="op">(</span><span class="ident">t4</span>&nbsp;<span class="op">|</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">&gt;&gt;</span>&nbsp;<span class="op">(</span><span class="num">3</span>&nbsp;<span class="op">*</span>&nbsp;<span class="ident">bitx</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno">215</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">str</span><span class="op">[</span><span class="num">1</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtintype">byte</span><span class="op">(</span><span class="ident">tx</span>&nbsp;<span class="op">|</span>&nbsp;<span class="op">(</span><span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">&gt;&gt;</span>&nbsp;<span class="op">(</span><span class="num">2</span>&nbsp;<span class="op">*</span>&nbsp;<span class="ident">bitx</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">&amp;</span>&nbsp;<span class="ident">maskx</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">str</span><span class="op">[</span><span class="num">2</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtintype">byte</span><span class="op">(</span><span class="ident">tx</span>&nbsp;<span class="op">|</span>&nbsp;<span class="op">(</span><span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">&gt;&gt;</span>&nbsp;<span class="op">(</span><span class="num">1</span>&nbsp;<span class="op">*</span>&nbsp;<span class="ident">bitx</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">&amp;</span>&nbsp;<span class="ident">maskx</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">str</span><span class="op">[</span><span class="num">3</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtintype">byte</span><span class="op">(</span><span class="ident">tx</span>&nbsp;<span class="op">|</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">&amp;</span>&nbsp;<span class="ident">maskx</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">4</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

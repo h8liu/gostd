@@ -1,0 +1,58 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2009&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">gob</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="string">&#34;fmt&#34;</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Errors&nbsp;in&nbsp;decoding&nbsp;and&nbsp;encoding&nbsp;are&nbsp;handled&nbsp;using&nbsp;panic&nbsp;and&nbsp;recover.</span><br>
+<span class="lineno">10</span><span class="comment">//&nbsp;Panics&nbsp;caused&nbsp;by&nbsp;user&nbsp;error&nbsp;(that&nbsp;is,&nbsp;everything&nbsp;except&nbsp;run-time&nbsp;panics</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;such&nbsp;as&nbsp;&#34;index&nbsp;out&nbsp;of&nbsp;bounds&#34;&nbsp;errors)&nbsp;do&nbsp;not&nbsp;leave&nbsp;the&nbsp;file&nbsp;that&nbsp;caused</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;them,&nbsp;but&nbsp;are&nbsp;instead&nbsp;turned&nbsp;into&nbsp;plain&nbsp;error&nbsp;returns.&nbsp;&nbsp;Encoding&nbsp;and</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;decoding&nbsp;functions&nbsp;and&nbsp;methods&nbsp;that&nbsp;do&nbsp;not&nbsp;return&nbsp;an&nbsp;error&nbsp;either&nbsp;use</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;panic&nbsp;to&nbsp;report&nbsp;an&nbsp;error&nbsp;or&nbsp;are&nbsp;guaranteed&nbsp;error-free.</span><br>
+<span class="lineno">15</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;A&nbsp;gobError&nbsp;is&nbsp;used&nbsp;to&nbsp;distinguish&nbsp;errors&nbsp;(panics)&nbsp;generated&nbsp;in&nbsp;this&nbsp;package.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">gobError</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">20</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;errorf&nbsp;is&nbsp;like&nbsp;error_&nbsp;but&nbsp;takes&nbsp;Printf-style&nbsp;arguments&nbsp;to&nbsp;construct&nbsp;an&nbsp;error.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;It&nbsp;always&nbsp;prefixes&nbsp;the&nbsp;message&nbsp;with&nbsp;&#34;gob:&nbsp;&#34;.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">errorf</span><span class="op">(</span><span class="ident">format</span>&nbsp;<span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">args</span>&nbsp;<span class="op">...</span><span class="keyword">interface</span><span class="op">{</span><span class="op">}</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">error_</span><span class="op">(</span><span class="ident">fmt</span><span class="op">.</span><span class="ident">Errorf</span><span class="op">(</span><span class="string">&#34;gob:&nbsp;&#34;</span><span class="op">+</span><span class="ident">format</span><span class="op">,</span>&nbsp;<span class="ident">args</span><span class="op">...</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno">25</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;error&nbsp;wraps&nbsp;the&nbsp;argument&nbsp;error&nbsp;and&nbsp;uses&nbsp;it&nbsp;as&nbsp;the&nbsp;argument&nbsp;to&nbsp;panic.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">error_</span><span class="op">(</span><span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">panic</span><span class="op">(</span><span class="ident">gobError</span><span class="op">{</span><span class="ident">err</span><span class="op">}</span><span class="op">)</span><br>
+<span class="lineno">30</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;catchError&nbsp;is&nbsp;meant&nbsp;to&nbsp;be&nbsp;used&nbsp;as&nbsp;a&nbsp;deferred&nbsp;function&nbsp;to&nbsp;turn&nbsp;a&nbsp;panic(gobError)&nbsp;into&nbsp;a</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;plain&nbsp;error.&nbsp;&nbsp;It&nbsp;overwrites&nbsp;the&nbsp;error&nbsp;return&nbsp;of&nbsp;the&nbsp;function&nbsp;that&nbsp;deferred&nbsp;its&nbsp;call.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">catchError</span><span class="op">(</span><span class="ident">err</span>&nbsp;<span class="op">*</span><span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">recover</span><span class="op">(</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ge</span><span class="op">,</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">e</span><span class="op">.</span><span class="op">(</span><span class="ident">gobError</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">ok</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">panic</span><span class="op">(</span><span class="ident">e</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">ge</span><span class="op">.</span><span class="ident">err</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

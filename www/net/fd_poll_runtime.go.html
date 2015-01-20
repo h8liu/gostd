@@ -1,0 +1,159 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2013&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="comment">//&nbsp;+build&nbsp;darwin&nbsp;dragonfly&nbsp;freebsd&nbsp;linux&nbsp;netbsd&nbsp;openbsd&nbsp;windows&nbsp;solaris</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">package</span>&nbsp;<span class="ident">net</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;sync&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;syscall&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;time&#34;</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">15</span><span class="comment">//&nbsp;runtimeNano&nbsp;returns&nbsp;the&nbsp;current&nbsp;value&nbsp;of&nbsp;the&nbsp;runtime&nbsp;clock&nbsp;in&nbsp;nanoseconds.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">runtimeNano</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="ident">int64</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">runtime_pollServerInit</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">runtime_pollOpen</span><span class="op">(</span><span class="ident">fd</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="builtintype">uintptr</span><span class="op">,</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span><br>
+<span class="lineno">20</span><span class="keyword">func</span>&nbsp;<span class="ident">runtime_pollClose</span><span class="op">(</span><span class="ident">ctx</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">runtime_pollWait</span><span class="op">(</span><span class="ident">ctx</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">,</span>&nbsp;<span class="ident">mode</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">runtime_pollWaitCanceled</span><span class="op">(</span><span class="ident">ctx</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">,</span>&nbsp;<span class="ident">mode</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">runtime_pollReset</span><span class="op">(</span><span class="ident">ctx</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">,</span>&nbsp;<span class="ident">mode</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">runtime_pollSetDeadline</span><span class="op">(</span><span class="ident">ctx</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">,</span>&nbsp;<span class="ident">d</span>&nbsp;<span class="ident">int64</span><span class="op">,</span>&nbsp;<span class="ident">mode</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span><br>
+<span class="lineno">25</span><span class="keyword">func</span>&nbsp;<span class="ident">runtime_pollUnblock</span><span class="op">(</span><span class="ident">ctx</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">pollDesc</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">runtimeCtx</span>&nbsp;<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">30</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">serverInit</span>&nbsp;<span class="ident">sync</span><span class="op">.</span><span class="ident">Once</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">pd</span>&nbsp;<span class="op">*</span><span class="ident">pollDesc</span><span class="op">)</span>&nbsp;<span class="ident">Init</span><span class="op">(</span><span class="ident">fd</span>&nbsp;<span class="op">*</span><span class="ident">netFD</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">serverInit</span><span class="op">.</span><span class="ident">Do</span><span class="op">(</span><span class="ident">runtime_pollServerInit</span><span class="op">)</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ctx</span><span class="op">,</span>&nbsp;<span class="ident">errno</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">runtime_pollOpen</span><span class="op">(</span><span class="builtintype">uintptr</span><span class="op">(</span><span class="ident">fd</span><span class="op">.</span><span class="ident">sysfd</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">errno</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">syscall</span><span class="op">.</span><span class="ident">Errno</span><span class="op">(</span><span class="ident">errno</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pd</span><span class="op">.</span><span class="ident">runtimeCtx</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">ctx</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">pd</span>&nbsp;<span class="op">*</span><span class="ident">pollDesc</span><span class="op">)</span>&nbsp;<span class="ident">Close</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">pd</span><span class="op">.</span><span class="ident">runtimeCtx</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">runtime_pollClose</span><span class="op">(</span><span class="ident">pd</span><span class="op">.</span><span class="ident">runtimeCtx</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pd</span><span class="op">.</span><span class="ident">runtimeCtx</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">50</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">pd</span>&nbsp;<span class="op">*</span><span class="ident">pollDesc</span><span class="op">)</span>&nbsp;<span class="ident">Lock</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">pd</span>&nbsp;<span class="op">*</span><span class="ident">pollDesc</span><span class="op">)</span>&nbsp;<span class="ident">Unlock</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">55</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">pd</span>&nbsp;<span class="op">*</span><span class="ident">pollDesc</span><span class="op">)</span>&nbsp;<span class="ident">Wakeup</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">60</span><span class="comment">//&nbsp;Evict&nbsp;evicts&nbsp;fd&nbsp;from&nbsp;the&nbsp;pending&nbsp;list,&nbsp;unblocking&nbsp;any&nbsp;I/O&nbsp;running&nbsp;on&nbsp;fd.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Return&nbsp;value&nbsp;is&nbsp;whether&nbsp;the&nbsp;pollServer&nbsp;should&nbsp;be&nbsp;woken&nbsp;up.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">pd</span>&nbsp;<span class="op">*</span><span class="ident">pollDesc</span><span class="op">)</span>&nbsp;<span class="ident">Evict</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">pd</span><span class="op">.</span><span class="ident">runtimeCtx</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">runtime_pollUnblock</span><span class="op">(</span><span class="ident">pd</span><span class="op">.</span><span class="ident">runtimeCtx</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">70</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">pd</span>&nbsp;<span class="op">*</span><span class="ident">pollDesc</span><span class="op">)</span>&nbsp;<span class="ident">Prepare</span><span class="op">(</span><span class="ident">mode</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">res</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">runtime_pollReset</span><span class="op">(</span><span class="ident">pd</span><span class="op">.</span><span class="ident">runtimeCtx</span><span class="op">,</span>&nbsp;<span class="ident">mode</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">convertErr</span><span class="op">(</span><span class="ident">res</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">75</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">pd</span>&nbsp;<span class="op">*</span><span class="ident">pollDesc</span><span class="op">)</span>&nbsp;<span class="ident">PrepareRead</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">pd</span><span class="op">.</span><span class="ident">Prepare</span><span class="op">(</span><span class="string">&#39;r&#39;</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">pd</span>&nbsp;<span class="op">*</span><span class="ident">pollDesc</span><span class="op">)</span>&nbsp;<span class="ident">PrepareWrite</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">pd</span><span class="op">.</span><span class="ident">Prepare</span><span class="op">(</span><span class="string">&#39;w&#39;</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">pd</span>&nbsp;<span class="op">*</span><span class="ident">pollDesc</span><span class="op">)</span>&nbsp;<span class="ident">Wait</span><span class="op">(</span><span class="ident">mode</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">res</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">runtime_pollWait</span><span class="op">(</span><span class="ident">pd</span><span class="op">.</span><span class="ident">runtimeCtx</span><span class="op">,</span>&nbsp;<span class="ident">mode</span><span class="op">)</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">convertErr</span><span class="op">(</span><span class="ident">res</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">pd</span>&nbsp;<span class="op">*</span><span class="ident">pollDesc</span><span class="op">)</span>&nbsp;<span class="ident">WaitRead</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">pd</span><span class="op">.</span><span class="ident">Wait</span><span class="op">(</span><span class="string">&#39;r&#39;</span><span class="op">)</span><br>
+<span class="lineno">90</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">pd</span>&nbsp;<span class="op">*</span><span class="ident">pollDesc</span><span class="op">)</span>&nbsp;<span class="ident">WaitWrite</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">pd</span><span class="op">.</span><span class="ident">Wait</span><span class="op">(</span><span class="string">&#39;w&#39;</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">95</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">pd</span>&nbsp;<span class="op">*</span><span class="ident">pollDesc</span><span class="op">)</span>&nbsp;<span class="ident">WaitCanceled</span><span class="op">(</span><span class="ident">mode</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">runtime_pollWaitCanceled</span><span class="op">(</span><span class="ident">pd</span><span class="op">.</span><span class="ident">runtimeCtx</span><span class="op">,</span>&nbsp;<span class="ident">mode</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">100</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">pd</span>&nbsp;<span class="op">*</span><span class="ident">pollDesc</span><span class="op">)</span>&nbsp;<span class="ident">WaitCanceledRead</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pd</span><span class="op">.</span><span class="ident">WaitCanceled</span><span class="op">(</span><span class="string">&#39;r&#39;</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">pd</span>&nbsp;<span class="op">*</span><span class="ident">pollDesc</span><span class="op">)</span>&nbsp;<span class="ident">WaitCanceledWrite</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pd</span><span class="op">.</span><span class="ident">WaitCanceled</span><span class="op">(</span><span class="string">&#39;w&#39;</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">convertErr</span><span class="op">(</span><span class="ident">res</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="ident">res</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">110</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="num">0</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="num">1</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">errClosing</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="num">2</span><span class="op">:</span><br>
+<span class="lineno">115</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">errTimeout</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">println</span><span class="op">(</span><span class="string">&#34;unreachable:&nbsp;&#34;</span><span class="op">,</span>&nbsp;<span class="ident">res</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">panic</span><span class="op">(</span><span class="string">&#34;unreachable&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">120</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">fd</span>&nbsp;<span class="op">*</span><span class="ident">netFD</span><span class="op">)</span>&nbsp;<span class="ident">setDeadline</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="ident">time</span><span class="op">.</span><span class="ident">Time</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">setDeadlineImpl</span><span class="op">(</span><span class="ident">fd</span><span class="op">,</span>&nbsp;<span class="ident">t</span><span class="op">,</span>&nbsp;<span class="string">&#39;r&#39;</span><span class="op">+</span><span class="string">&#39;w&#39;</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">125</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">fd</span>&nbsp;<span class="op">*</span><span class="ident">netFD</span><span class="op">)</span>&nbsp;<span class="ident">setReadDeadline</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="ident">time</span><span class="op">.</span><span class="ident">Time</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">setDeadlineImpl</span><span class="op">(</span><span class="ident">fd</span><span class="op">,</span>&nbsp;<span class="ident">t</span><span class="op">,</span>&nbsp;<span class="string">&#39;r&#39;</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">fd</span>&nbsp;<span class="op">*</span><span class="ident">netFD</span><span class="op">)</span>&nbsp;<span class="ident">setWriteDeadline</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="ident">time</span><span class="op">.</span><span class="ident">Time</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">130</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">setDeadlineImpl</span><span class="op">(</span><span class="ident">fd</span><span class="op">,</span>&nbsp;<span class="ident">t</span><span class="op">,</span>&nbsp;<span class="string">&#39;w&#39;</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">setDeadlineImpl</span><span class="op">(</span><span class="ident">fd</span>&nbsp;<span class="op">*</span><span class="ident">netFD</span><span class="op">,</span>&nbsp;<span class="ident">t</span>&nbsp;<span class="ident">time</span><span class="op">.</span><span class="ident">Time</span><span class="op">,</span>&nbsp;<span class="ident">mode</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">runtimeNano</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">int64</span><span class="op">(</span><span class="ident">t</span><span class="op">.</span><span class="ident">Sub</span><span class="op">(</span><span class="ident">time</span><span class="op">.</span><span class="ident">Now</span><span class="op">(</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno">135</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">t</span><span class="op">.</span><span class="ident">IsZero</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">fd</span><span class="op">.</span><span class="ident">incref</span><span class="op">(</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno">140</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">runtime_pollSetDeadline</span><span class="op">(</span><span class="ident">fd</span><span class="op">.</span><span class="ident">pd</span><span class="op">.</span><span class="ident">runtimeCtx</span><span class="op">,</span>&nbsp;<span class="ident">d</span><span class="op">,</span>&nbsp;<span class="ident">mode</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fd</span><span class="op">.</span><span class="ident">decref</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

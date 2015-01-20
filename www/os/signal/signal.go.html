@@ -1,0 +1,146 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2012&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="comment">//&nbsp;Package&nbsp;signal&nbsp;implements&nbsp;access&nbsp;to&nbsp;incoming&nbsp;signals.</span><br>
+<span class="lineno"></span><span class="keyword">package</span>&nbsp;<span class="ident">signal</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;BUG(rsc):&nbsp;This&nbsp;package&nbsp;is&nbsp;not&nbsp;yet&nbsp;implemented&nbsp;on&nbsp;Plan&nbsp;9.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">10</span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;os&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;sync&#34;</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">15</span><span class="keyword">var</span>&nbsp;<span class="ident">handlers</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sync</span><span class="op">.</span><span class="ident">Mutex</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">m</span>&nbsp;&nbsp;&nbsp;<span class="keyword">map</span><span class="op">[</span><span class="keyword">chan</span><span class="op">&lt;-</span>&nbsp;<span class="ident">os</span><span class="op">.</span><span class="ident">Signal</span><span class="op">]</span><span class="op">*</span><span class="ident">handler</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ref</span>&nbsp;<span class="op">[</span><span class="ident">numSig</span><span class="op">]</span><span class="ident">int64</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">20</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">handler</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mask</span>&nbsp;<span class="op">[</span><span class="op">(</span><span class="ident">numSig</span>&nbsp;<span class="op">+</span>&nbsp;<span class="num">31</span><span class="op">)</span>&nbsp;<span class="op">/</span>&nbsp;<span class="num">32</span><span class="op">]</span><span class="builtintype">uint32</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">25</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">h</span>&nbsp;<span class="op">*</span><span class="ident">handler</span><span class="op">)</span>&nbsp;<span class="ident">want</span><span class="op">(</span><span class="ident">sig</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="op">(</span><span class="ident">h</span><span class="op">.</span><span class="ident">mask</span><span class="op">[</span><span class="ident">sig</span><span class="op">/</span><span class="num">32</span><span class="op">]</span><span class="op">&gt;&gt;</span><span class="builtintype">uint</span><span class="op">(</span><span class="ident">sig</span><span class="op">&amp;</span><span class="num">31</span><span class="op">)</span><span class="op">)</span><span class="op">&amp;</span><span class="num">1</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">h</span>&nbsp;<span class="op">*</span><span class="ident">handler</span><span class="op">)</span>&nbsp;<span class="ident">set</span><span class="op">(</span><span class="ident">sig</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">h</span><span class="op">.</span><span class="ident">mask</span><span class="op">[</span><span class="ident">sig</span><span class="op">/</span><span class="num">32</span><span class="op">]</span>&nbsp;<span class="op">|=</span>&nbsp;<span class="num">1</span>&nbsp;<span class="op">&lt;&lt;</span>&nbsp;<span class="builtintype">uint</span><span class="op">(</span><span class="ident">sig</span><span class="op">&amp;</span><span class="num">31</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Notify&nbsp;causes&nbsp;package&nbsp;signal&nbsp;to&nbsp;relay&nbsp;incoming&nbsp;signals&nbsp;to&nbsp;c.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;If&nbsp;no&nbsp;signals&nbsp;are&nbsp;listed,&nbsp;all&nbsp;incoming&nbsp;signals&nbsp;will&nbsp;be&nbsp;relayed&nbsp;to&nbsp;c.</span><br>
+<span class="lineno">35</span><span class="comment">//&nbsp;Otherwise,&nbsp;just&nbsp;the&nbsp;listed&nbsp;signals&nbsp;will.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Package&nbsp;signal&nbsp;will&nbsp;not&nbsp;block&nbsp;sending&nbsp;to&nbsp;c:&nbsp;the&nbsp;caller&nbsp;must&nbsp;ensure</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;that&nbsp;c&nbsp;has&nbsp;sufficient&nbsp;buffer&nbsp;space&nbsp;to&nbsp;keep&nbsp;up&nbsp;with&nbsp;the&nbsp;expected</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;signal&nbsp;rate.&nbsp;&nbsp;For&nbsp;a&nbsp;channel&nbsp;used&nbsp;for&nbsp;notification&nbsp;of&nbsp;just&nbsp;one&nbsp;signal&nbsp;value,</span><br>
+<span class="lineno">40</span><span class="comment">//&nbsp;a&nbsp;buffer&nbsp;of&nbsp;size&nbsp;1&nbsp;is&nbsp;sufficient.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;It&nbsp;is&nbsp;allowed&nbsp;to&nbsp;call&nbsp;Notify&nbsp;multiple&nbsp;times&nbsp;with&nbsp;the&nbsp;same&nbsp;channel:</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;each&nbsp;call&nbsp;expands&nbsp;the&nbsp;set&nbsp;of&nbsp;signals&nbsp;sent&nbsp;to&nbsp;that&nbsp;channel.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;only&nbsp;way&nbsp;to&nbsp;remove&nbsp;signals&nbsp;from&nbsp;the&nbsp;set&nbsp;is&nbsp;to&nbsp;call&nbsp;Stop.</span><br>
+<span class="lineno">45</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;It&nbsp;is&nbsp;allowed&nbsp;to&nbsp;call&nbsp;Notify&nbsp;multiple&nbsp;times&nbsp;with&nbsp;different&nbsp;channels</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;and&nbsp;the&nbsp;same&nbsp;signals:&nbsp;each&nbsp;channel&nbsp;receives&nbsp;copies&nbsp;of&nbsp;incoming</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;signals&nbsp;independently.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">Notify</span><span class="op">(</span><span class="ident">c</span>&nbsp;<span class="keyword">chan</span><span class="op">&lt;-</span>&nbsp;<span class="ident">os</span><span class="op">.</span><span class="ident">Signal</span><span class="op">,</span>&nbsp;<span class="ident">sig</span>&nbsp;<span class="op">...</span><span class="ident">os</span><span class="op">.</span><span class="ident">Signal</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">panic</span><span class="op">(</span><span class="string">&#34;os/signal:&nbsp;Notify&nbsp;using&nbsp;nil&nbsp;channel&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">handlers</span><span class="op">.</span><span class="ident">Lock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">defer</span>&nbsp;<span class="ident">handlers</span><span class="op">.</span><span class="ident">Unlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">h</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">handlers</span><span class="op">.</span><span class="ident">m</span><span class="op">[</span><span class="ident">c</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">h</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">handlers</span><span class="op">.</span><span class="ident">m</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">handlers</span><span class="op">.</span><span class="ident">m</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">make</span><span class="op">(</span><span class="keyword">map</span><span class="op">[</span><span class="keyword">chan</span><span class="op">&lt;-</span>&nbsp;<span class="ident">os</span><span class="op">.</span><span class="ident">Signal</span><span class="op">]</span><span class="op">*</span><span class="ident">handler</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">h</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">new</span><span class="op">(</span><span class="ident">handler</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">handlers</span><span class="op">.</span><span class="ident">m</span><span class="op">[</span><span class="ident">c</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">h</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">65</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">add</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="ident">n</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">h</span><span class="op">.</span><span class="ident">want</span><span class="op">(</span><span class="ident">n</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">h</span><span class="op">.</span><span class="ident">set</span><span class="op">(</span><span class="ident">n</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">handlers</span><span class="op">.</span><span class="ident">ref</span><span class="op">[</span><span class="ident">n</span><span class="op">]</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">enableSignal</span><span class="op">(</span><span class="ident">n</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">handlers</span><span class="op">.</span><span class="ident">ref</span><span class="op">[</span><span class="ident">n</span><span class="op">]</span><span class="op">++</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">sig</span><span class="op">)</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="num">0</span><span class="op">;</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">numSig</span><span class="op">;</span>&nbsp;<span class="ident">n</span><span class="op">++</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">add</span><span class="op">(</span><span class="ident">n</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">s</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">sig</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">add</span><span class="op">(</span><span class="ident">signum</span><span class="op">(</span><span class="ident">s</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">90</span><span class="comment">//&nbsp;Stop&nbsp;causes&nbsp;package&nbsp;signal&nbsp;to&nbsp;stop&nbsp;relaying&nbsp;incoming&nbsp;signals&nbsp;to&nbsp;c.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;It&nbsp;undoes&nbsp;the&nbsp;effect&nbsp;of&nbsp;all&nbsp;prior&nbsp;calls&nbsp;to&nbsp;Notify&nbsp;using&nbsp;c.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;When&nbsp;Stop&nbsp;returns,&nbsp;it&nbsp;is&nbsp;guaranteed&nbsp;that&nbsp;c&nbsp;will&nbsp;receive&nbsp;no&nbsp;more&nbsp;signals.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">Stop</span><span class="op">(</span><span class="ident">c</span>&nbsp;<span class="keyword">chan</span><span class="op">&lt;-</span>&nbsp;<span class="ident">os</span><span class="op">.</span><span class="ident">Signal</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">handlers</span><span class="op">.</span><span class="ident">Lock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">defer</span>&nbsp;<span class="ident">handlers</span><span class="op">.</span><span class="ident">Unlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">h</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">handlers</span><span class="op">.</span><span class="ident">m</span><span class="op">[</span><span class="ident">c</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">h</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno">100</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">delete</span><span class="op">(</span><span class="ident">handlers</span><span class="op">.</span><span class="ident">m</span><span class="op">,</span>&nbsp;<span class="ident">c</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="num">0</span><span class="op">;</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">numSig</span><span class="op">;</span>&nbsp;<span class="ident">n</span><span class="op">++</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">h</span><span class="op">.</span><span class="ident">want</span><span class="op">(</span><span class="ident">n</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">handlers</span><span class="op">.</span><span class="ident">ref</span><span class="op">[</span><span class="ident">n</span><span class="op">]</span><span class="op">--</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">handlers</span><span class="op">.</span><span class="ident">ref</span><span class="op">[</span><span class="ident">n</span><span class="op">]</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">disableSignal</span><span class="op">(</span><span class="ident">n</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">110</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">process</span><span class="op">(</span><span class="ident">sig</span>&nbsp;<span class="ident">os</span><span class="op">.</span><span class="ident">Signal</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">signum</span><span class="op">(</span><span class="ident">sig</span><span class="op">)</span><br>
+<span class="lineno">115</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">handlers</span><span class="op">.</span><span class="ident">Lock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">120</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">defer</span>&nbsp;<span class="ident">handlers</span><span class="op">.</span><span class="ident">Unlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">c</span><span class="op">,</span>&nbsp;<span class="ident">h</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">handlers</span><span class="op">.</span><span class="ident">m</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">h</span><span class="op">.</span><span class="ident">want</span><span class="op">(</span><span class="ident">n</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;send&nbsp;but&nbsp;do&nbsp;not&nbsp;block&nbsp;for&nbsp;it</span><br>
+<span class="lineno">125</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">select</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&lt;-</span>&nbsp;<span class="ident">sig</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">default</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">130</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

@@ -1,0 +1,213 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2009&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">strconv</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="string">&#34;errors&#34;</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ErrRange&nbsp;indicates&nbsp;that&nbsp;a&nbsp;value&nbsp;is&nbsp;out&nbsp;of&nbsp;range&nbsp;for&nbsp;the&nbsp;target&nbsp;type.</span><br>
+<span class="lineno">10</span><span class="keyword">var</span>&nbsp;<span class="ident">ErrRange</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">errors</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="string">&#34;value&nbsp;out&nbsp;of&nbsp;range&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ErrSyntax&nbsp;indicates&nbsp;that&nbsp;a&nbsp;value&nbsp;does&nbsp;not&nbsp;have&nbsp;the&nbsp;right&nbsp;syntax&nbsp;for&nbsp;the&nbsp;target&nbsp;type.</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">ErrSyntax</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">errors</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="string">&#34;invalid&nbsp;syntax&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">15</span><span class="comment">//&nbsp;A&nbsp;NumError&nbsp;records&nbsp;a&nbsp;failed&nbsp;conversion.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">NumError</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Func</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="comment">//&nbsp;the&nbsp;failing&nbsp;function&nbsp;(ParseBool,&nbsp;ParseInt,&nbsp;ParseUint,&nbsp;ParseFloat)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Num</span>&nbsp;&nbsp;<span class="builtintype">string</span>&nbsp;<span class="comment">//&nbsp;the&nbsp;input</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Err</span>&nbsp;&nbsp;<span class="builtintype">error</span>&nbsp;&nbsp;<span class="comment">//&nbsp;the&nbsp;reason&nbsp;the&nbsp;conversion&nbsp;failed&nbsp;(ErrRange,&nbsp;ErrSyntax)</span><br>
+<span class="lineno">20</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">e</span>&nbsp;<span class="op">*</span><span class="ident">NumError</span><span class="op">)</span>&nbsp;<span class="ident">Error</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="string">&#34;strconv.&#34;</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">e</span><span class="op">.</span><span class="ident">Func</span>&nbsp;<span class="op">+</span>&nbsp;<span class="string">&#34;:&nbsp;&#34;</span>&nbsp;<span class="op">+</span>&nbsp;<span class="string">&#34;parsing&nbsp;&#34;</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">Quote</span><span class="op">(</span><span class="ident">e</span><span class="op">.</span><span class="ident">Num</span><span class="op">)</span>&nbsp;<span class="op">+</span>&nbsp;<span class="string">&#34;:&nbsp;&#34;</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">e</span><span class="op">.</span><span class="ident">Err</span><span class="op">.</span><span class="ident">Error</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">25</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">syntaxError</span><span class="op">(</span><span class="ident">fn</span><span class="op">,</span>&nbsp;<span class="ident">str</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">NumError</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="op">&amp;</span><span class="ident">NumError</span><span class="op">{</span><span class="ident">fn</span><span class="op">,</span>&nbsp;<span class="ident">str</span><span class="op">,</span>&nbsp;<span class="ident">ErrSyntax</span><span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">30</span><span class="keyword">func</span>&nbsp;<span class="ident">rangeError</span><span class="op">(</span><span class="ident">fn</span><span class="op">,</span>&nbsp;<span class="ident">str</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">NumError</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="op">&amp;</span><span class="ident">NumError</span><span class="op">{</span><span class="ident">fn</span><span class="op">,</span>&nbsp;<span class="ident">str</span><span class="op">,</span>&nbsp;<span class="ident">ErrRange</span><span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">intSize</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">32</span>&nbsp;<span class="op">&lt;&lt;</span>&nbsp;<span class="op">(</span><span class="op">^</span><span class="builtintype">uint</span><span class="op">(</span><span class="num">0</span><span class="op">)</span>&nbsp;<span class="op">&gt;&gt;</span>&nbsp;<span class="num">63</span><span class="op">)</span><br>
+<span class="lineno">35</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;IntSize&nbsp;is&nbsp;the&nbsp;size&nbsp;in&nbsp;bits&nbsp;of&nbsp;an&nbsp;int&nbsp;or&nbsp;uint&nbsp;value.</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">IntSize</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">intSize</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Return&nbsp;the&nbsp;first&nbsp;number&nbsp;n&nbsp;such&nbsp;that&nbsp;n*base&nbsp;&gt;=&nbsp;1&lt;&lt;64.</span><br>
+<span class="lineno">40</span><span class="keyword">func</span>&nbsp;<span class="ident">cutoff64</span><span class="op">(</span><span class="ident">base</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="ident">uint64</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">base</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">2</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="op">(</span><span class="num">1</span><span class="op">&lt;&lt;</span><span class="num">64</span><span class="op">-</span><span class="num">1</span><span class="op">)</span><span class="op">/</span><span class="ident">uint64</span><span class="op">(</span><span class="ident">base</span><span class="op">)</span>&nbsp;<span class="op">+</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno">45</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ParseUint&nbsp;is&nbsp;like&nbsp;ParseInt&nbsp;but&nbsp;for&nbsp;unsigned&nbsp;numbers.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">ParseUint</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">base</span>&nbsp;<span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">bitSize</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">n</span>&nbsp;<span class="ident">uint64</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">cutoff</span><span class="op">,</span>&nbsp;<span class="ident">maxVal</span>&nbsp;<span class="ident">uint64</span><br>
+<span class="lineno">50</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">bitSize</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">bitSize</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtintype">int</span><span class="op">(</span><span class="ident">IntSize</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s0</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">s</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">s</span><span class="op">)</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">1</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">ErrSyntax</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">goto</span>&nbsp;<span class="ident">Error</span><br>
+<span class="lineno">60</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="num">2</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">base</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">base</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="num">36</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;valid&nbsp;base;&nbsp;nothing&nbsp;to&nbsp;do</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">base</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span><span class="op">:</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Look&nbsp;for&nbsp;octal,&nbsp;hex&nbsp;prefix.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">s</span><span class="op">[</span><span class="num">0</span><span class="op">]</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;0&#39;</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">s</span><span class="op">)</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">1</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="op">(</span><span class="ident">s</span><span class="op">[</span><span class="num">1</span><span class="op">]</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;x&#39;</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">s</span><span class="op">[</span><span class="num">1</span><span class="op">]</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;X&#39;</span><span class="op">)</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">base</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">16</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">s</span><span class="op">[</span><span class="num">2</span><span class="op">:</span><span class="op">]</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">s</span><span class="op">)</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">1</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">ErrSyntax</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">goto</span>&nbsp;<span class="ident">Error</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">s</span><span class="op">[</span><span class="num">0</span><span class="op">]</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;0&#39;</span><span class="op">:</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">base</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">8</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">default</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">base</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">10</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">default</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">errors</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="string">&#34;invalid&nbsp;base&nbsp;&#34;</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">Itoa</span><span class="op">(</span><span class="ident">base</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">goto</span>&nbsp;<span class="ident">Error</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">cutoff</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">cutoff64</span><span class="op">(</span><span class="ident">base</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">maxVal</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><span class="op">&lt;&lt;</span><span class="builtintype">uint</span><span class="op">(</span><span class="ident">bitSize</span><span class="op">)</span>&nbsp;<span class="op">-</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="num">0</span><span class="op">;</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">s</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">i</span><span class="op">++</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">v</span>&nbsp;<span class="builtintype">byte</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">s</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="string">&#39;0&#39;</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">d</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">d</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="string">&#39;9&#39;</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">d</span>&nbsp;<span class="op">-</span>&nbsp;<span class="string">&#39;0&#39;</span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="string">&#39;a&#39;</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">d</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">d</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="string">&#39;z&#39;</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">d</span>&nbsp;<span class="op">-</span>&nbsp;<span class="string">&#39;a&#39;</span>&nbsp;<span class="op">+</span>&nbsp;<span class="num">10</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="string">&#39;A&#39;</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">d</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">d</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="string">&#39;Z&#39;</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">d</span>&nbsp;<span class="op">-</span>&nbsp;<span class="string">&#39;A&#39;</span>&nbsp;<span class="op">+</span>&nbsp;<span class="num">10</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">default</span><span class="op">:</span><br>
+<span class="lineno">100</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">ErrSyntax</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">goto</span>&nbsp;<span class="ident">Error</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtintype">int</span><span class="op">(</span><span class="ident">v</span><span class="op">)</span>&nbsp;<span class="op">&gt;=</span>&nbsp;<span class="ident">base</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">ErrSyntax</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">goto</span>&nbsp;<span class="ident">Error</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">110</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="op">&gt;=</span>&nbsp;<span class="ident">cutoff</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;n*base&nbsp;overflows</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><span class="op">&lt;&lt;</span><span class="num">64</span>&nbsp;<span class="op">-</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">ErrRange</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">goto</span>&nbsp;<span class="ident">Error</span><br>
+<span class="lineno">115</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span>&nbsp;<span class="op">*=</span>&nbsp;<span class="ident">uint64</span><span class="op">(</span><span class="ident">base</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n1</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">uint64</span><span class="op">(</span><span class="ident">v</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">n1</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">n1</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="ident">maxVal</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">120</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;n+v&nbsp;overflows</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><span class="op">&lt;&lt;</span><span class="num">64</span>&nbsp;<span class="op">-</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">ErrRange</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">goto</span>&nbsp;<span class="ident">Error</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">125</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">n1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">n</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">130</span><span class="ident">Error</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">n</span><span class="op">,</span>&nbsp;<span class="op">&amp;</span><span class="ident">NumError</span><span class="op">{</span><span class="string">&#34;ParseUint&#34;</span><span class="op">,</span>&nbsp;<span class="ident">s0</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ParseInt&nbsp;interprets&nbsp;a&nbsp;string&nbsp;s&nbsp;in&nbsp;the&nbsp;given&nbsp;base&nbsp;(2&nbsp;to&nbsp;36)&nbsp;and</span><br>
+<span class="lineno">135</span><span class="comment">//&nbsp;returns&nbsp;the&nbsp;corresponding&nbsp;value&nbsp;i.&nbsp;&nbsp;If&nbsp;base&nbsp;==&nbsp;0,&nbsp;the&nbsp;base&nbsp;is</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;implied&nbsp;by&nbsp;the&nbsp;string&#39;s&nbsp;prefix:&nbsp;base&nbsp;16&nbsp;for&nbsp;&#34;0x&#34;,&nbsp;base&nbsp;8&nbsp;for</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&#34;0&#34;,&nbsp;and&nbsp;base&nbsp;10&nbsp;otherwise.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;bitSize&nbsp;argument&nbsp;specifies&nbsp;the&nbsp;integer&nbsp;type</span><br>
+<span class="lineno">140</span><span class="comment">//&nbsp;that&nbsp;the&nbsp;result&nbsp;must&nbsp;fit&nbsp;into.&nbsp;&nbsp;Bit&nbsp;sizes&nbsp;0,&nbsp;8,&nbsp;16,&nbsp;32,&nbsp;and&nbsp;64</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;correspond&nbsp;to&nbsp;int,&nbsp;int8,&nbsp;int16,&nbsp;int32,&nbsp;and&nbsp;int64.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;errors&nbsp;that&nbsp;ParseInt&nbsp;returns&nbsp;have&nbsp;concrete&nbsp;type&nbsp;*NumError</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;and&nbsp;include&nbsp;err.Num&nbsp;=&nbsp;s.&nbsp;&nbsp;If&nbsp;s&nbsp;is&nbsp;empty&nbsp;or&nbsp;contains&nbsp;invalid</span><br>
+<span class="lineno">145</span><span class="comment">//&nbsp;digits,&nbsp;err.Err&nbsp;=&nbsp;ErrSyntax&nbsp;and&nbsp;the&nbsp;returned&nbsp;value&nbsp;is&nbsp;0;</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;if&nbsp;the&nbsp;value&nbsp;corresponding&nbsp;to&nbsp;s&nbsp;cannot&nbsp;be&nbsp;represented&nbsp;by&nbsp;a</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;signed&nbsp;integer&nbsp;of&nbsp;the&nbsp;given&nbsp;size,&nbsp;err.Err&nbsp;=&nbsp;ErrRange&nbsp;and&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;returned&nbsp;value&nbsp;is&nbsp;the&nbsp;maximum&nbsp;magnitude&nbsp;integer&nbsp;of&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;appropriate&nbsp;bitSize&nbsp;and&nbsp;sign.</span><br>
+<span class="lineno">150</span><span class="keyword">func</span>&nbsp;<span class="ident">ParseInt</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">base</span>&nbsp;<span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">bitSize</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">i</span>&nbsp;<span class="ident">int64</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">const</span>&nbsp;<span class="ident">fnParseInt</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">&#34;ParseInt&#34;</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">bitSize</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">bitSize</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtintype">int</span><span class="op">(</span><span class="ident">IntSize</span><span class="op">)</span><br>
+<span class="lineno">155</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Empty&nbsp;string&nbsp;bad.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">s</span><span class="op">)</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">syntaxError</span><span class="op">(</span><span class="ident">fnParseInt</span><span class="op">,</span>&nbsp;<span class="ident">s</span><span class="op">)</span><br>
+<span class="lineno">160</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Pick&nbsp;off&nbsp;leading&nbsp;sign.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s0</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">s</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">neg</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno">165</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">s</span><span class="op">[</span><span class="num">0</span><span class="op">]</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;+&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">s</span><span class="op">[</span><span class="num">1</span><span class="op">:</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="keyword">if</span>&nbsp;<span class="ident">s</span><span class="op">[</span><span class="num">0</span><span class="op">]</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;-&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">neg</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">s</span><span class="op">[</span><span class="num">1</span><span class="op">:</span><span class="op">]</span><br>
+<span class="lineno">170</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Convert&nbsp;unsigned&nbsp;and&nbsp;check&nbsp;range.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">un</span>&nbsp;<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">un</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">ParseUint</span><span class="op">(</span><span class="ident">s</span><span class="op">,</span>&nbsp;<span class="ident">base</span><span class="op">,</span>&nbsp;<span class="ident">bitSize</span><span class="op">)</span><br>
+<span class="lineno">175</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">err</span><span class="op">.</span><span class="op">(</span><span class="op">*</span><span class="ident">NumError</span><span class="op">)</span><span class="op">.</span><span class="ident">Err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">ErrRange</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span><span class="op">.</span><span class="op">(</span><span class="op">*</span><span class="ident">NumError</span><span class="op">)</span><span class="op">.</span><span class="ident">Func</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">fnParseInt</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span><span class="op">.</span><span class="op">(</span><span class="op">*</span><span class="ident">NumError</span><span class="op">)</span><span class="op">.</span><span class="ident">Num</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">s0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">180</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">cutoff</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">uint64</span><span class="op">(</span><span class="num">1</span>&nbsp;<span class="op">&lt;&lt;</span>&nbsp;<span class="builtintype">uint</span><span class="op">(</span><span class="ident">bitSize</span><span class="op">-</span><span class="num">1</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">neg</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">un</span>&nbsp;<span class="op">&gt;=</span>&nbsp;<span class="ident">cutoff</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">int64</span><span class="op">(</span><span class="ident">cutoff</span>&nbsp;<span class="op">-</span>&nbsp;<span class="num">1</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">rangeError</span><span class="op">(</span><span class="ident">fnParseInt</span><span class="op">,</span>&nbsp;<span class="ident">s0</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">neg</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">un</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="ident">cutoff</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">185</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="op">-</span><span class="ident">int64</span><span class="op">(</span><span class="ident">cutoff</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">rangeError</span><span class="op">(</span><span class="ident">fnParseInt</span><span class="op">,</span>&nbsp;<span class="ident">s0</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">int64</span><span class="op">(</span><span class="ident">un</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">neg</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">-</span><span class="ident">n</span><br>
+<span class="lineno">190</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">n</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Atoi&nbsp;is&nbsp;shorthand&nbsp;for&nbsp;ParseInt(s,&nbsp;10,&nbsp;0).</span><br>
+<span class="lineno">195</span><span class="keyword">func</span>&nbsp;<span class="ident">Atoi</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">i</span>&nbsp;<span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">i64</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">ParseInt</span><span class="op">(</span><span class="ident">s</span><span class="op">,</span>&nbsp;<span class="num">10</span><span class="op">,</span>&nbsp;<span class="num">0</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="builtintype">int</span><span class="op">(</span><span class="ident">i64</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

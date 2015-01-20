@@ -1,0 +1,88 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2011&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">des</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;crypto/cipher&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;strconv&#34;</span><br>
+<span class="lineno">10</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;DES&nbsp;block&nbsp;size&nbsp;in&nbsp;bytes.</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">BlockSize</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">8</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">15</span><span class="keyword">type</span>&nbsp;<span class="ident">KeySizeError</span>&nbsp;<span class="builtintype">int</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">k</span>&nbsp;<span class="ident">KeySizeError</span><span class="op">)</span>&nbsp;<span class="ident">Error</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="string">&#34;crypto/des:&nbsp;invalid&nbsp;key&nbsp;size&nbsp;&#34;</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">strconv</span><span class="op">.</span><span class="ident">Itoa</span><span class="op">(</span><span class="builtintype">int</span><span class="op">(</span><span class="ident">k</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">20</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;desCipher&nbsp;is&nbsp;an&nbsp;instance&nbsp;of&nbsp;DES&nbsp;encryption.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">desCipher</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">subkeys</span>&nbsp;<span class="op">[</span><span class="num">16</span><span class="op">]</span><span class="ident">uint64</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">25</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;NewCipher&nbsp;creates&nbsp;and&nbsp;returns&nbsp;a&nbsp;new&nbsp;cipher.Block.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">NewCipher</span><span class="op">(</span><span class="ident">key</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">cipher</span><span class="op">.</span><span class="ident">Block</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">key</span><span class="op">)</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">8</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">KeySizeError</span><span class="op">(</span><span class="builtinfunc">len</span><span class="op">(</span><span class="ident">key</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">new</span><span class="op">(</span><span class="ident">desCipher</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">generateSubkeys</span><span class="op">(</span><span class="ident">key</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">c</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno">35</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">desCipher</span><span class="op">)</span>&nbsp;<span class="ident">BlockSize</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="ident">BlockSize</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">desCipher</span><span class="op">)</span>&nbsp;<span class="ident">Encrypt</span><span class="op">(</span><span class="ident">dst</span><span class="op">,</span>&nbsp;<span class="ident">src</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">{</span>&nbsp;<span class="ident">encryptBlock</span><span class="op">(</span><span class="ident">c</span><span class="op">.</span><span class="ident">subkeys</span><span class="op">[</span><span class="op">:</span><span class="op">]</span><span class="op">,</span>&nbsp;<span class="ident">dst</span><span class="op">,</span>&nbsp;<span class="ident">src</span><span class="op">)</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno">40</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">desCipher</span><span class="op">)</span>&nbsp;<span class="ident">Decrypt</span><span class="op">(</span><span class="ident">dst</span><span class="op">,</span>&nbsp;<span class="ident">src</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">{</span>&nbsp;<span class="ident">decryptBlock</span><span class="op">(</span><span class="ident">c</span><span class="op">.</span><span class="ident">subkeys</span><span class="op">[</span><span class="op">:</span><span class="op">]</span><span class="op">,</span>&nbsp;<span class="ident">dst</span><span class="op">,</span>&nbsp;<span class="ident">src</span><span class="op">)</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;A&nbsp;tripleDESCipher&nbsp;is&nbsp;an&nbsp;instance&nbsp;of&nbsp;TripleDES&nbsp;encryption.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">tripleDESCipher</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">cipher1</span><span class="op">,</span>&nbsp;<span class="ident">cipher2</span><span class="op">,</span>&nbsp;<span class="ident">cipher3</span>&nbsp;<span class="ident">desCipher</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;NewTripleDESCipher&nbsp;creates&nbsp;and&nbsp;returns&nbsp;a&nbsp;new&nbsp;cipher.Block.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">NewTripleDESCipher</span><span class="op">(</span><span class="ident">key</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">cipher</span><span class="op">.</span><span class="ident">Block</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">key</span><span class="op">)</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">24</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">KeySizeError</span><span class="op">(</span><span class="builtinfunc">len</span><span class="op">(</span><span class="ident">key</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">new</span><span class="op">(</span><span class="ident">tripleDESCipher</span><span class="op">)</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">cipher1</span><span class="op">.</span><span class="ident">generateSubkeys</span><span class="op">(</span><span class="ident">key</span><span class="op">[</span><span class="op">:</span><span class="num">8</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">cipher2</span><span class="op">.</span><span class="ident">generateSubkeys</span><span class="op">(</span><span class="ident">key</span><span class="op">[</span><span class="num">8</span><span class="op">:</span><span class="num">16</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">cipher3</span><span class="op">.</span><span class="ident">generateSubkeys</span><span class="op">(</span><span class="ident">key</span><span class="op">[</span><span class="num">16</span><span class="op">:</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">c</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">60</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">tripleDESCipher</span><span class="op">)</span>&nbsp;<span class="ident">BlockSize</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="ident">BlockSize</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">tripleDESCipher</span><span class="op">)</span>&nbsp;<span class="ident">Encrypt</span><span class="op">(</span><span class="ident">dst</span><span class="op">,</span>&nbsp;<span class="ident">src</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">cipher1</span><span class="op">.</span><span class="ident">Encrypt</span><span class="op">(</span><span class="ident">dst</span><span class="op">,</span>&nbsp;<span class="ident">src</span><span class="op">)</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">cipher2</span><span class="op">.</span><span class="ident">Decrypt</span><span class="op">(</span><span class="ident">dst</span><span class="op">,</span>&nbsp;<span class="ident">dst</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">cipher3</span><span class="op">.</span><span class="ident">Encrypt</span><span class="op">(</span><span class="ident">dst</span><span class="op">,</span>&nbsp;<span class="ident">dst</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">tripleDESCipher</span><span class="op">)</span>&nbsp;<span class="ident">Decrypt</span><span class="op">(</span><span class="ident">dst</span><span class="op">,</span>&nbsp;<span class="ident">src</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">cipher3</span><span class="op">.</span><span class="ident">Decrypt</span><span class="op">(</span><span class="ident">dst</span><span class="op">,</span>&nbsp;<span class="ident">src</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">cipher2</span><span class="op">.</span><span class="ident">Encrypt</span><span class="op">(</span><span class="ident">dst</span><span class="op">,</span>&nbsp;<span class="ident">dst</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">cipher1</span><span class="op">.</span><span class="ident">Decrypt</span><span class="op">(</span><span class="ident">dst</span><span class="op">,</span>&nbsp;<span class="ident">dst</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

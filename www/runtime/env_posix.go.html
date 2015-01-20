@@ -1,0 +1,78 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2012&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="comment">//&nbsp;+build&nbsp;darwin&nbsp;dragonfly&nbsp;freebsd&nbsp;linux&nbsp;nacl&nbsp;netbsd&nbsp;openbsd&nbsp;solaris&nbsp;windows</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">package</span>&nbsp;<span class="ident">runtime</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="string">&#34;unsafe&#34;</span><br>
+<span class="lineno">10</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">environ</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">string</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">getenv</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="builtintype">byte</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">val</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">gogetenv</span><span class="op">(</span><span class="ident">gostringnocopy</span><span class="op">(</span><span class="ident">s</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno">15</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">val</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#34;&#34;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Strings&nbsp;found&nbsp;in&nbsp;environment&nbsp;are&nbsp;NUL-terminated.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="op">&amp;</span><span class="ident">bytes</span><span class="op">(</span><span class="ident">val</span><span class="op">)</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><br>
+<span class="lineno">20</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">gogetenv</span><span class="op">(</span><span class="ident">key</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">env</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">environ</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">env</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gothrow</span><span class="op">(</span><span class="string">&#34;getenv&nbsp;before&nbsp;env&nbsp;init&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">s</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">environ</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">s</span><span class="op">)</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">key</span><span class="op">)</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">s</span><span class="op">[</span><span class="builtinfunc">len</span><span class="op">(</span><span class="ident">key</span><span class="op">)</span><span class="op">]</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;=&#39;</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">s</span><span class="op">[</span><span class="op">:</span><span class="builtinfunc">len</span><span class="op">(</span><span class="ident">key</span><span class="op">)</span><span class="op">]</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">key</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">s</span><span class="op">[</span><span class="builtinfunc">len</span><span class="op">(</span><span class="ident">key</span><span class="op">)</span><span class="op">+</span><span class="num">1</span><span class="op">:</span><span class="op">]</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="string">&#34;&#34;</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">35</span><span class="keyword">var</span>&nbsp;<span class="ident">_cgo_setenv</span>&nbsp;<span class="builtintype">uintptr</span>&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;pointer&nbsp;to&nbsp;C&nbsp;function</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">_cgo_unsetenv</span>&nbsp;<span class="builtintype">uintptr</span>&nbsp;<span class="comment">//&nbsp;pointer&nbsp;to&nbsp;C&nbsp;function</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Update&nbsp;the&nbsp;C&nbsp;environment&nbsp;if&nbsp;cgo&nbsp;is&nbsp;loaded.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Called&nbsp;from&nbsp;syscall.Setenv.</span><br>
+<span class="lineno">40</span><span class="keyword">func</span>&nbsp;<span class="ident">syscall_setenv_c</span><span class="op">(</span><span class="ident">k</span>&nbsp;<span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">v</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">_cgo_setenv</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">arg</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">[</span><span class="num">2</span><span class="op">]</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">{</span><span class="ident">cstring</span><span class="op">(</span><span class="ident">k</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">cstring</span><span class="op">(</span><span class="ident">v</span><span class="op">)</span><span class="op">}</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">asmcgocall</span><span class="op">(</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="ident">_cgo_setenv</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">arg</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Update&nbsp;the&nbsp;C&nbsp;environment&nbsp;if&nbsp;cgo&nbsp;is&nbsp;loaded.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Called&nbsp;from&nbsp;syscall.unsetenv.</span><br>
+<span class="lineno">50</span><span class="keyword">func</span>&nbsp;<span class="ident">syscall_unsetenv_c</span><span class="op">(</span><span class="ident">k</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">_cgo_unsetenv</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">arg</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">[</span><span class="num">1</span><span class="op">]</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">{</span><span class="ident">cstring</span><span class="op">(</span><span class="ident">k</span><span class="op">)</span><span class="op">}</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">asmcgocall</span><span class="op">(</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="ident">_cgo_unsetenv</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">arg</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">cstring</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">make</span><span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">s</span><span class="op">)</span><span class="op">+</span><span class="num">1</span><span class="op">)</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">(</span><span class="op">*</span><span class="ident">_string</span><span class="op">)</span><span class="op">(</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">s</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">memmove</span><span class="op">(</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">p</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="ident">sp</span><span class="op">.</span><span class="ident">str</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">(</span><span class="builtinfunc">len</span><span class="op">(</span><span class="ident">s</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">p</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

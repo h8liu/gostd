@@ -1,0 +1,117 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2009&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="comment">/*<br>
+<span class="lineno"></span>Package&nbsp;hmac&nbsp;implements&nbsp;the&nbsp;Keyed-Hash&nbsp;Message&nbsp;Authentication&nbsp;Code&nbsp;(HMAC)&nbsp;as<br>
+<span class="lineno"></span>defined&nbsp;in&nbsp;U.S.&nbsp;Federal&nbsp;Information&nbsp;Processing&nbsp;Standards&nbsp;Publication&nbsp;198.<br>
+<span class="lineno"></span>An&nbsp;HMAC&nbsp;is&nbsp;a&nbsp;cryptographic&nbsp;hash&nbsp;that&nbsp;uses&nbsp;a&nbsp;key&nbsp;to&nbsp;sign&nbsp;a&nbsp;message.<br>
+<span class="lineno"></span>The&nbsp;receiver&nbsp;verifies&nbsp;the&nbsp;hash&nbsp;by&nbsp;recomputing&nbsp;it&nbsp;using&nbsp;the&nbsp;same&nbsp;key.<br>
+<span class="lineno">10</span><br>
+<span class="lineno"></span>Receivers&nbsp;should&nbsp;be&nbsp;careful&nbsp;to&nbsp;use&nbsp;Equal&nbsp;to&nbsp;compare&nbsp;MACs&nbsp;in&nbsp;order&nbsp;to&nbsp;avoid<br>
+<span class="lineno"></span>timing&nbsp;side-channels:<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp//&nbsp;CheckMAC&nbsp;returns&nbsp;true&nbsp;if&nbsp;messageMAC&nbsp;is&nbsp;a&nbsp;valid&nbsp;HMAC&nbsp;tag&nbsp;for&nbsp;message.<br>
+<span class="lineno">15</span>&nbsp;&nbsp;&nbsp;&nbspfunc&nbsp;CheckMAC(message,&nbsp;messageMAC,&nbsp;key&nbsp;[]byte)&nbsp;bool&nbsp;{<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspmac&nbsp;:=&nbsp;hmac.New(sha256.New,&nbsp;key)<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspmac.Write(message)<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspexpectedMAC&nbsp;:=&nbsp;mac.Sum(nil)<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspreturn&nbsp;hmac.Equal(messageMAC,&nbsp;expectedMAC)<br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp}<br>
+<span class="lineno"></span>*/</span><br>
+<span class="lineno"></span><span class="keyword">package</span>&nbsp;<span class="ident">hmac</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;crypto/subtle&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;hash&#34;</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;FIPS&nbsp;198:</span><br>
+<span class="lineno">30</span><span class="comment">//&nbsp;http://csrc.nist.gov/publications/fips/fips198/fips-198a.pdf</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;key&nbsp;is&nbsp;zero&nbsp;padded&nbsp;to&nbsp;the&nbsp;block&nbsp;size&nbsp;of&nbsp;the&nbsp;hash&nbsp;function</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ipad&nbsp;=&nbsp;0x36&nbsp;byte&nbsp;repeated&nbsp;for&nbsp;key&nbsp;length</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;opad&nbsp;=&nbsp;0x5c&nbsp;byte&nbsp;repeated&nbsp;for&nbsp;key&nbsp;length</span><br>
+<span class="lineno">35</span><span class="comment">//&nbsp;hmac&nbsp;=&nbsp;H([key&nbsp;^&nbsp;opad]&nbsp;H([key&nbsp;^&nbsp;ipad]&nbsp;text))</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">hmac</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">size</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">int</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">blocksize</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">int</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">key</span><span class="op">,</span>&nbsp;<span class="ident">tmp</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">outer</span><span class="op">,</span>&nbsp;<span class="ident">inner</span>&nbsp;<span class="ident">hash</span><span class="op">.</span><span class="ident">Hash</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">h</span>&nbsp;<span class="op">*</span><span class="ident">hmac</span><span class="op">)</span>&nbsp;<span class="ident">tmpPad</span><span class="op">(</span><span class="ident">xor</span>&nbsp;<span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span><span class="op">,</span>&nbsp;<span class="ident">k</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">h</span><span class="op">.</span><span class="ident">key</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">h</span><span class="op">.</span><span class="ident">tmp</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">xor</span>&nbsp;<span class="op">^</span>&nbsp;<span class="ident">k</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">h</span><span class="op">.</span><span class="ident">key</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">h</span><span class="op">.</span><span class="ident">blocksize</span><span class="op">;</span>&nbsp;<span class="ident">i</span><span class="op">++</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">h</span><span class="op">.</span><span class="ident">tmp</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">xor</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">h</span>&nbsp;<span class="op">*</span><span class="ident">hmac</span><span class="op">)</span>&nbsp;<span class="ident">Sum</span><span class="op">(</span><span class="ident">in</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">origLen</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">in</span><span class="op">)</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">in</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">h</span><span class="op">.</span><span class="ident">inner</span><span class="op">.</span><span class="ident">Sum</span><span class="op">(</span><span class="ident">in</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">h</span><span class="op">.</span><span class="ident">tmpPad</span><span class="op">(</span><span class="num">0x5c</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">copy</span><span class="op">(</span><span class="ident">h</span><span class="op">.</span><span class="ident">tmp</span><span class="op">[</span><span class="ident">h</span><span class="op">.</span><span class="ident">blocksize</span><span class="op">:</span><span class="op">]</span><span class="op">,</span>&nbsp;<span class="ident">in</span><span class="op">[</span><span class="ident">origLen</span><span class="op">:</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">h</span><span class="op">.</span><span class="ident">outer</span><span class="op">.</span><span class="ident">Reset</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">h</span><span class="op">.</span><span class="ident">outer</span><span class="op">.</span><span class="ident">Write</span><span class="op">(</span><span class="ident">h</span><span class="op">.</span><span class="ident">tmp</span><span class="op">)</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">h</span><span class="op">.</span><span class="ident">outer</span><span class="op">.</span><span class="ident">Sum</span><span class="op">(</span><span class="ident">in</span><span class="op">[</span><span class="op">:</span><span class="ident">origLen</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">h</span>&nbsp;<span class="op">*</span><span class="ident">hmac</span><span class="op">)</span>&nbsp;<span class="ident">Write</span><span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">n</span>&nbsp;<span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">h</span><span class="op">.</span><span class="ident">inner</span><span class="op">.</span><span class="ident">Write</span><span class="op">(</span><span class="ident">p</span><span class="op">)</span><br>
+<span class="lineno">65</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">h</span>&nbsp;<span class="op">*</span><span class="ident">hmac</span><span class="op">)</span>&nbsp;<span class="ident">Size</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="ident">h</span><span class="op">.</span><span class="ident">size</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">h</span>&nbsp;<span class="op">*</span><span class="ident">hmac</span><span class="op">)</span>&nbsp;<span class="ident">BlockSize</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="ident">h</span><span class="op">.</span><span class="ident">blocksize</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno">70</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">h</span>&nbsp;<span class="op">*</span><span class="ident">hmac</span><span class="op">)</span>&nbsp;<span class="ident">Reset</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">h</span><span class="op">.</span><span class="ident">inner</span><span class="op">.</span><span class="ident">Reset</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">h</span><span class="op">.</span><span class="ident">tmpPad</span><span class="op">(</span><span class="num">0x36</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">h</span><span class="op">.</span><span class="ident">inner</span><span class="op">.</span><span class="ident">Write</span><span class="op">(</span><span class="ident">h</span><span class="op">.</span><span class="ident">tmp</span><span class="op">[</span><span class="op">:</span><span class="ident">h</span><span class="op">.</span><span class="ident">blocksize</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno">75</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;New&nbsp;returns&nbsp;a&nbsp;new&nbsp;HMAC&nbsp;hash&nbsp;using&nbsp;the&nbsp;given&nbsp;hash.Hash&nbsp;type&nbsp;and&nbsp;key.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">New</span><span class="op">(</span><span class="ident">h</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="ident">hash</span><span class="op">.</span><span class="ident">Hash</span><span class="op">,</span>&nbsp;<span class="ident">key</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="ident">hash</span><span class="op">.</span><span class="ident">Hash</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">hm</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">new</span><span class="op">(</span><span class="ident">hmac</span><span class="op">)</span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">hm</span><span class="op">.</span><span class="ident">outer</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">h</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">hm</span><span class="op">.</span><span class="ident">inner</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">h</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">hm</span><span class="op">.</span><span class="ident">size</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">hm</span><span class="op">.</span><span class="ident">inner</span><span class="op">.</span><span class="ident">Size</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">hm</span><span class="op">.</span><span class="ident">blocksize</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">hm</span><span class="op">.</span><span class="ident">inner</span><span class="op">.</span><span class="ident">BlockSize</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">hm</span><span class="op">.</span><span class="ident">tmp</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">make</span><span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="ident">hm</span><span class="op">.</span><span class="ident">blocksize</span><span class="op">+</span><span class="ident">hm</span><span class="op">.</span><span class="ident">size</span><span class="op">)</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">key</span><span class="op">)</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="ident">hm</span><span class="op">.</span><span class="ident">blocksize</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;If&nbsp;key&nbsp;is&nbsp;too&nbsp;big,&nbsp;hash&nbsp;it.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">hm</span><span class="op">.</span><span class="ident">outer</span><span class="op">.</span><span class="ident">Write</span><span class="op">(</span><span class="ident">key</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">key</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">hm</span><span class="op">.</span><span class="ident">outer</span><span class="op">.</span><span class="ident">Sum</span><span class="op">(</span><span class="ident">nil</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">hm</span><span class="op">.</span><span class="ident">key</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">make</span><span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">key</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">copy</span><span class="op">(</span><span class="ident">hm</span><span class="op">.</span><span class="ident">key</span><span class="op">,</span>&nbsp;<span class="ident">key</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">hm</span><span class="op">.</span><span class="ident">Reset</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">hm</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">95</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Equal&nbsp;compares&nbsp;two&nbsp;MACs&nbsp;for&nbsp;equality&nbsp;without&nbsp;leaking&nbsp;timing&nbsp;information.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">Equal</span><span class="op">(</span><span class="ident">mac1</span><span class="op">,</span>&nbsp;<span class="ident">mac2</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;We&nbsp;don&#39;t&nbsp;have&nbsp;to&nbsp;be&nbsp;constant&nbsp;time&nbsp;if&nbsp;the&nbsp;lengths&nbsp;of&nbsp;the&nbsp;MACs&nbsp;are</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;different&nbsp;as&nbsp;that&nbsp;suggests&nbsp;that&nbsp;a&nbsp;completely&nbsp;different&nbsp;hash&nbsp;function</span><br>
+<span class="lineno">100</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;was&nbsp;used.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">mac1</span><span class="op">)</span>&nbsp;<span class="op">==</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">mac2</span><span class="op">)</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">subtle</span><span class="op">.</span><span class="ident">ConstantTimeCompare</span><span class="op">(</span><span class="ident">mac1</span><span class="op">,</span>&nbsp;<span class="ident">mac2</span><span class="op">)</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

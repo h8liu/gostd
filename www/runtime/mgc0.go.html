@@ -1,0 +1,167 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2012&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">runtime</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="string">&#34;unsafe&#34;</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Called&nbsp;from&nbsp;C.&nbsp;Returns&nbsp;the&nbsp;Go&nbsp;type&nbsp;*m.</span><br>
+<span class="lineno">10</span><span class="keyword">func</span>&nbsp;<span class="ident">gc_m_ptr</span><span class="op">(</span><span class="ident">ret</span>&nbsp;<span class="op">*</span><span class="keyword">interface</span><span class="op">{</span><span class="op">}</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">ret</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">(</span><span class="op">*</span><span class="ident">m</span><span class="op">)</span><span class="op">(</span><span class="ident">nil</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Called&nbsp;from&nbsp;C.&nbsp;Returns&nbsp;the&nbsp;Go&nbsp;type&nbsp;*g.</span><br>
+<span class="lineno">15</span><span class="keyword">func</span>&nbsp;<span class="ident">gc_g_ptr</span><span class="op">(</span><span class="ident">ret</span>&nbsp;<span class="op">*</span><span class="keyword">interface</span><span class="op">{</span><span class="op">}</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">ret</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">(</span><span class="op">*</span><span class="ident">g</span><span class="op">)</span><span class="op">(</span><span class="ident">nil</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Called&nbsp;from&nbsp;C.&nbsp;Returns&nbsp;the&nbsp;Go&nbsp;type&nbsp;*itab.</span><br>
+<span class="lineno">20</span><span class="keyword">func</span>&nbsp;<span class="ident">gc_itab_ptr</span><span class="op">(</span><span class="ident">ret</span>&nbsp;<span class="op">*</span><span class="keyword">interface</span><span class="op">{</span><span class="op">}</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">ret</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">(</span><span class="op">*</span><span class="ident">itab</span><span class="op">)</span><span class="op">(</span><span class="ident">nil</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">gc_unixnanotime</span><span class="op">(</span><span class="ident">now</span>&nbsp;<span class="op">*</span><span class="ident">int64</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sec</span><span class="op">,</span>&nbsp;<span class="ident">nsec</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">timenow</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">now</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">sec</span><span class="op">*</span><span class="num">1e9</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">int64</span><span class="op">(</span><span class="ident">nsec</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">freeOSMemory</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gogc</span><span class="op">(</span><span class="num">2</span><span class="op">)</span>&nbsp;<span class="comment">//&nbsp;force&nbsp;GC&nbsp;and&nbsp;do&nbsp;eager&nbsp;sweep</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">onM</span><span class="op">(</span><span class="ident">scavenge_m</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">poolcleanup</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">35</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">registerPoolCleanup</span><span class="op">(</span><span class="ident">f</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">poolcleanup</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">f</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">40</span><span class="keyword">func</span>&nbsp;<span class="ident">clearpools</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;clear&nbsp;sync.Pools</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">poolcleanup</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">poolcleanup</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">45</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">p</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="op">&amp;</span><span class="ident">allp</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">p</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">break</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;clear&nbsp;tinyalloc&nbsp;pool</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">p</span><span class="op">.</span><span class="ident">mcache</span><span class="op">;</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">tiny</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">tinysize</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;disconnect&nbsp;cached&nbsp;list&nbsp;before&nbsp;dropping&nbsp;it&nbsp;on&nbsp;the&nbsp;floor,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;so&nbsp;that&nbsp;a&nbsp;dangling&nbsp;ref&nbsp;to&nbsp;one&nbsp;entry&nbsp;does&nbsp;not&nbsp;pin&nbsp;all&nbsp;of&nbsp;them.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">sg</span><span class="op">,</span>&nbsp;<span class="ident">sgnext</span>&nbsp;<span class="op">*</span><span class="ident">sudog</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">sg</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">sudogcache</span><span class="op">;</span>&nbsp;<span class="ident">sg</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span><span class="op">;</span>&nbsp;<span class="ident">sg</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">sgnext</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sgnext</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">sg</span><span class="op">.</span><span class="ident">next</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sg</span><span class="op">.</span><span class="ident">next</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">sudogcache</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;clear&nbsp;defer&nbsp;pools</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">p</span><span class="op">.</span><span class="ident">deferpool</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;disconnect&nbsp;cached&nbsp;list&nbsp;before&nbsp;dropping&nbsp;it&nbsp;on&nbsp;the&nbsp;floor,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;so&nbsp;that&nbsp;a&nbsp;dangling&nbsp;ref&nbsp;to&nbsp;one&nbsp;entry&nbsp;does&nbsp;not&nbsp;pin&nbsp;all&nbsp;of&nbsp;them.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">d</span><span class="op">,</span>&nbsp;<span class="ident">dlink</span>&nbsp;<span class="op">*</span><span class="ident">_defer</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">d</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">p</span><span class="op">.</span><span class="ident">deferpool</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><span class="op">;</span>&nbsp;<span class="ident">d</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span><span class="op">;</span>&nbsp;<span class="ident">d</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">dlink</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dlink</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">d</span><span class="op">.</span><span class="ident">link</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span><span class="op">.</span><span class="ident">link</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">.</span><span class="ident">deferpool</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">gosweepone</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">uintptr</span><br>
+<span class="lineno">80</span><span class="keyword">func</span>&nbsp;<span class="ident">gosweepdone</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">bgsweep</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">getg</span><span class="op">(</span><span class="op">)</span><span class="op">.</span><span class="ident">issystem</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">gosweepone</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="op">^</span><span class="builtintype">uintptr</span><span class="op">(</span><span class="num">0</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sweep</span><span class="op">.</span><span class="ident">nbgsweep</span><span class="op">++</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Gosched</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">lock</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">gclock</span><span class="op">)</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">gosweepdone</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;This&nbsp;can&nbsp;happen&nbsp;if&nbsp;a&nbsp;GC&nbsp;runs&nbsp;between</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;gosweepone&nbsp;returning&nbsp;^0&nbsp;above</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;and&nbsp;the&nbsp;lock&nbsp;being&nbsp;acquired.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">unlock</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">gclock</span><span class="op">)</span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">continue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sweep</span><span class="op">.</span><span class="ident">parked</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">goparkunlock</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">gclock</span><span class="op">,</span>&nbsp;<span class="string">&#34;GC&nbsp;sweep&nbsp;wait&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">100</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;NOTE:&nbsp;Really&nbsp;dst&nbsp;*unsafe.Pointer,&nbsp;src&nbsp;unsafe.Pointer,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;but&nbsp;if&nbsp;we&nbsp;do&nbsp;that,&nbsp;Go&nbsp;inserts&nbsp;a&nbsp;write&nbsp;barrier&nbsp;on&nbsp;*dst&nbsp;=&nbsp;src.</span><br>
+<span class="lineno"></span><span class="comment">//go:nosplit</span><br>
+<span class="lineno">105</span><span class="keyword">func</span>&nbsp;<span class="ident">writebarrierptr</span><span class="op">(</span><span class="ident">dst</span>&nbsp;<span class="op">*</span><span class="builtintype">uintptr</span><span class="op">,</span>&nbsp;<span class="ident">src</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">dst</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">src</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//go:nosplit</span><br>
+<span class="lineno">110</span><span class="keyword">func</span>&nbsp;<span class="ident">writebarrierstring</span><span class="op">(</span><span class="ident">dst</span>&nbsp;<span class="op">*</span><span class="op">[</span><span class="num">2</span><span class="op">]</span><span class="builtintype">uintptr</span><span class="op">,</span>&nbsp;<span class="ident">src</span>&nbsp;<span class="op">[</span><span class="num">2</span><span class="op">]</span><span class="builtintype">uintptr</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dst</span><span class="op">[</span><span class="num">0</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">src</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dst</span><span class="op">[</span><span class="num">1</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">src</span><span class="op">[</span><span class="num">1</span><span class="op">]</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">115</span><span class="comment">//go:nosplit</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">writebarrierslice</span><span class="op">(</span><span class="ident">dst</span>&nbsp;<span class="op">*</span><span class="op">[</span><span class="num">3</span><span class="op">]</span><span class="builtintype">uintptr</span><span class="op">,</span>&nbsp;<span class="ident">src</span>&nbsp;<span class="op">[</span><span class="num">3</span><span class="op">]</span><span class="builtintype">uintptr</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dst</span><span class="op">[</span><span class="num">0</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">src</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dst</span><span class="op">[</span><span class="num">1</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">src</span><span class="op">[</span><span class="num">1</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dst</span><span class="op">[</span><span class="num">2</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">src</span><span class="op">[</span><span class="num">2</span><span class="op">]</span><br>
+<span class="lineno">120</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//go:nosplit</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">writebarrieriface</span><span class="op">(</span><span class="ident">dst</span>&nbsp;<span class="op">*</span><span class="op">[</span><span class="num">2</span><span class="op">]</span><span class="builtintype">uintptr</span><span class="op">,</span>&nbsp;<span class="ident">src</span>&nbsp;<span class="op">[</span><span class="num">2</span><span class="op">]</span><span class="builtintype">uintptr</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dst</span><span class="op">[</span><span class="num">0</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">src</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><br>
+<span class="lineno">125</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dst</span><span class="op">[</span><span class="num">1</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">src</span><span class="op">[</span><span class="num">1</span><span class="op">]</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//go:nosplit</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">writebarrierfat2</span><span class="op">(</span><span class="ident">dst</span>&nbsp;<span class="op">*</span><span class="op">[</span><span class="num">2</span><span class="op">]</span><span class="builtintype">uintptr</span><span class="op">,</span>&nbsp;<span class="ident">_</span>&nbsp;<span class="op">*</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="ident">src</span>&nbsp;<span class="op">[</span><span class="num">2</span><span class="op">]</span><span class="builtintype">uintptr</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">130</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dst</span><span class="op">[</span><span class="num">0</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">src</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dst</span><span class="op">[</span><span class="num">1</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">src</span><span class="op">[</span><span class="num">1</span><span class="op">]</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//go:nosplit</span><br>
+<span class="lineno">135</span><span class="keyword">func</span>&nbsp;<span class="ident">writebarrierfat3</span><span class="op">(</span><span class="ident">dst</span>&nbsp;<span class="op">*</span><span class="op">[</span><span class="num">3</span><span class="op">]</span><span class="builtintype">uintptr</span><span class="op">,</span>&nbsp;<span class="ident">_</span>&nbsp;<span class="op">*</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="ident">src</span>&nbsp;<span class="op">[</span><span class="num">3</span><span class="op">]</span><span class="builtintype">uintptr</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dst</span><span class="op">[</span><span class="num">0</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">src</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dst</span><span class="op">[</span><span class="num">1</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">src</span><span class="op">[</span><span class="num">1</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dst</span><span class="op">[</span><span class="num">2</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">src</span><span class="op">[</span><span class="num">2</span><span class="op">]</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">140</span><br>
+<span class="lineno"></span><span class="comment">//go:nosplit</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">writebarrierfat4</span><span class="op">(</span><span class="ident">dst</span>&nbsp;<span class="op">*</span><span class="op">[</span><span class="num">4</span><span class="op">]</span><span class="builtintype">uintptr</span><span class="op">,</span>&nbsp;<span class="ident">_</span>&nbsp;<span class="op">*</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="ident">src</span>&nbsp;<span class="op">[</span><span class="num">4</span><span class="op">]</span><span class="builtintype">uintptr</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dst</span><span class="op">[</span><span class="num">0</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">src</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dst</span><span class="op">[</span><span class="num">1</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">src</span><span class="op">[</span><span class="num">1</span><span class="op">]</span><br>
+<span class="lineno">145</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dst</span><span class="op">[</span><span class="num">2</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">src</span><span class="op">[</span><span class="num">2</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dst</span><span class="op">[</span><span class="num">3</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">src</span><span class="op">[</span><span class="num">3</span><span class="op">]</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//go:nosplit</span><br>
+<span class="lineno">150</span><span class="keyword">func</span>&nbsp;<span class="ident">writebarrierfat</span><span class="op">(</span><span class="ident">typ</span>&nbsp;<span class="op">*</span><span class="ident">_type</span><span class="op">,</span>&nbsp;<span class="ident">dst</span><span class="op">,</span>&nbsp;<span class="ident">src</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">memmove</span><span class="op">(</span><span class="ident">dst</span><span class="op">,</span>&nbsp;<span class="ident">src</span><span class="op">,</span>&nbsp;<span class="ident">typ</span><span class="op">.</span><span class="ident">size</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

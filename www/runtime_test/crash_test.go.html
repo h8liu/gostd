@@ -1,0 +1,530 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2012&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">runtime_test</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;io/ioutil&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;os&#34;</span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;os/exec&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;path/filepath&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;runtime&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;strings&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;testing&#34;</span><br>
+<span class="lineno">15</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;text/template&#34;</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;testEnv&nbsp;excludes&nbsp;GODEBUG&nbsp;from&nbsp;the&nbsp;environment</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;to&nbsp;prevent&nbsp;its&nbsp;output&nbsp;from&nbsp;breaking&nbsp;tests&nbsp;that</span><br>
+<span class="lineno">20</span><span class="comment">//&nbsp;are&nbsp;trying&nbsp;to&nbsp;parse&nbsp;other&nbsp;command&nbsp;output.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">testEnv</span><span class="op">(</span><span class="ident">cmd</span>&nbsp;<span class="op">*</span><span class="ident">exec</span><span class="op">.</span><span class="ident">Cmd</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">exec</span><span class="op">.</span><span class="ident">Cmd</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">cmd</span><span class="op">.</span><span class="ident">Env</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">panic</span><span class="op">(</span><span class="string">&#34;environment&nbsp;already&nbsp;set&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">env</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">os</span><span class="op">.</span><span class="ident">Environ</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">strings</span><span class="op">.</span><span class="ident">HasPrefix</span><span class="op">(</span><span class="ident">env</span><span class="op">,</span>&nbsp;<span class="string">&#34;GODEBUG=&#34;</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">continue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">cmd</span><span class="op">.</span><span class="ident">Env</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">append</span><span class="op">(</span><span class="ident">cmd</span><span class="op">.</span><span class="ident">Env</span><span class="op">,</span>&nbsp;<span class="ident">env</span><span class="op">)</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">cmd</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">executeTest</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">,</span>&nbsp;<span class="ident">templ</span>&nbsp;<span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">data</span>&nbsp;<span class="keyword">interface</span><span class="op">{</span><span class="op">}</span><span class="op">,</span>&nbsp;<span class="ident">extra</span>&nbsp;<span class="op">...</span><span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="ident">runtime</span><span class="op">.</span><span class="ident">GOOS</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="string">&#34;android&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;nacl&#34;</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Skipf</span><span class="op">(</span><span class="string">&#34;skipping&nbsp;on&nbsp;%s&#34;</span><span class="op">,</span>&nbsp;<span class="ident">runtime</span><span class="op">.</span><span class="ident">GOOS</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">checkStaleRuntime</span><span class="op">(</span><span class="ident">t</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">st</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">template</span><span class="op">.</span><span class="ident">Must</span><span class="op">(</span><span class="ident">template</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="string">&#34;crashSource&#34;</span><span class="op">)</span><span class="op">.</span><span class="ident">Parse</span><span class="op">(</span><span class="ident">templ</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dir</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">ioutil</span><span class="op">.</span><span class="ident">TempDir</span><span class="op">(</span><span class="string">&#34;&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;go-build&#34;</span><span class="op">)</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;failed&nbsp;to&nbsp;create&nbsp;temp&nbsp;directory:&nbsp;%v&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">defer</span>&nbsp;<span class="ident">os</span><span class="op">.</span><span class="ident">RemoveAll</span><span class="op">(</span><span class="ident">dir</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">src</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">filepath</span><span class="op">.</span><span class="ident">Join</span><span class="op">(</span><span class="ident">dir</span><span class="op">,</span>&nbsp;<span class="string">&#34;main.go&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">f</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">os</span><span class="op">.</span><span class="ident">Create</span><span class="op">(</span><span class="ident">src</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;failed&nbsp;to&nbsp;create&nbsp;file:&nbsp;%v&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">st</span><span class="op">.</span><span class="ident">Execute</span><span class="op">(</span><span class="ident">f</span><span class="op">,</span>&nbsp;<span class="ident">data</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">f</span><span class="op">.</span><span class="ident">Close</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;failed&nbsp;to&nbsp;execute&nbsp;template:&nbsp;%v&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">f</span><span class="op">.</span><span class="ident">Close</span><span class="op">(</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;failed&nbsp;to&nbsp;close&nbsp;file:&nbsp;%v&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="num">0</span><span class="op">;</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">extra</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="num">2</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">ioutil</span><span class="op">.</span><span class="ident">WriteFile</span><span class="op">(</span><span class="ident">filepath</span><span class="op">.</span><span class="ident">Join</span><span class="op">(</span><span class="ident">dir</span><span class="op">,</span>&nbsp;<span class="ident">extra</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">(</span><span class="ident">extra</span><span class="op">[</span><span class="ident">i</span><span class="op">+</span><span class="num">1</span><span class="op">]</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="num">0666</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatal</span><span class="op">(</span><span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">cmd</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">exec</span><span class="op">.</span><span class="ident">Command</span><span class="op">(</span><span class="string">&#34;go&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;build&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;-o&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;a.exe&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">cmd</span><span class="op">.</span><span class="ident">Dir</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">dir</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">out</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">testEnv</span><span class="op">(</span><span class="ident">cmd</span><span class="op">)</span><span class="op">.</span><span class="ident">CombinedOutput</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;building&nbsp;source:&nbsp;%v\n%s&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">,</span>&nbsp;<span class="ident">out</span><span class="op">)</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">got</span><span class="op">,</span>&nbsp;<span class="ident">_</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">testEnv</span><span class="op">(</span><span class="ident">exec</span><span class="op">.</span><span class="ident">Command</span><span class="op">(</span><span class="ident">filepath</span><span class="op">.</span><span class="ident">Join</span><span class="op">(</span><span class="ident">dir</span><span class="op">,</span>&nbsp;<span class="string">&#34;a.exe&#34;</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><span class="op">.</span><span class="ident">CombinedOutput</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="builtintype">string</span><span class="op">(</span><span class="ident">got</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">80</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">checkStaleRuntime</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;&#39;go&nbsp;run&#39;&nbsp;uses&nbsp;the&nbsp;installed&nbsp;copy&nbsp;of&nbsp;runtime.a,&nbsp;which&nbsp;may&nbsp;be&nbsp;out&nbsp;of&nbsp;date.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">out</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">testEnv</span><span class="op">(</span><span class="ident">exec</span><span class="op">.</span><span class="ident">Command</span><span class="op">(</span><span class="string">&#34;go&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;list&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;-f&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;{{.Stale}}&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;runtime&#34;</span><span class="op">)</span><span class="op">)</span><span class="op">.</span><span class="ident">CombinedOutput</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;failed&nbsp;to&nbsp;execute&nbsp;&#39;go&nbsp;list&#39;:&nbsp;%v\n%v&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">,</span>&nbsp;<span class="builtintype">string</span><span class="op">(</span><span class="ident">out</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtintype">string</span><span class="op">(</span><span class="ident">out</span><span class="op">)</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="string">&#34;false\n&#34;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;Stale&nbsp;runtime.a.&nbsp;Run&nbsp;&#39;go&nbsp;install&nbsp;runtime&#39;.&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">90</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">testCrashHandler</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">,</span>&nbsp;<span class="ident">cgo</span>&nbsp;<span class="builtintype">bool</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">type</span>&nbsp;<span class="ident">crashTest</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Cgo</span>&nbsp;<span class="builtintype">bool</span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">output</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">executeTest</span><span class="op">(</span><span class="ident">t</span><span class="op">,</span>&nbsp;<span class="ident">crashSource</span><span class="op">,</span>&nbsp;<span class="op">&amp;</span><span class="ident">crashTest</span><span class="op">{</span><span class="ident">Cgo</span><span class="op">:</span>&nbsp;<span class="ident">cgo</span><span class="op">}</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">want</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="string">&#34;main:&nbsp;recovered&nbsp;done\nnew-thread:&nbsp;recovered&nbsp;done\nsecond-new-thread:&nbsp;recovered&nbsp;done\nmain-again:&nbsp;recovered&nbsp;done\n&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">output</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">want</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;output:\n%s\n\nwanted:\n%s&#34;</span><span class="op">,</span>&nbsp;<span class="ident">output</span><span class="op">,</span>&nbsp;<span class="ident">want</span><span class="op">)</span><br>
+<span class="lineno">100</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">TestCrashHandler</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">testCrashHandler</span><span class="op">(</span><span class="ident">t</span><span class="op">,</span>&nbsp;<span class="ident">false</span><span class="op">)</span><br>
+<span class="lineno">105</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">testDeadlock</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">,</span>&nbsp;<span class="ident">source</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">output</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">executeTest</span><span class="op">(</span><span class="ident">t</span><span class="op">,</span>&nbsp;<span class="ident">source</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">want</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="string">&#34;fatal&nbsp;error:&nbsp;all&nbsp;goroutines&nbsp;are&nbsp;asleep&nbsp;-&nbsp;deadlock!\n&#34;</span><br>
+<span class="lineno">110</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">strings</span><span class="op">.</span><span class="ident">HasPrefix</span><span class="op">(</span><span class="ident">output</span><span class="op">,</span>&nbsp;<span class="ident">want</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;output&nbsp;does&nbsp;not&nbsp;start&nbsp;with&nbsp;%q:\n%s&#34;</span><span class="op">,</span>&nbsp;<span class="ident">want</span><span class="op">,</span>&nbsp;<span class="ident">output</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">115</span><span class="keyword">func</span>&nbsp;<span class="ident">TestSimpleDeadlock</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">testDeadlock</span><span class="op">(</span><span class="ident">t</span><span class="op">,</span>&nbsp;<span class="ident">simpleDeadlockSource</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">TestInitDeadlock</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">120</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">testDeadlock</span><span class="op">(</span><span class="ident">t</span><span class="op">,</span>&nbsp;<span class="ident">initDeadlockSource</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">TestLockedDeadlock</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">testDeadlock</span><span class="op">(</span><span class="ident">t</span><span class="op">,</span>&nbsp;<span class="ident">lockedDeadlockSource</span><span class="op">)</span><br>
+<span class="lineno">125</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">TestLockedDeadlock2</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">testDeadlock</span><span class="op">(</span><span class="ident">t</span><span class="op">,</span>&nbsp;<span class="ident">lockedDeadlockSource2</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">130</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">TestGoexitDeadlock</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">output</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">executeTest</span><span class="op">(</span><span class="ident">t</span><span class="op">,</span>&nbsp;<span class="ident">goexitDeadlockSource</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">want</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="string">&#34;no&nbsp;goroutines&nbsp;(main&nbsp;called&nbsp;runtime.Goexit)&nbsp;-&nbsp;deadlock!&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">strings</span><span class="op">.</span><span class="ident">Contains</span><span class="op">(</span><span class="ident">output</span><span class="op">,</span>&nbsp;<span class="ident">want</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">135</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;output:\n%s\n\nwant&nbsp;output&nbsp;containing:&nbsp;%s&#34;</span><span class="op">,</span>&nbsp;<span class="ident">output</span><span class="op">,</span>&nbsp;<span class="ident">want</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">TestStackOverflow</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">140</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">output</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">executeTest</span><span class="op">(</span><span class="ident">t</span><span class="op">,</span>&nbsp;<span class="ident">stackOverflowSource</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">want</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="string">&#34;runtime:&nbsp;goroutine&nbsp;stack&nbsp;exceeds&nbsp;4194304-byte&nbsp;limit\nfatal&nbsp;error:&nbsp;stack&nbsp;overflow&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">strings</span><span class="op">.</span><span class="ident">HasPrefix</span><span class="op">(</span><span class="ident">output</span><span class="op">,</span>&nbsp;<span class="ident">want</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;output&nbsp;does&nbsp;not&nbsp;start&nbsp;with&nbsp;%q:\n%s&#34;</span><span class="op">,</span>&nbsp;<span class="ident">want</span><span class="op">,</span>&nbsp;<span class="ident">output</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">145</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">TestThreadExhaustion</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">output</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">executeTest</span><span class="op">(</span><span class="ident">t</span><span class="op">,</span>&nbsp;<span class="ident">threadExhaustionSource</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">want</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="string">&#34;runtime:&nbsp;program&nbsp;exceeds&nbsp;10-thread&nbsp;limit\nfatal&nbsp;error:&nbsp;thread&nbsp;exhaustion&#34;</span><br>
+<span class="lineno">150</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">strings</span><span class="op">.</span><span class="ident">HasPrefix</span><span class="op">(</span><span class="ident">output</span><span class="op">,</span>&nbsp;<span class="ident">want</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;output&nbsp;does&nbsp;not&nbsp;start&nbsp;with&nbsp;%q:\n%s&#34;</span><span class="op">,</span>&nbsp;<span class="ident">want</span><span class="op">,</span>&nbsp;<span class="ident">output</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">155</span><span class="keyword">func</span>&nbsp;<span class="ident">TestRecursivePanic</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">output</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">executeTest</span><span class="op">(</span><span class="ident">t</span><span class="op">,</span>&nbsp;<span class="ident">recursivePanicSource</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">want</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="string">`wrap:&nbsp;bad<br>
+<span class="lineno"></span>panic:&nbsp;again<br>
+<span class="lineno"></span><br>
+<span class="lineno">160</span>`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">strings</span><span class="op">.</span><span class="ident">HasPrefix</span><span class="op">(</span><span class="ident">output</span><span class="op">,</span>&nbsp;<span class="ident">want</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;output&nbsp;does&nbsp;not&nbsp;start&nbsp;with&nbsp;%q:\n%s&#34;</span><span class="op">,</span>&nbsp;<span class="ident">want</span><span class="op">,</span>&nbsp;<span class="ident">output</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">165</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">TestGoexitCrash</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">output</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">executeTest</span><span class="op">(</span><span class="ident">t</span><span class="op">,</span>&nbsp;<span class="ident">goexitExitSource</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">want</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="string">&#34;no&nbsp;goroutines&nbsp;(main&nbsp;called&nbsp;runtime.Goexit)&nbsp;-&nbsp;deadlock!&#34;</span><br>
+<span class="lineno">170</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">strings</span><span class="op">.</span><span class="ident">Contains</span><span class="op">(</span><span class="ident">output</span><span class="op">,</span>&nbsp;<span class="ident">want</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;output:\n%s\n\nwant&nbsp;output&nbsp;containing:&nbsp;%s&#34;</span><span class="op">,</span>&nbsp;<span class="ident">output</span><span class="op">,</span>&nbsp;<span class="ident">want</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">175</span><span class="keyword">func</span>&nbsp;<span class="ident">TestGoexitDefer</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">make</span><span class="op">(</span><span class="keyword">chan</span>&nbsp;<span class="keyword">struct</span><span class="op">{</span><span class="op">}</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">go</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">defer</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">recover</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">180</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">r</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Errorf</span><span class="op">(</span><span class="string">&#34;non-nil&nbsp;recover&nbsp;during&nbsp;Goexit&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span>&nbsp;<span class="op">&lt;-</span>&nbsp;<span class="keyword">struct</span><span class="op">{</span><span class="op">}</span><span class="op">{</span><span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">185</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">runtime</span><span class="op">.</span><span class="ident">Goexit</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Note:&nbsp;if&nbsp;the&nbsp;defer&nbsp;fails&nbsp;to&nbsp;run,&nbsp;we&nbsp;will&nbsp;get&nbsp;a&nbsp;deadlock&nbsp;here</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">&lt;-</span><span class="ident">c</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">190</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">TestGoNil</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">output</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">executeTest</span><span class="op">(</span><span class="ident">t</span><span class="op">,</span>&nbsp;<span class="ident">goNilSource</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">want</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="string">&#34;go&nbsp;of&nbsp;nil&nbsp;func&nbsp;value&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">strings</span><span class="op">.</span><span class="ident">Contains</span><span class="op">(</span><span class="ident">output</span><span class="op">,</span>&nbsp;<span class="ident">want</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">195</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;output:\n%s\n\nwant&nbsp;output&nbsp;containing:&nbsp;%s&#34;</span><span class="op">,</span>&nbsp;<span class="ident">output</span><span class="op">,</span>&nbsp;<span class="ident">want</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">TestMainGoroutineId</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">200</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">output</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">executeTest</span><span class="op">(</span><span class="ident">t</span><span class="op">,</span>&nbsp;<span class="ident">mainGoroutineIdSource</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">want</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="string">&#34;panic:&nbsp;test\n\ngoroutine&nbsp;1&nbsp;[running]:\n&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">strings</span><span class="op">.</span><span class="ident">HasPrefix</span><span class="op">(</span><span class="ident">output</span><span class="op">,</span>&nbsp;<span class="ident">want</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;output&nbsp;does&nbsp;not&nbsp;start&nbsp;with&nbsp;%q:\n%s&#34;</span><span class="op">,</span>&nbsp;<span class="ident">want</span><span class="op">,</span>&nbsp;<span class="ident">output</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">205</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">TestBreakpoint</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">output</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">executeTest</span><span class="op">(</span><span class="ident">t</span><span class="op">,</span>&nbsp;<span class="ident">breakpointSource</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">want</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="string">&#34;runtime.Breakpoint()&#34;</span><br>
+<span class="lineno">210</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">strings</span><span class="op">.</span><span class="ident">Contains</span><span class="op">(</span><span class="ident">output</span><span class="op">,</span>&nbsp;<span class="ident">want</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;output:\n%s\n\nwant&nbsp;output&nbsp;containing:&nbsp;%s&#34;</span><span class="op">,</span>&nbsp;<span class="ident">output</span><span class="op">,</span>&nbsp;<span class="ident">want</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">215</span><span class="keyword">const</span>&nbsp;<span class="ident">crashSource</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">`<br>
+<span class="lineno"></span>package&nbsp;main<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>import&nbsp;(<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&#34;fmt&#34;<br>
+<span class="lineno">220</span>&nbsp;&nbsp;&nbsp;&nbsp&#34;runtime&#34;<br>
+<span class="lineno"></span>)<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>{{if&nbsp;.Cgo}}<br>
+<span class="lineno"></span>import&nbsp;&#34;C&#34;<br>
+<span class="lineno">225</span>{{end}}<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>func&nbsp;test(name&nbsp;string)&nbsp;{<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspdefer&nbsp;func()&nbsp;{<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspif&nbsp;x&nbsp;:=&nbsp;recover();&nbsp;x&nbsp;!=&nbsp;nil&nbsp;{<br>
+<span class="lineno">230</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspfmt.Printf(&#34;&nbsp;recovered&#34;)<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp}<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspfmt.Printf(&#34;&nbsp;done\n&#34;)<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp}()<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspfmt.Printf(&#34;%s:&#34;,&nbsp;name)<br>
+<span class="lineno">235</span>&nbsp;&nbsp;&nbsp;&nbspvar&nbsp;s&nbsp;*string<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp_&nbsp;=&nbsp;*s<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspfmt.Print(&#34;SHOULD&nbsp;NOT&nbsp;BE&nbsp;HERE&#34;)<br>
+<span class="lineno"></span>}<br>
+<span class="lineno"></span><br>
+<span class="lineno">240</span>func&nbsp;testInNewThread(name&nbsp;string)&nbsp;{<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspc&nbsp;:=&nbsp;make(chan&nbsp;bool)<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspgo&nbsp;func()&nbsp;{<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspruntime.LockOSThread()<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsptest(name)<br>
+<span class="lineno">245</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspc&nbsp;&lt;-&nbsp;true<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp}()<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&lt;-c<br>
+<span class="lineno"></span>}<br>
+<span class="lineno"></span><br>
+<span class="lineno">250</span>func&nbsp;main()&nbsp;{<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspruntime.LockOSThread()<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsptest(&#34;main&#34;)<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsptestInNewThread(&#34;new-thread&#34;)<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsptestInNewThread(&#34;second-new-thread&#34;)<br>
+<span class="lineno">255</span>&nbsp;&nbsp;&nbsp;&nbsptest(&#34;main-again&#34;)<br>
+<span class="lineno"></span>}<br>
+<span class="lineno"></span>`</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">simpleDeadlockSource</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">`<br>
+<span class="lineno">260</span>package&nbsp;main<br>
+<span class="lineno"></span>func&nbsp;main()&nbsp;{<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspselect&nbsp;{}<br>
+<span class="lineno"></span>}<br>
+<span class="lineno"></span>`</span><br>
+<span class="lineno">265</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">initDeadlockSource</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">`<br>
+<span class="lineno"></span>package&nbsp;main<br>
+<span class="lineno"></span>func&nbsp;init()&nbsp;{<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspselect&nbsp;{}<br>
+<span class="lineno">270</span>}<br>
+<span class="lineno"></span>func&nbsp;main()&nbsp;{<br>
+<span class="lineno"></span>}<br>
+<span class="lineno"></span>`</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">275</span><span class="keyword">const</span>&nbsp;<span class="ident">lockedDeadlockSource</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">`<br>
+<span class="lineno"></span>package&nbsp;main<br>
+<span class="lineno"></span>import&nbsp;&#34;runtime&#34;<br>
+<span class="lineno"></span>func&nbsp;main()&nbsp;{<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspruntime.LockOSThread()<br>
+<span class="lineno">280</span>&nbsp;&nbsp;&nbsp;&nbspselect&nbsp;{}<br>
+<span class="lineno"></span>}<br>
+<span class="lineno"></span>`</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">lockedDeadlockSource2</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">`<br>
+<span class="lineno">285</span>package&nbsp;main<br>
+<span class="lineno"></span>import&nbsp;(<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&#34;runtime&#34;<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&#34;time&#34;<br>
+<span class="lineno"></span>)<br>
+<span class="lineno">290</span>func&nbsp;main()&nbsp;{<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspgo&nbsp;func()&nbsp;{<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspruntime.LockOSThread()<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspselect&nbsp;{}<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp}()<br>
+<span class="lineno">295</span>&nbsp;&nbsp;&nbsp;&nbsptime.Sleep(time.Millisecond)<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspselect&nbsp;{}<br>
+<span class="lineno"></span>}<br>
+<span class="lineno"></span>`</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">300</span><span class="keyword">const</span>&nbsp;<span class="ident">goexitDeadlockSource</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">`<br>
+<span class="lineno"></span>package&nbsp;main<br>
+<span class="lineno"></span>import&nbsp;(<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&#34;runtime&#34;<br>
+<span class="lineno"></span>)<br>
+<span class="lineno">305</span><br>
+<span class="lineno"></span>func&nbsp;F()&nbsp;{<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;i&nbsp;:=&nbsp;0;&nbsp;i&nbsp;&lt;&nbsp;10;&nbsp;i++&nbsp;{<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br>
+<span class="lineno"></span>}<br>
+<span class="lineno">310</span><br>
+<span class="lineno"></span>func&nbsp;main()&nbsp;{<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;go&nbsp;F()<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;go&nbsp;F()<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;runtime.Goexit()<br>
+<span class="lineno">315</span>}<br>
+<span class="lineno"></span>`</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">stackOverflowSource</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">`<br>
+<span class="lineno"></span>package&nbsp;main<br>
+<span class="lineno">320</span><br>
+<span class="lineno"></span>import&nbsp;&#34;runtime/debug&#34;<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>func&nbsp;main()&nbsp;{<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspdebug.SetMaxStack(4&lt;&lt;20)<br>
+<span class="lineno">325</span>&nbsp;&nbsp;&nbsp;&nbspf(make([]byte,&nbsp;10))<br>
+<span class="lineno"></span>}<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>func&nbsp;f(x&nbsp;[]byte)&nbsp;byte&nbsp;{<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspvar&nbsp;buf&nbsp;[64&lt;&lt;10]byte<br>
+<span class="lineno">330</span>&nbsp;&nbsp;&nbsp;&nbspreturn&nbsp;x[0]&nbsp;+&nbsp;f(buf[:])<br>
+<span class="lineno"></span>}<br>
+<span class="lineno"></span>`</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">threadExhaustionSource</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">`<br>
+<span class="lineno">335</span>package&nbsp;main<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>import&nbsp;(<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&#34;runtime&#34;<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&#34;runtime/debug&#34;<br>
+<span class="lineno">340</span>)<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>func&nbsp;main()&nbsp;{<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspdebug.SetMaxThreads(10)<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspc&nbsp;:=&nbsp;make(chan&nbsp;int)<br>
+<span class="lineno">345</span>&nbsp;&nbsp;&nbsp;&nbspfor&nbsp;i&nbsp;:=&nbsp;0;&nbsp;i&nbsp;&lt;&nbsp;100;&nbsp;i++&nbsp;{<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspgo&nbsp;func()&nbsp;{<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspruntime.LockOSThread()<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspc&nbsp;&lt;-&nbsp;0<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspselect{}<br>
+<span class="lineno">350</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp}()<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&lt;-c<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp}<br>
+<span class="lineno"></span>}<br>
+<span class="lineno"></span>`</span><br>
+<span class="lineno">355</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">recursivePanicSource</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">`<br>
+<span class="lineno"></span>package&nbsp;main<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>import&nbsp;(<br>
+<span class="lineno">360</span>&nbsp;&nbsp;&nbsp;&nbsp&#34;fmt&#34;<br>
+<span class="lineno"></span>)<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>func&nbsp;main()&nbsp;{<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspfunc()&nbsp;{<br>
+<span class="lineno">365</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspdefer&nbsp;func()&nbsp;{<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspfmt.Println(recover())<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp}()<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspvar&nbsp;x&nbsp;[8192]byte<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspfunc(x&nbsp;[8192]byte)&nbsp;{<br>
+<span class="lineno">370</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspdefer&nbsp;func()&nbsp;{<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspif&nbsp;err&nbsp;:=&nbsp;recover();&nbsp;err&nbsp;!=&nbsp;nil&nbsp;{<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsppanic(&#34;wrap:&nbsp;&#34;&nbsp;+&nbsp;err.(string))<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp}<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp}()<br>
+<span class="lineno">375</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsppanic(&#34;bad&#34;)<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp}(x)<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp}()<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsppanic(&#34;again&#34;)<br>
+<span class="lineno"></span>}<br>
+<span class="lineno">380</span>`</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">goexitExitSource</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">`<br>
+<span class="lineno"></span>package&nbsp;main<br>
+<span class="lineno"></span><br>
+<span class="lineno">385</span>import&nbsp;(<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&#34;runtime&#34;<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&#34;time&#34;<br>
+<span class="lineno"></span>)<br>
+<span class="lineno"></span><br>
+<span class="lineno">390</span>func&nbsp;main()&nbsp;{<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspgo&nbsp;func()&nbsp;{<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsptime.Sleep(time.Millisecond)<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp}()<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspi&nbsp;:=&nbsp;0<br>
+<span class="lineno">395</span>&nbsp;&nbsp;&nbsp;&nbspruntime.SetFinalizer(&amp;i,&nbsp;func(p&nbsp;*int)&nbsp;{})<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspruntime.GC()<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspruntime.Goexit()<br>
+<span class="lineno"></span>}<br>
+<span class="lineno"></span>`</span><br>
+<span class="lineno">400</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">goNilSource</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">`<br>
+<span class="lineno"></span>package&nbsp;main<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>func&nbsp;main()&nbsp;{<br>
+<span class="lineno">405</span>&nbsp;&nbsp;&nbsp;&nbspdefer&nbsp;func()&nbsp;{<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsprecover()<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp}()<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspvar&nbsp;f&nbsp;func()<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspgo&nbsp;f()<br>
+<span class="lineno">410</span>&nbsp;&nbsp;&nbsp;&nbspselect{}<br>
+<span class="lineno"></span>}<br>
+<span class="lineno"></span>`</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">mainGoroutineIdSource</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">`<br>
+<span class="lineno">415</span>package&nbsp;main<br>
+<span class="lineno"></span>func&nbsp;main()&nbsp;{<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsppanic(&#34;test&#34;)<br>
+<span class="lineno"></span>}<br>
+<span class="lineno"></span>`</span><br>
+<span class="lineno">420</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">breakpointSource</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">`<br>
+<span class="lineno"></span>package&nbsp;main<br>
+<span class="lineno"></span>import&nbsp;&#34;runtime&#34;<br>
+<span class="lineno"></span>func&nbsp;main()&nbsp;{<br>
+<span class="lineno">425</span>&nbsp;&nbsp;&nbsp;&nbspruntime.Breakpoint()<br>
+<span class="lineno"></span>}<br>
+<span class="lineno"></span>`</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">TestGoexitInPanic</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">430</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;see&nbsp;issue&nbsp;8774:&nbsp;this&nbsp;code&nbsp;used&nbsp;to&nbsp;trigger&nbsp;an&nbsp;infinite&nbsp;recursion</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">output</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">executeTest</span><span class="op">(</span><span class="ident">t</span><span class="op">,</span>&nbsp;<span class="ident">goexitInPanicSource</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">want</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="string">&#34;fatal&nbsp;error:&nbsp;no&nbsp;goroutines&nbsp;(main&nbsp;called&nbsp;runtime.Goexit)&nbsp;-&nbsp;deadlock!&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">strings</span><span class="op">.</span><span class="ident">HasPrefix</span><span class="op">(</span><span class="ident">output</span><span class="op">,</span>&nbsp;<span class="ident">want</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;output&nbsp;does&nbsp;not&nbsp;start&nbsp;with&nbsp;%q:\n%s&#34;</span><span class="op">,</span>&nbsp;<span class="ident">want</span><span class="op">,</span>&nbsp;<span class="ident">output</span><span class="op">)</span><br>
+<span class="lineno">435</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">goexitInPanicSource</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">`<br>
+<span class="lineno"></span>package&nbsp;main<br>
+<span class="lineno">440</span>import&nbsp;&#34;runtime&#34;<br>
+<span class="lineno"></span>func&nbsp;main()&nbsp;{<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspgo&nbsp;func()&nbsp;{<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspdefer&nbsp;func()&nbsp;{<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspruntime.Goexit()<br>
+<span class="lineno">445</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp}()<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsppanic(&#34;hello&#34;)<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp}()<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspruntime.Goexit()<br>
+<span class="lineno"></span>}<br>
+<span class="lineno">450</span>`</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">TestPanicAfterGoexit</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;an&nbsp;uncaught&nbsp;panic&nbsp;should&nbsp;still&nbsp;work&nbsp;after&nbsp;goexit</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">output</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">executeTest</span><span class="op">(</span><span class="ident">t</span><span class="op">,</span>&nbsp;<span class="ident">panicAfterGoexitSource</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><span class="op">)</span><br>
+<span class="lineno">455</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">want</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="string">&#34;panic:&nbsp;hello&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">strings</span><span class="op">.</span><span class="ident">HasPrefix</span><span class="op">(</span><span class="ident">output</span><span class="op">,</span>&nbsp;<span class="ident">want</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;output&nbsp;does&nbsp;not&nbsp;start&nbsp;with&nbsp;%q:\n%s&#34;</span><span class="op">,</span>&nbsp;<span class="ident">want</span><span class="op">,</span>&nbsp;<span class="ident">output</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">460</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">panicAfterGoexitSource</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">`<br>
+<span class="lineno"></span>package&nbsp;main<br>
+<span class="lineno"></span>import&nbsp;&#34;runtime&#34;<br>
+<span class="lineno"></span>func&nbsp;main()&nbsp;{<br>
+<span class="lineno">465</span>&nbsp;&nbsp;&nbsp;&nbspdefer&nbsp;func()&nbsp;{<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsppanic(&#34;hello&#34;)<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp}()<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspruntime.Goexit()<br>
+<span class="lineno"></span>}<br>
+<span class="lineno">470</span>`</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">TestRecoveredPanicAfterGoexit</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">output</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">executeTest</span><span class="op">(</span><span class="ident">t</span><span class="op">,</span>&nbsp;<span class="ident">recoveredPanicAfterGoexitSource</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">want</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="string">&#34;fatal&nbsp;error:&nbsp;no&nbsp;goroutines&nbsp;(main&nbsp;called&nbsp;runtime.Goexit)&nbsp;-&nbsp;deadlock!&#34;</span><br>
+<span class="lineno">475</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">strings</span><span class="op">.</span><span class="ident">HasPrefix</span><span class="op">(</span><span class="ident">output</span><span class="op">,</span>&nbsp;<span class="ident">want</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;output&nbsp;does&nbsp;not&nbsp;start&nbsp;with&nbsp;%q:\n%s&#34;</span><span class="op">,</span>&nbsp;<span class="ident">want</span><span class="op">,</span>&nbsp;<span class="ident">output</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">480</span><span class="keyword">const</span>&nbsp;<span class="ident">recoveredPanicAfterGoexitSource</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">`<br>
+<span class="lineno"></span>package&nbsp;main<br>
+<span class="lineno"></span>import&nbsp;&#34;runtime&#34;<br>
+<span class="lineno"></span>func&nbsp;main()&nbsp;{<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspdefer&nbsp;func()&nbsp;{<br>
+<span class="lineno">485</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspdefer&nbsp;func()&nbsp;{<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspr&nbsp;:=&nbsp;recover()<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspif&nbsp;r&nbsp;==&nbsp;nil&nbsp;{<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsppanic(&#34;bad&nbsp;recover&#34;)<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp}<br>
+<span class="lineno">490</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp}()<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsppanic(&#34;hello&#34;)<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp}()<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspruntime.Goexit()<br>
+<span class="lineno"></span>}<br>
+<span class="lineno">495</span>`</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">TestRecoverBeforePanicAfterGoexit</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;1.&nbsp;defer&nbsp;a&nbsp;function&nbsp;that&nbsp;recovers</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;2.&nbsp;defer&nbsp;a&nbsp;function&nbsp;that&nbsp;panics</span><br>
+<span class="lineno">500</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;3.&nbsp;call&nbsp;goexit</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Goexit&nbsp;should&nbsp;run&nbsp;the&nbsp;#2&nbsp;defer.&nbsp;&nbsp;Its&nbsp;panic</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;should&nbsp;be&nbsp;caught&nbsp;by&nbsp;the&nbsp;#1&nbsp;defer,&nbsp;and&nbsp;execution</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;should&nbsp;resume&nbsp;in&nbsp;the&nbsp;caller.&nbsp;&nbsp;Like&nbsp;the&nbsp;Goexit</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;never&nbsp;happened!</span><br>
+<span class="lineno">505</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">defer</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">recover</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">r</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">panic</span><span class="op">(</span><span class="string">&#34;bad&nbsp;recover&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">510</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">defer</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">panic</span><span class="op">(</span><span class="string">&#34;hello&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">runtime</span><span class="op">.</span><span class="ident">Goexit</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">515</span><span class="op">}</span>
+</div>
+</body>
+</html>

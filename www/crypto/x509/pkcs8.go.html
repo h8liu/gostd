@@ -1,0 +1,69 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2011&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">x509</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;crypto/x509/pkix&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;encoding/asn1&#34;</span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;errors&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;fmt&#34;</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;pkcs8&nbsp;reflects&nbsp;an&nbsp;ASN.1,&nbsp;PKCS#8&nbsp;PrivateKey.&nbsp;See</span><br>
+<span class="lineno">15</span><span class="comment">//&nbsp;ftp://ftp.rsasecurity.com/pub/pkcs/pkcs-8/pkcs-8v1_2.asn</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;and&nbsp;RFC5208.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">pkcs8</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Version</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">int</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Algo</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">pkix</span><span class="op">.</span><span class="ident">AlgorithmIdentifier</span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">PrivateKey</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;optional&nbsp;attributes&nbsp;omitted.</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ParsePKCS8PrivateKey&nbsp;parses&nbsp;an&nbsp;unencrypted,&nbsp;PKCS#8&nbsp;private&nbsp;key.&nbsp;See</span><br>
+<span class="lineno">25</span><span class="comment">//&nbsp;http://www.rsa.com/rsalabs/node.asp?id=2130&nbsp;and&nbsp;RFC5208.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">ParsePKCS8PrivateKey</span><span class="op">(</span><span class="ident">der</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">key</span>&nbsp;<span class="keyword">interface</span><span class="op">{</span><span class="op">}</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">privKey</span>&nbsp;<span class="ident">pkcs8</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">asn1</span><span class="op">.</span><span class="ident">Unmarshal</span><span class="op">(</span><span class="ident">der</span><span class="op">,</span>&nbsp;<span class="op">&amp;</span><span class="ident">privKey</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">privKey</span><span class="op">.</span><span class="ident">Algo</span><span class="op">.</span><span class="ident">Algorithm</span><span class="op">.</span><span class="ident">Equal</span><span class="op">(</span><span class="ident">oidPublicKeyRSA</span><span class="op">)</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">key</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">ParsePKCS1PrivateKey</span><span class="op">(</span><span class="ident">privKey</span><span class="op">.</span><span class="ident">PrivateKey</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">errors</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="string">&#34;x509:&nbsp;failed&nbsp;to&nbsp;parse&nbsp;RSA&nbsp;private&nbsp;key&nbsp;embedded&nbsp;in&nbsp;PKCS#8:&nbsp;&#34;</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">err</span><span class="op">.</span><span class="ident">Error</span><span class="op">(</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">key</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">privKey</span><span class="op">.</span><span class="ident">Algo</span><span class="op">.</span><span class="ident">Algorithm</span><span class="op">.</span><span class="ident">Equal</span><span class="op">(</span><span class="ident">oidPublicKeyECDSA</span><span class="op">)</span><span class="op">:</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">bytes</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">privKey</span><span class="op">.</span><span class="ident">Algo</span><span class="op">.</span><span class="ident">Parameters</span><span class="op">.</span><span class="ident">FullBytes</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">namedCurveOID</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">new</span><span class="op">(</span><span class="ident">asn1</span><span class="op">.</span><span class="ident">ObjectIdentifier</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">asn1</span><span class="op">.</span><span class="ident">Unmarshal</span><span class="op">(</span><span class="ident">bytes</span><span class="op">,</span>&nbsp;<span class="ident">namedCurveOID</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">namedCurveOID</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">key</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">parseECPrivateKey</span><span class="op">(</span><span class="ident">namedCurveOID</span><span class="op">,</span>&nbsp;<span class="ident">privKey</span><span class="op">.</span><span class="ident">PrivateKey</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">errors</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="string">&#34;x509:&nbsp;failed&nbsp;to&nbsp;parse&nbsp;EC&nbsp;private&nbsp;key&nbsp;embedded&nbsp;in&nbsp;PKCS#8:&nbsp;&#34;</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">err</span><span class="op">.</span><span class="ident">Error</span><span class="op">(</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">key</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno">50</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">default</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">fmt</span><span class="op">.</span><span class="ident">Errorf</span><span class="op">(</span><span class="string">&#34;x509:&nbsp;PKCS#8&nbsp;wrapping&nbsp;contained&nbsp;private&nbsp;key&nbsp;with&nbsp;unknown&nbsp;algorithm:&nbsp;%v&#34;</span><span class="op">,</span>&nbsp;<span class="ident">privKey</span><span class="op">.</span><span class="ident">Algo</span><span class="op">.</span><span class="ident">Algorithm</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

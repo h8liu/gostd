@@ -1,0 +1,729 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2009&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">xml</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;io&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;reflect&#34;</span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;strings&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;testing&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;time&#34;</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">15</span><span class="comment">//&nbsp;Stripped&nbsp;down&nbsp;Atom&nbsp;feed&nbsp;data&nbsp;structures.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">TestUnmarshalFeed</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">f</span>&nbsp;<span class="ident">Feed</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">Unmarshal</span><span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">(</span><span class="ident">atomFeedString</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="op">&amp;</span><span class="ident">f</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;Unmarshal:&nbsp;%s&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">reflect</span><span class="op">.</span><span class="ident">DeepEqual</span><span class="op">(</span><span class="ident">f</span><span class="op">,</span>&nbsp;<span class="ident">atomFeed</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;have&nbsp;%#v\nwant&nbsp;%#v&#34;</span><span class="op">,</span>&nbsp;<span class="ident">f</span><span class="op">,</span>&nbsp;<span class="ident">atomFeed</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">25</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;hget&nbsp;http://codereview.appspot.com/rss/mine/rsc</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">atomFeedString</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">`<br>
+<span class="lineno"></span>&lt;?xml&nbsp;version=&#34;1.0&#34;&nbsp;encoding=&#34;utf-8&#34;?&gt;<br>
+<span class="lineno">30</span>&lt;feed&nbsp;xmlns=&#34;http://www.w3.org/2005/Atom&#34;&nbsp;xml:lang=&#34;en-us&#34;&nbsp;updated=&#34;2009-10-04T01:35:58+00:00&#34;&gt;&lt;title&gt;Code&nbsp;Review&nbsp;-&nbsp;My&nbsp;issues&lt;/title&gt;&lt;link&nbsp;href=&#34;http://codereview.appspot.com/&#34;&nbsp;rel=&#34;alternate&#34;&gt;&lt;/link&gt;&lt;link&nbsp;href=&#34;http://codereview.appspot.com/rss/mine/rsc&#34;&nbsp;rel=&#34;self&#34;&gt;&lt;/link&gt;&lt;id&gt;http://codereview.appspot.com/&lt;/id&gt;&lt;author&gt;&lt;name&gt;rietveld&amp;lt;&amp;gt;&lt;/name&gt;&lt;/author&gt;&lt;entry&gt;&lt;title&gt;rietveld:&nbsp;an&nbsp;attempt&nbsp;at&nbsp;pubsubhubbub<br>
+<span class="lineno"></span>&lt;/title&gt;&lt;link&nbsp;href=&#34;http://codereview.appspot.com/126085&#34;&nbsp;rel=&#34;alternate&#34;&gt;&lt;/link&gt;&lt;updated&gt;2009-10-04T01:35:58+00:00&lt;/updated&gt;&lt;author&gt;&lt;name&gt;email-address-removed&lt;/name&gt;&lt;/author&gt;&lt;id&gt;urn:md5:134d9179c41f806be79b3a5f7877d19a&lt;/id&gt;&lt;summary&nbsp;type=&#34;html&#34;&gt;<br>
+<span class="lineno"></span>&nbsp;&nbsp;An&nbsp;attempt&nbsp;at&nbsp;adding&nbsp;pubsubhubbub&nbsp;support&nbsp;to&nbsp;Rietveld.<br>
+<span class="lineno"></span>http://code.google.com/p/pubsubhubbub<br>
+<span class="lineno"></span>http://code.google.com/p/rietveld/issues/detail?id=155<br>
+<span class="lineno">35</span><br>
+<span class="lineno"></span>The&nbsp;server&nbsp;side&nbsp;of&nbsp;the&nbsp;protocol&nbsp;is&nbsp;trivial:<br>
+<span class="lineno"></span>&nbsp;&nbsp;1.&nbsp;add&nbsp;a&nbsp;&amp;amp;lt;link&nbsp;rel=&amp;amp;quot;hub&amp;amp;quot;&nbsp;href=&amp;amp;quot;hub-server&amp;amp;quot;&amp;amp;gt;&nbsp;tag&nbsp;to&nbsp;all<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;feeds&nbsp;that&nbsp;will&nbsp;be&nbsp;pubsubhubbubbed.<br>
+<span class="lineno"></span>&nbsp;&nbsp;2.&nbsp;every&nbsp;time&nbsp;one&nbsp;of&nbsp;those&nbsp;feeds&nbsp;changes,&nbsp;tell&nbsp;the&nbsp;hub<br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;with&nbsp;a&nbsp;simple&nbsp;POST&nbsp;request.<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>I&nbsp;have&nbsp;tested&nbsp;this&nbsp;by&nbsp;adding&nbsp;debug&nbsp;prints&nbsp;to&nbsp;a&nbsp;local&nbsp;hub<br>
+<span class="lineno"></span>server&nbsp;and&nbsp;checking&nbsp;that&nbsp;the&nbsp;server&nbsp;got&nbsp;the&nbsp;right&nbsp;publish<br>
+<span class="lineno"></span>requests.<br>
+<span class="lineno">45</span><br>
+<span class="lineno"></span>I&nbsp;can&amp;amp;#39;t&nbsp;quite&nbsp;get&nbsp;the&nbsp;server&nbsp;to&nbsp;work,&nbsp;but&nbsp;I&nbsp;think&nbsp;the&nbsp;bug<br>
+<span class="lineno"></span>is&nbsp;not&nbsp;in&nbsp;my&nbsp;code.&nbsp;&nbsp;I&nbsp;think&nbsp;that&nbsp;the&nbsp;server&nbsp;expects&nbsp;to&nbsp;be<br>
+<span class="lineno"></span>able&nbsp;to&nbsp;grab&nbsp;the&nbsp;feed&nbsp;and&nbsp;see&nbsp;the&nbsp;feed&amp;amp;#39;s&nbsp;actual&nbsp;URL&nbsp;in<br>
+<span class="lineno"></span>the&nbsp;link&nbsp;rel=&amp;amp;quot;self&amp;amp;quot;,&nbsp;but&nbsp;the&nbsp;default&nbsp;value&nbsp;for&nbsp;that&nbsp;drops<br>
+<span class="lineno">50</span>the&nbsp;:port&nbsp;from&nbsp;the&nbsp;URL,&nbsp;and&nbsp;I&nbsp;cannot&nbsp;for&nbsp;the&nbsp;life&nbsp;of&nbsp;me<br>
+<span class="lineno"></span>figure&nbsp;out&nbsp;how&nbsp;to&nbsp;get&nbsp;the&nbsp;Atom&nbsp;generator&nbsp;deep&nbsp;inside<br>
+<span class="lineno"></span>django&nbsp;not&nbsp;to&nbsp;do&nbsp;that,&nbsp;or&nbsp;even&nbsp;where&nbsp;it&nbsp;is&nbsp;doing&nbsp;that,<br>
+<span class="lineno"></span>or&nbsp;even&nbsp;what&nbsp;code&nbsp;is&nbsp;running&nbsp;to&nbsp;generate&nbsp;the&nbsp;Atom&nbsp;feed.<br>
+<span class="lineno"></span>(I&nbsp;thought&nbsp;I&nbsp;knew&nbsp;but&nbsp;I&nbsp;added&nbsp;some&nbsp;assert&nbsp;False&nbsp;statements<br>
+<span class="lineno">55</span>and&nbsp;it&nbsp;kept&nbsp;running!)<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>Ignoring&nbsp;that&nbsp;particular&nbsp;problem,&nbsp;I&nbsp;would&nbsp;appreciate<br>
+<span class="lineno"></span>feedback&nbsp;on&nbsp;the&nbsp;right&nbsp;way&nbsp;to&nbsp;get&nbsp;the&nbsp;two&nbsp;values&nbsp;at<br>
+<span class="lineno"></span>the&nbsp;top&nbsp;of&nbsp;feeds.py&nbsp;marked&nbsp;NOTE(rsc).<br>
+<span class="lineno">60</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&lt;/summary&gt;&lt;/entry&gt;&lt;entry&gt;&lt;title&gt;rietveld:&nbsp;correct&nbsp;tab&nbsp;handling<br>
+<span class="lineno"></span>&lt;/title&gt;&lt;link&nbsp;href=&#34;http://codereview.appspot.com/124106&#34;&nbsp;rel=&#34;alternate&#34;&gt;&lt;/link&gt;&lt;updated&gt;2009-10-03T23:02:17+00:00&lt;/updated&gt;&lt;author&gt;&lt;name&gt;email-address-removed&lt;/name&gt;&lt;/author&gt;&lt;id&gt;urn:md5:0a2a4f19bb815101f0ba2904aed7c35a&lt;/id&gt;&lt;summary&nbsp;type=&#34;html&#34;&gt;<br>
+<span class="lineno"></span>&nbsp;&nbsp;This&nbsp;fixes&nbsp;the&nbsp;buggy&nbsp;tab&nbsp;rendering&nbsp;that&nbsp;can&nbsp;be&nbsp;seen&nbsp;at<br>
+<span class="lineno">65</span>http://codereview.appspot.com/116075/diff/1/2<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>The&nbsp;fundamental&nbsp;problem&nbsp;was&nbsp;that&nbsp;the&nbsp;tab&nbsp;code&nbsp;was<br>
+<span class="lineno"></span>not&nbsp;being&nbsp;told&nbsp;what&nbsp;column&nbsp;the&nbsp;text&nbsp;began&nbsp;in,&nbsp;so&nbsp;it<br>
+<span class="lineno"></span>didn&amp;amp;#39;t&nbsp;know&nbsp;where&nbsp;to&nbsp;put&nbsp;the&nbsp;tab&nbsp;stops.&nbsp;&nbsp;Another&nbsp;problem<br>
+<span class="lineno">70</span>was&nbsp;that&nbsp;some&nbsp;of&nbsp;the&nbsp;code&nbsp;assumed&nbsp;that&nbsp;string&nbsp;byte<br>
+<span class="lineno"></span>offsets&nbsp;were&nbsp;the&nbsp;same&nbsp;as&nbsp;column&nbsp;offsets,&nbsp;which&nbsp;is&nbsp;only<br>
+<span class="lineno"></span>true&nbsp;if&nbsp;there&nbsp;are&nbsp;no&nbsp;tabs.<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>In&nbsp;the&nbsp;process&nbsp;of&nbsp;fixing&nbsp;this,&nbsp;I&nbsp;cleaned&nbsp;up&nbsp;the&nbsp;arguments<br>
+<span class="lineno">75</span>to&nbsp;Fold&nbsp;and&nbsp;ExpandTabs&nbsp;and&nbsp;renamed&nbsp;them&nbsp;Break&nbsp;and<br>
+<span class="lineno"></span>_ExpandTabs&nbsp;so&nbsp;that&nbsp;I&nbsp;could&nbsp;be&nbsp;sure&nbsp;that&nbsp;I&nbsp;found&nbsp;all&nbsp;the<br>
+<span class="lineno"></span>call&nbsp;sites.&nbsp;&nbsp;I&nbsp;also&nbsp;wanted&nbsp;to&nbsp;verify&nbsp;that&nbsp;ExpandTabs&nbsp;was<br>
+<span class="lineno"></span>not&nbsp;being&nbsp;used&nbsp;from&nbsp;outside&nbsp;intra_region_diff.py.<br>
+<span class="lineno"></span><br>
+<span class="lineno">80</span><br>
+<span class="lineno"></span>&lt;/summary&gt;&lt;/entry&gt;&lt;/feed&gt;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;`</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">Feed</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">XMLName</span>&nbsp;<span class="ident">Name</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">`xml:&#34;http://www.w3.org/2005/Atom&nbsp;feed&#34;`</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Title</span>&nbsp;&nbsp;&nbsp;<span class="builtintype">string</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">`xml:&#34;title&#34;`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Id</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">string</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">`xml:&#34;id&#34;`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Link</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">[</span><span class="op">]</span><span class="ident">Link</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">`xml:&#34;link&#34;`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Updated</span>&nbsp;<span class="ident">time</span><span class="op">.</span><span class="ident">Time</span>&nbsp;<span class="string">`xml:&#34;updated,attr&#34;`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Author</span>&nbsp;&nbsp;<span class="ident">Person</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">`xml:&#34;author&#34;`</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Entry</span>&nbsp;&nbsp;&nbsp;<span class="op">[</span><span class="op">]</span><span class="ident">Entry</span>&nbsp;&nbsp;&nbsp;<span class="string">`xml:&#34;entry&#34;`</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">Entry</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Title</span>&nbsp;&nbsp;&nbsp;<span class="builtintype">string</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">`xml:&#34;title&#34;`</span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Id</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">string</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">`xml:&#34;id&#34;`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Link</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">[</span><span class="op">]</span><span class="ident">Link</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">`xml:&#34;link&#34;`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Updated</span>&nbsp;<span class="ident">time</span><span class="op">.</span><span class="ident">Time</span>&nbsp;<span class="string">`xml:&#34;updated&#34;`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Author</span>&nbsp;&nbsp;<span class="ident">Person</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">`xml:&#34;author&#34;`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Summary</span>&nbsp;<span class="ident">Text</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">`xml:&#34;summary&#34;`</span><br>
+<span class="lineno">100</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">Link</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Rel</span>&nbsp;&nbsp;<span class="builtintype">string</span>&nbsp;<span class="string">`xml:&#34;rel,attr,omitempty&#34;`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Href</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="string">`xml:&#34;href,attr&#34;`</span><br>
+<span class="lineno">105</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">Person</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Name</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">string</span>&nbsp;<span class="string">`xml:&#34;name&#34;`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">URI</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">string</span>&nbsp;<span class="string">`xml:&#34;uri&#34;`</span><br>
+<span class="lineno">110</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Email</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">string</span>&nbsp;<span class="string">`xml:&#34;email&#34;`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">InnerXML</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="string">`xml:&#34;,innerxml&#34;`</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">Text</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">115</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Type</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="string">`xml:&#34;type,attr,omitempty&#34;`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Body</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="string">`xml:&#34;,chardata&#34;`</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">atomFeed</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">Feed</span><span class="op">{</span><br>
+<span class="lineno">120</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">XMLName</span><span class="op">:</span>&nbsp;<span class="ident">Name</span><span class="op">{</span><span class="string">&#34;http://www.w3.org/2005/Atom&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;feed&#34;</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Title</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;<span class="string">&#34;Code&nbsp;Review&nbsp;-&nbsp;My&nbsp;issues&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Link</span><span class="op">:</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="ident">Link</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="ident">Rel</span><span class="op">:</span>&nbsp;<span class="string">&#34;alternate&#34;</span><span class="op">,</span>&nbsp;<span class="ident">Href</span><span class="op">:</span>&nbsp;<span class="string">&#34;http://codereview.appspot.com/&#34;</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="ident">Rel</span><span class="op">:</span>&nbsp;<span class="string">&#34;self&#34;</span><span class="op">,</span>&nbsp;<span class="ident">Href</span><span class="op">:</span>&nbsp;<span class="string">&#34;http://codereview.appspot.com/rss/mine/rsc&#34;</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno">125</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Id</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;http://codereview.appspot.com/&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Updated</span><span class="op">:</span>&nbsp;<span class="ident">ParseTime</span><span class="op">(</span><span class="string">&#34;2009-10-04T01:35:58+00:00&#34;</span><span class="op">)</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Author</span><span class="op">:</span>&nbsp;<span class="ident">Person</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Name</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;rietveld&lt;&gt;&#34;</span><span class="op">,</span><br>
+<span class="lineno">130</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">InnerXML</span><span class="op">:</span>&nbsp;<span class="string">&#34;&lt;name&gt;rietveld&amp;lt;&amp;gt;&lt;/name&gt;&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Entry</span><span class="op">:</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="ident">Entry</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Title</span><span class="op">:</span>&nbsp;<span class="string">&#34;rietveld:&nbsp;an&nbsp;attempt&nbsp;at&nbsp;pubsubhubbub\n&#34;</span><span class="op">,</span><br>
+<span class="lineno">135</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Link</span><span class="op">:</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="ident">Link</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="ident">Rel</span><span class="op">:</span>&nbsp;<span class="string">&#34;alternate&#34;</span><span class="op">,</span>&nbsp;<span class="ident">Href</span><span class="op">:</span>&nbsp;<span class="string">&#34;http://codereview.appspot.com/126085&#34;</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Updated</span><span class="op">:</span>&nbsp;<span class="ident">ParseTime</span><span class="op">(</span><span class="string">&#34;2009-10-04T01:35:58+00:00&#34;</span><span class="op">)</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Author</span><span class="op">:</span>&nbsp;<span class="ident">Person</span><span class="op">{</span><br>
+<span class="lineno">140</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Name</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;email-address-removed&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">InnerXML</span><span class="op">:</span>&nbsp;<span class="string">&#34;&lt;name&gt;email-address-removed&lt;/name&gt;&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Id</span><span class="op">:</span>&nbsp;<span class="string">&#34;urn:md5:134d9179c41f806be79b3a5f7877d19a&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Summary</span><span class="op">:</span>&nbsp;<span class="ident">Text</span><span class="op">{</span><br>
+<span class="lineno">145</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Type</span><span class="op">:</span>&nbsp;<span class="string">&#34;html&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Body</span><span class="op">:</span>&nbsp;<span class="string">`<br>
+<span class="lineno"></span>&nbsp;&nbsp;An&nbsp;attempt&nbsp;at&nbsp;adding&nbsp;pubsubhubbub&nbsp;support&nbsp;to&nbsp;Rietveld.<br>
+<span class="lineno"></span>http://code.google.com/p/pubsubhubbub<br>
+<span class="lineno"></span>http://code.google.com/p/rietveld/issues/detail?id=155<br>
+<span class="lineno">150</span><br>
+<span class="lineno"></span>The&nbsp;server&nbsp;side&nbsp;of&nbsp;the&nbsp;protocol&nbsp;is&nbsp;trivial:<br>
+<span class="lineno"></span>&nbsp;&nbsp;1.&nbsp;add&nbsp;a&nbsp;&amp;lt;link&nbsp;rel=&amp;quot;hub&amp;quot;&nbsp;href=&amp;quot;hub-server&amp;quot;&amp;gt;&nbsp;tag&nbsp;to&nbsp;all<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;feeds&nbsp;that&nbsp;will&nbsp;be&nbsp;pubsubhubbubbed.<br>
+<span class="lineno"></span>&nbsp;&nbsp;2.&nbsp;every&nbsp;time&nbsp;one&nbsp;of&nbsp;those&nbsp;feeds&nbsp;changes,&nbsp;tell&nbsp;the&nbsp;hub<br>
+<span class="lineno">155</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;with&nbsp;a&nbsp;simple&nbsp;POST&nbsp;request.<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>I&nbsp;have&nbsp;tested&nbsp;this&nbsp;by&nbsp;adding&nbsp;debug&nbsp;prints&nbsp;to&nbsp;a&nbsp;local&nbsp;hub<br>
+<span class="lineno"></span>server&nbsp;and&nbsp;checking&nbsp;that&nbsp;the&nbsp;server&nbsp;got&nbsp;the&nbsp;right&nbsp;publish<br>
+<span class="lineno"></span>requests.<br>
+<span class="lineno">160</span><br>
+<span class="lineno"></span>I&nbsp;can&amp;#39;t&nbsp;quite&nbsp;get&nbsp;the&nbsp;server&nbsp;to&nbsp;work,&nbsp;but&nbsp;I&nbsp;think&nbsp;the&nbsp;bug<br>
+<span class="lineno"></span>is&nbsp;not&nbsp;in&nbsp;my&nbsp;code.&nbsp;&nbsp;I&nbsp;think&nbsp;that&nbsp;the&nbsp;server&nbsp;expects&nbsp;to&nbsp;be<br>
+<span class="lineno"></span>able&nbsp;to&nbsp;grab&nbsp;the&nbsp;feed&nbsp;and&nbsp;see&nbsp;the&nbsp;feed&amp;#39;s&nbsp;actual&nbsp;URL&nbsp;in<br>
+<span class="lineno"></span>the&nbsp;link&nbsp;rel=&amp;quot;self&amp;quot;,&nbsp;but&nbsp;the&nbsp;default&nbsp;value&nbsp;for&nbsp;that&nbsp;drops<br>
+<span class="lineno">165</span>the&nbsp;:port&nbsp;from&nbsp;the&nbsp;URL,&nbsp;and&nbsp;I&nbsp;cannot&nbsp;for&nbsp;the&nbsp;life&nbsp;of&nbsp;me<br>
+<span class="lineno"></span>figure&nbsp;out&nbsp;how&nbsp;to&nbsp;get&nbsp;the&nbsp;Atom&nbsp;generator&nbsp;deep&nbsp;inside<br>
+<span class="lineno"></span>django&nbsp;not&nbsp;to&nbsp;do&nbsp;that,&nbsp;or&nbsp;even&nbsp;where&nbsp;it&nbsp;is&nbsp;doing&nbsp;that,<br>
+<span class="lineno"></span>or&nbsp;even&nbsp;what&nbsp;code&nbsp;is&nbsp;running&nbsp;to&nbsp;generate&nbsp;the&nbsp;Atom&nbsp;feed.<br>
+<span class="lineno"></span>(I&nbsp;thought&nbsp;I&nbsp;knew&nbsp;but&nbsp;I&nbsp;added&nbsp;some&nbsp;assert&nbsp;False&nbsp;statements<br>
+<span class="lineno">170</span>and&nbsp;it&nbsp;kept&nbsp;running!)<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>Ignoring&nbsp;that&nbsp;particular&nbsp;problem,&nbsp;I&nbsp;would&nbsp;appreciate<br>
+<span class="lineno"></span>feedback&nbsp;on&nbsp;the&nbsp;right&nbsp;way&nbsp;to&nbsp;get&nbsp;the&nbsp;two&nbsp;values&nbsp;at<br>
+<span class="lineno"></span>the&nbsp;top&nbsp;of&nbsp;feeds.py&nbsp;marked&nbsp;NOTE(rsc).<br>
+<span class="lineno">175</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>`</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><span class="op">,</span><br>
+<span class="lineno">180</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Title</span><span class="op">:</span>&nbsp;<span class="string">&#34;rietveld:&nbsp;correct&nbsp;tab&nbsp;handling\n&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Link</span><span class="op">:</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="ident">Link</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="ident">Rel</span><span class="op">:</span>&nbsp;<span class="string">&#34;alternate&#34;</span><span class="op">,</span>&nbsp;<span class="ident">Href</span><span class="op">:</span>&nbsp;<span class="string">&#34;http://codereview.appspot.com/124106&#34;</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><span class="op">,</span><br>
+<span class="lineno">185</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Updated</span><span class="op">:</span>&nbsp;<span class="ident">ParseTime</span><span class="op">(</span><span class="string">&#34;2009-10-03T23:02:17+00:00&#34;</span><span class="op">)</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Author</span><span class="op">:</span>&nbsp;<span class="ident">Person</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Name</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;email-address-removed&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">InnerXML</span><span class="op">:</span>&nbsp;<span class="string">&#34;&lt;name&gt;email-address-removed&lt;/name&gt;&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><span class="op">,</span><br>
+<span class="lineno">190</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Id</span><span class="op">:</span>&nbsp;<span class="string">&#34;urn:md5:0a2a4f19bb815101f0ba2904aed7c35a&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Summary</span><span class="op">:</span>&nbsp;<span class="ident">Text</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Type</span><span class="op">:</span>&nbsp;<span class="string">&#34;html&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Body</span><span class="op">:</span>&nbsp;<span class="string">`<br>
+<span class="lineno"></span>&nbsp;&nbsp;This&nbsp;fixes&nbsp;the&nbsp;buggy&nbsp;tab&nbsp;rendering&nbsp;that&nbsp;can&nbsp;be&nbsp;seen&nbsp;at<br>
+<span class="lineno">195</span>http://codereview.appspot.com/116075/diff/1/2<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>The&nbsp;fundamental&nbsp;problem&nbsp;was&nbsp;that&nbsp;the&nbsp;tab&nbsp;code&nbsp;was<br>
+<span class="lineno"></span>not&nbsp;being&nbsp;told&nbsp;what&nbsp;column&nbsp;the&nbsp;text&nbsp;began&nbsp;in,&nbsp;so&nbsp;it<br>
+<span class="lineno"></span>didn&amp;#39;t&nbsp;know&nbsp;where&nbsp;to&nbsp;put&nbsp;the&nbsp;tab&nbsp;stops.&nbsp;&nbsp;Another&nbsp;problem<br>
+<span class="lineno">200</span>was&nbsp;that&nbsp;some&nbsp;of&nbsp;the&nbsp;code&nbsp;assumed&nbsp;that&nbsp;string&nbsp;byte<br>
+<span class="lineno"></span>offsets&nbsp;were&nbsp;the&nbsp;same&nbsp;as&nbsp;column&nbsp;offsets,&nbsp;which&nbsp;is&nbsp;only<br>
+<span class="lineno"></span>true&nbsp;if&nbsp;there&nbsp;are&nbsp;no&nbsp;tabs.<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>In&nbsp;the&nbsp;process&nbsp;of&nbsp;fixing&nbsp;this,&nbsp;I&nbsp;cleaned&nbsp;up&nbsp;the&nbsp;arguments<br>
+<span class="lineno">205</span>to&nbsp;Fold&nbsp;and&nbsp;ExpandTabs&nbsp;and&nbsp;renamed&nbsp;them&nbsp;Break&nbsp;and<br>
+<span class="lineno"></span>_ExpandTabs&nbsp;so&nbsp;that&nbsp;I&nbsp;could&nbsp;be&nbsp;sure&nbsp;that&nbsp;I&nbsp;found&nbsp;all&nbsp;the<br>
+<span class="lineno"></span>call&nbsp;sites.&nbsp;&nbsp;I&nbsp;also&nbsp;wanted&nbsp;to&nbsp;verify&nbsp;that&nbsp;ExpandTabs&nbsp;was<br>
+<span class="lineno"></span>not&nbsp;being&nbsp;used&nbsp;from&nbsp;outside&nbsp;intra_region_diff.py.<br>
+<span class="lineno"></span><br>
+<span class="lineno">210</span><br>
+<span class="lineno"></span>`</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><span class="op">,</span><br>
+<span class="lineno">215</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">pathTestString</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">`<br>
+<span class="lineno"></span>&lt;Result&gt;<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;&lt;Before&gt;1&lt;/Before&gt;<br>
+<span class="lineno">220</span>&nbsp;&nbsp;&nbsp;&nbsp;&lt;Items&gt;<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;Item1&gt;<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;Value&gt;A&lt;/Value&gt;<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/Item1&gt;<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;Item2&gt;<br>
+<span class="lineno">225</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;Value&gt;B&lt;/Value&gt;<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/Item2&gt;<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;Item1&gt;<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;Value&gt;C&lt;/Value&gt;<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;Value&gt;D&lt;/Value&gt;<br>
+<span class="lineno">230</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/Item1&gt;<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;_&gt;<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;Value&gt;E&lt;/Value&gt;<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;/_&gt;<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;&lt;/Items&gt;<br>
+<span class="lineno">235</span>&nbsp;&nbsp;&nbsp;&nbsp;&lt;After&gt;2&lt;/After&gt;<br>
+<span class="lineno"></span>&lt;/Result&gt;<br>
+<span class="lineno"></span>`</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">PathTestItem</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">240</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Value</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">PathTestA</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Items</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">[</span><span class="op">]</span><span class="ident">PathTestItem</span>&nbsp;<span class="string">`xml:&#34;&gt;Item1&#34;`</span><br>
+<span class="lineno">245</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Before</span><span class="op">,</span>&nbsp;<span class="ident">After</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">PathTestB</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Other</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">[</span><span class="op">]</span><span class="ident">PathTestItem</span>&nbsp;<span class="string">`xml:&#34;Items&gt;Item1&#34;`</span><br>
+<span class="lineno">250</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Before</span><span class="op">,</span>&nbsp;<span class="ident">After</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">PathTestC</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Values1</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">string</span>&nbsp;<span class="string">`xml:&#34;Items&gt;Item1&gt;Value&#34;`</span><br>
+<span class="lineno">255</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Values2</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">string</span>&nbsp;<span class="string">`xml:&#34;Items&gt;Item2&gt;Value&#34;`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Before</span><span class="op">,</span>&nbsp;<span class="ident">After</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">PathTestSet</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">260</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Item1</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="ident">PathTestItem</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">PathTestD</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Other</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">PathTestSet</span>&nbsp;<span class="string">`xml:&#34;Items&#34;`</span><br>
+<span class="lineno">265</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Before</span><span class="op">,</span>&nbsp;<span class="ident">After</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">PathTestE</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Underline</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">string</span>&nbsp;<span class="string">`xml:&#34;Items&gt;_&gt;Value&#34;`</span><br>
+<span class="lineno">270</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Before</span><span class="op">,</span>&nbsp;<span class="ident">After</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">pathTests</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="keyword">interface</span><span class="op">{</span><span class="op">}</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">&amp;</span><span class="ident">PathTestA</span><span class="op">{</span><span class="ident">Items</span><span class="op">:</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="ident">PathTestItem</span><span class="op">{</span><span class="op">{</span><span class="string">&#34;A&#34;</span><span class="op">}</span><span class="op">,</span>&nbsp;<span class="op">{</span><span class="string">&#34;D&#34;</span><span class="op">}</span><span class="op">}</span><span class="op">,</span>&nbsp;<span class="ident">Before</span><span class="op">:</span>&nbsp;<span class="string">&#34;1&#34;</span><span class="op">,</span>&nbsp;<span class="ident">After</span><span class="op">:</span>&nbsp;<span class="string">&#34;2&#34;</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno">275</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">&amp;</span><span class="ident">PathTestB</span><span class="op">{</span><span class="ident">Other</span><span class="op">:</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="ident">PathTestItem</span><span class="op">{</span><span class="op">{</span><span class="string">&#34;A&#34;</span><span class="op">}</span><span class="op">,</span>&nbsp;<span class="op">{</span><span class="string">&#34;D&#34;</span><span class="op">}</span><span class="op">}</span><span class="op">,</span>&nbsp;<span class="ident">Before</span><span class="op">:</span>&nbsp;<span class="string">&#34;1&#34;</span><span class="op">,</span>&nbsp;<span class="ident">After</span><span class="op">:</span>&nbsp;<span class="string">&#34;2&#34;</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">&amp;</span><span class="ident">PathTestC</span><span class="op">{</span><span class="ident">Values1</span><span class="op">:</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">string</span><span class="op">{</span><span class="string">&#34;A&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;C&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;D&#34;</span><span class="op">}</span><span class="op">,</span>&nbsp;<span class="ident">Values2</span><span class="op">:</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">string</span><span class="op">{</span><span class="string">&#34;B&#34;</span><span class="op">}</span><span class="op">,</span>&nbsp;<span class="ident">Before</span><span class="op">:</span>&nbsp;<span class="string">&#34;1&#34;</span><span class="op">,</span>&nbsp;<span class="ident">After</span><span class="op">:</span>&nbsp;<span class="string">&#34;2&#34;</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">&amp;</span><span class="ident">PathTestD</span><span class="op">{</span><span class="ident">Other</span><span class="op">:</span>&nbsp;<span class="ident">PathTestSet</span><span class="op">{</span><span class="ident">Item1</span><span class="op">:</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="ident">PathTestItem</span><span class="op">{</span><span class="op">{</span><span class="string">&#34;A&#34;</span><span class="op">}</span><span class="op">,</span>&nbsp;<span class="op">{</span><span class="string">&#34;D&#34;</span><span class="op">}</span><span class="op">}</span><span class="op">}</span><span class="op">,</span>&nbsp;<span class="ident">Before</span><span class="op">:</span>&nbsp;<span class="string">&#34;1&#34;</span><span class="op">,</span>&nbsp;<span class="ident">After</span><span class="op">:</span>&nbsp;<span class="string">&#34;2&#34;</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">&amp;</span><span class="ident">PathTestE</span><span class="op">{</span><span class="ident">Underline</span><span class="op">:</span>&nbsp;<span class="string">&#34;E&#34;</span><span class="op">,</span>&nbsp;<span class="ident">Before</span><span class="op">:</span>&nbsp;<span class="string">&#34;1&#34;</span><span class="op">,</span>&nbsp;<span class="ident">After</span><span class="op">:</span>&nbsp;<span class="string">&#34;2&#34;</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">280</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">TestUnmarshalPaths</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">pt</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">pathTests</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">reflect</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="ident">reflect</span><span class="op">.</span><span class="ident">TypeOf</span><span class="op">(</span><span class="ident">pt</span><span class="op">)</span><span class="op">.</span><span class="ident">Elem</span><span class="op">(</span><span class="op">)</span><span class="op">)</span><span class="op">.</span><span class="ident">Interface</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">Unmarshal</span><span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">(</span><span class="ident">pathTestString</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">v</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">285</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;Unmarshal:&nbsp;%s&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">reflect</span><span class="op">.</span><span class="ident">DeepEqual</span><span class="op">(</span><span class="ident">v</span><span class="op">,</span>&nbsp;<span class="ident">pt</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;have&nbsp;%#v\nwant&nbsp;%#v&#34;</span><span class="op">,</span>&nbsp;<span class="ident">v</span><span class="op">,</span>&nbsp;<span class="ident">pt</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">290</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">BadPathTestA</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">First</span>&nbsp;&nbsp;<span class="builtintype">string</span>&nbsp;<span class="string">`xml:&#34;items&gt;item1&#34;`</span><br>
+<span class="lineno">295</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Other</span>&nbsp;&nbsp;<span class="builtintype">string</span>&nbsp;<span class="string">`xml:&#34;items&gt;item2&#34;`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Second</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="string">`xml:&#34;items&#34;`</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">BadPathTestB</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">300</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Other</span>&nbsp;&nbsp;<span class="builtintype">string</span>&nbsp;<span class="string">`xml:&#34;items&gt;item2&gt;value&#34;`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">First</span>&nbsp;&nbsp;<span class="builtintype">string</span>&nbsp;<span class="string">`xml:&#34;items&gt;item1&#34;`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Second</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="string">`xml:&#34;items&gt;item1&gt;value&#34;`</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">305</span><span class="keyword">type</span>&nbsp;<span class="ident">BadPathTestC</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">First</span>&nbsp;&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Second</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="string">`xml:&#34;First&#34;`</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">310</span><span class="keyword">type</span>&nbsp;<span class="ident">BadPathTestD</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">BadPathEmbeddedA</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">BadPathEmbeddedB</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">315</span><span class="keyword">type</span>&nbsp;<span class="ident">BadPathEmbeddedA</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">First</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">BadPathEmbeddedB</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">320</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Second</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="string">`xml:&#34;First&#34;`</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">badPathTests</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span><span class="op">,</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="keyword">interface</span><span class="op">{</span><span class="op">}</span><br>
+<span class="lineno">325</span><span class="op">}</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="op">&amp;</span><span class="ident">BadPathTestA</span><span class="op">{</span><span class="op">}</span><span class="op">,</span>&nbsp;<span class="op">&amp;</span><span class="ident">TagPathError</span><span class="op">{</span><span class="ident">reflect</span><span class="op">.</span><span class="ident">TypeOf</span><span class="op">(</span><span class="ident">BadPathTestA</span><span class="op">{</span><span class="op">}</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="string">&#34;First&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;items&gt;item1&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;Second&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;items&#34;</span><span class="op">}</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="op">&amp;</span><span class="ident">BadPathTestB</span><span class="op">{</span><span class="op">}</span><span class="op">,</span>&nbsp;<span class="op">&amp;</span><span class="ident">TagPathError</span><span class="op">{</span><span class="ident">reflect</span><span class="op">.</span><span class="ident">TypeOf</span><span class="op">(</span><span class="ident">BadPathTestB</span><span class="op">{</span><span class="op">}</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="string">&#34;First&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;items&gt;item1&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;Second&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;items&gt;item1&gt;value&#34;</span><span class="op">}</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="op">&amp;</span><span class="ident">BadPathTestC</span><span class="op">{</span><span class="op">}</span><span class="op">,</span>&nbsp;<span class="op">&amp;</span><span class="ident">TagPathError</span><span class="op">{</span><span class="ident">reflect</span><span class="op">.</span><span class="ident">TypeOf</span><span class="op">(</span><span class="ident">BadPathTestC</span><span class="op">{</span><span class="op">}</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="string">&#34;First&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;Second&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;First&#34;</span><span class="op">}</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="op">&amp;</span><span class="ident">BadPathTestD</span><span class="op">{</span><span class="op">}</span><span class="op">,</span>&nbsp;<span class="op">&amp;</span><span class="ident">TagPathError</span><span class="op">{</span><span class="ident">reflect</span><span class="op">.</span><span class="ident">TypeOf</span><span class="op">(</span><span class="ident">BadPathTestD</span><span class="op">{</span><span class="op">}</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="string">&#34;First&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;Second&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;First&#34;</span><span class="op">}</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno">330</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">TestUnmarshalBadPaths</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">tt</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">badPathTests</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">Unmarshal</span><span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">(</span><span class="ident">pathTestString</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">tt</span><span class="op">.</span><span class="ident">v</span><span class="op">)</span><br>
+<span class="lineno">335</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">reflect</span><span class="op">.</span><span class="ident">DeepEqual</span><span class="op">(</span><span class="ident">err</span><span class="op">,</span>&nbsp;<span class="ident">tt</span><span class="op">.</span><span class="ident">e</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;Unmarshal&nbsp;with&nbsp;%#v&nbsp;didn&#39;t&nbsp;fail&nbsp;properly:\nhave&nbsp;%#v,\nwant&nbsp;%#v&#34;</span><span class="op">,</span>&nbsp;<span class="ident">tt</span><span class="op">.</span><span class="ident">v</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">,</span>&nbsp;<span class="ident">tt</span><span class="op">.</span><span class="ident">e</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">340</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">OK</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">&#34;OK&#34;</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">withoutNameTypeData</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">`<br>
+<span class="lineno"></span>&lt;?xml&nbsp;version=&#34;1.0&#34;&nbsp;charset=&#34;utf-8&#34;?&gt;<br>
+<span class="lineno"></span>&lt;Test3&nbsp;Attr=&#34;OK&#34;&nbsp;/&gt;`</span><br>
+<span class="lineno">345</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">TestThree</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">XMLName</span>&nbsp;<span class="ident">Name</span>&nbsp;&nbsp;&nbsp;<span class="string">`xml:&#34;Test3&#34;`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Attr</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">string</span>&nbsp;<span class="string">`xml:&#34;,attr&#34;`</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">350</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">TestUnmarshalWithoutNameType</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="ident">TestThree</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">Unmarshal</span><span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">(</span><span class="ident">withoutNameTypeData</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="op">&amp;</span><span class="ident">x</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;Unmarshal:&nbsp;%s&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno">355</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">x</span><span class="op">.</span><span class="ident">Attr</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">OK</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;have&nbsp;%v\nwant&nbsp;%v&#34;</span><span class="op">,</span>&nbsp;<span class="ident">x</span><span class="op">.</span><span class="ident">Attr</span><span class="op">,</span>&nbsp;<span class="ident">OK</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">360</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">TestUnmarshalAttr</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">type</span>&nbsp;<span class="ident">ParamVal</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Int</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="string">`xml:&#34;int,attr&#34;`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">365</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">type</span>&nbsp;<span class="ident">ParamPtr</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Int</span>&nbsp;<span class="op">*</span><span class="builtintype">int</span>&nbsp;<span class="string">`xml:&#34;int,attr&#34;`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">370</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">type</span>&nbsp;<span class="ident">ParamStringPtr</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Int</span>&nbsp;<span class="op">*</span><span class="builtintype">string</span>&nbsp;<span class="string">`xml:&#34;int,attr&#34;`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">x</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">(</span><span class="string">`&lt;Param&nbsp;int=&#34;1&#34;&nbsp;/&gt;`</span><span class="op">)</span><br>
+<span class="lineno">375</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p1</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">&amp;</span><span class="ident">ParamPtr</span><span class="op">{</span><span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">Unmarshal</span><span class="op">(</span><span class="ident">x</span><span class="op">,</span>&nbsp;<span class="ident">p1</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;Unmarshal:&nbsp;%s&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">380</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">p1</span><span class="op">.</span><span class="ident">Int</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;Unmarshal&nbsp;failed&nbsp;in&nbsp;to&nbsp;*int&nbsp;field&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="keyword">if</span>&nbsp;<span class="op">*</span><span class="ident">p1</span><span class="op">.</span><span class="ident">Int</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">1</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;Unmarshal&nbsp;with&nbsp;%s&nbsp;failed:\nhave&nbsp;%#v,\n&nbsp;want&nbsp;%#v&#34;</span><span class="op">,</span>&nbsp;<span class="ident">x</span><span class="op">,</span>&nbsp;<span class="ident">p1</span><span class="op">.</span><span class="ident">Int</span><span class="op">,</span>&nbsp;<span class="num">1</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">385</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p2</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">&amp;</span><span class="ident">ParamVal</span><span class="op">{</span><span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">Unmarshal</span><span class="op">(</span><span class="ident">x</span><span class="op">,</span>&nbsp;<span class="ident">p2</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;Unmarshal:&nbsp;%s&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">390</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">p2</span><span class="op">.</span><span class="ident">Int</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">1</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;Unmarshal&nbsp;with&nbsp;%s&nbsp;failed:\nhave&nbsp;%#v,\n&nbsp;want&nbsp;%#v&#34;</span><span class="op">,</span>&nbsp;<span class="ident">x</span><span class="op">,</span>&nbsp;<span class="ident">p2</span><span class="op">.</span><span class="ident">Int</span><span class="op">,</span>&nbsp;<span class="num">1</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p3</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">&amp;</span><span class="ident">ParamStringPtr</span><span class="op">{</span><span class="op">}</span><br>
+<span class="lineno">395</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">Unmarshal</span><span class="op">(</span><span class="ident">x</span><span class="op">,</span>&nbsp;<span class="ident">p3</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;Unmarshal:&nbsp;%s&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">p3</span><span class="op">.</span><span class="ident">Int</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;Unmarshal&nbsp;failed&nbsp;in&nbsp;to&nbsp;*string&nbsp;field&#34;</span><span class="op">)</span><br>
+<span class="lineno">400</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="keyword">if</span>&nbsp;<span class="op">*</span><span class="ident">p3</span><span class="op">.</span><span class="ident">Int</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="string">&#34;1&#34;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;Unmarshal&nbsp;with&nbsp;%s&nbsp;failed:\nhave&nbsp;%#v,\n&nbsp;want&nbsp;%#v&#34;</span><span class="op">,</span>&nbsp;<span class="ident">x</span><span class="op">,</span>&nbsp;<span class="ident">p3</span><span class="op">.</span><span class="ident">Int</span><span class="op">,</span>&nbsp;<span class="num">1</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">405</span><span class="keyword">type</span>&nbsp;<span class="ident">Tables</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">HTable</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="string">`xml:&#34;http://www.w3.org/TR/html4/&nbsp;table&#34;`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">FTable</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="string">`xml:&#34;http://www.w3schools.com/furniture&nbsp;table&#34;`</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">410</span><span class="keyword">var</span>&nbsp;<span class="ident">tables</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">xml</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tab</span>&nbsp;<span class="ident">Tables</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ns</span>&nbsp;&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span><span class="op">}</span><span class="op">{</span><br>
+<span class="lineno">415</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">xml</span><span class="op">:</span>&nbsp;<span class="string">`&lt;Tables&gt;`</span>&nbsp;<span class="op">+</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">`&lt;table&nbsp;xmlns=&#34;http://www.w3.org/TR/html4/&#34;&gt;hello&lt;/table&gt;`</span>&nbsp;<span class="op">+</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">`&lt;table&nbsp;xmlns=&#34;http://www.w3schools.com/furniture&#34;&gt;world&lt;/table&gt;`</span>&nbsp;<span class="op">+</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">`&lt;/Tables&gt;`</span><span class="op">,</span><br>
+<span class="lineno">420</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tab</span><span class="op">:</span>&nbsp;<span class="ident">Tables</span><span class="op">{</span><span class="string">&#34;hello&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;world&#34;</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">xml</span><span class="op">:</span>&nbsp;<span class="string">`&lt;Tables&gt;`</span>&nbsp;<span class="op">+</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">`&lt;table&nbsp;xmlns=&#34;http://www.w3schools.com/furniture&#34;&gt;world&lt;/table&gt;`</span>&nbsp;<span class="op">+</span><br>
+<span class="lineno">425</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">`&lt;table&nbsp;xmlns=&#34;http://www.w3.org/TR/html4/&#34;&gt;hello&lt;/table&gt;`</span>&nbsp;<span class="op">+</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">`&lt;/Tables&gt;`</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tab</span><span class="op">:</span>&nbsp;<span class="ident">Tables</span><span class="op">{</span><span class="string">&#34;hello&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;world&#34;</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><br>
+<span class="lineno">430</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">xml</span><span class="op">:</span>&nbsp;<span class="string">`&lt;Tables&nbsp;xmlns:f=&#34;http://www.w3schools.com/furniture&#34;&nbsp;xmlns:h=&#34;http://www.w3.org/TR/html4/&#34;&gt;`</span>&nbsp;<span class="op">+</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">`&lt;f:table&gt;world&lt;/f:table&gt;`</span>&nbsp;<span class="op">+</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">`&lt;h:table&gt;hello&lt;/h:table&gt;`</span>&nbsp;<span class="op">+</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">`&lt;/Tables&gt;`</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tab</span><span class="op">:</span>&nbsp;<span class="ident">Tables</span><span class="op">{</span><span class="string">&#34;hello&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;world&#34;</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno">435</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">xml</span><span class="op">:</span>&nbsp;<span class="string">`&lt;Tables&gt;`</span>&nbsp;<span class="op">+</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">`&lt;table&gt;bogus&lt;/table&gt;`</span>&nbsp;<span class="op">+</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">`&lt;/Tables&gt;`</span><span class="op">,</span><br>
+<span class="lineno">440</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tab</span><span class="op">:</span>&nbsp;<span class="ident">Tables</span><span class="op">{</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">xml</span><span class="op">:</span>&nbsp;<span class="string">`&lt;Tables&gt;`</span>&nbsp;<span class="op">+</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">`&lt;table&gt;only&lt;/table&gt;`</span>&nbsp;<span class="op">+</span><br>
+<span class="lineno">445</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">`&lt;/Tables&gt;`</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tab</span><span class="op">:</span>&nbsp;<span class="ident">Tables</span><span class="op">{</span><span class="ident">HTable</span><span class="op">:</span>&nbsp;<span class="string">&#34;only&#34;</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ns</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">&#34;http://www.w3.org/TR/html4/&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><br>
+<span class="lineno">450</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">xml</span><span class="op">:</span>&nbsp;<span class="string">`&lt;Tables&gt;`</span>&nbsp;<span class="op">+</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">`&lt;table&gt;only&lt;/table&gt;`</span>&nbsp;<span class="op">+</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">`&lt;/Tables&gt;`</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tab</span><span class="op">:</span>&nbsp;<span class="ident">Tables</span><span class="op">{</span><span class="ident">FTable</span><span class="op">:</span>&nbsp;<span class="string">&#34;only&#34;</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ns</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">&#34;http://www.w3schools.com/furniture&#34;</span><span class="op">,</span><br>
+<span class="lineno">455</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">xml</span><span class="op">:</span>&nbsp;<span class="string">`&lt;Tables&gt;`</span>&nbsp;<span class="op">+</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">`&lt;table&gt;only&lt;/table&gt;`</span>&nbsp;<span class="op">+</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">`&lt;/Tables&gt;`</span><span class="op">,</span><br>
+<span class="lineno">460</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tab</span><span class="op">:</span>&nbsp;<span class="ident">Tables</span><span class="op">{</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ns</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">&#34;something&nbsp;else&nbsp;entirely&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">465</span><span class="keyword">func</span>&nbsp;<span class="ident">TestUnmarshalNS</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span><span class="op">,</span>&nbsp;<span class="ident">tt</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">tables</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">dst</span>&nbsp;<span class="ident">Tables</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">tt</span><span class="op">.</span><span class="ident">ns</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="string">&#34;&#34;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">470</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">NewDecoder</span><span class="op">(</span><span class="ident">strings</span><span class="op">.</span><span class="ident">NewReader</span><span class="op">(</span><span class="ident">tt</span><span class="op">.</span><span class="ident">xml</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span><span class="op">.</span><span class="ident">DefaultSpace</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">tt</span><span class="op">.</span><span class="ident">ns</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">d</span><span class="op">.</span><span class="ident">Decode</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">dst</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">Unmarshal</span><span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">(</span><span class="ident">tt</span><span class="op">.</span><span class="ident">xml</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="op">&amp;</span><span class="ident">dst</span><span class="op">)</span><br>
+<span class="lineno">475</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Errorf</span><span class="op">(</span><span class="string">&#34;#%d:&nbsp;Unmarshal:&nbsp;%v&#34;</span><span class="op">,</span>&nbsp;<span class="ident">i</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">continue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">480</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">want</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">tt</span><span class="op">.</span><span class="ident">tab</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">dst</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">want</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Errorf</span><span class="op">(</span><span class="string">&#34;#%d:&nbsp;dst=%+v,&nbsp;want&nbsp;%+v&#34;</span><span class="op">,</span>&nbsp;<span class="ident">i</span><span class="op">,</span>&nbsp;<span class="ident">dst</span><span class="op">,</span>&nbsp;<span class="ident">want</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">485</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">TestMarshalNS</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dst</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">Tables</span><span class="op">{</span><span class="string">&#34;hello&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;world&#34;</span><span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">data</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">Marshal</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">dst</span><span class="op">)</span><br>
+<span class="lineno">490</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;Marshal:&nbsp;%v&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">want</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="string">`&lt;Tables&gt;&lt;table&nbsp;xmlns=&#34;http://www.w3.org/TR/html4/&#34;&gt;hello&lt;/table&gt;&lt;table&nbsp;xmlns=&#34;http://www.w3schools.com/furniture&#34;&gt;world&lt;/table&gt;&lt;/Tables&gt;`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">str</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtintype">string</span><span class="op">(</span><span class="ident">data</span><span class="op">)</span><br>
+<span class="lineno">495</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">str</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">want</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Errorf</span><span class="op">(</span><span class="string">&#34;have:&nbsp;%q\nwant:&nbsp;%q\n&#34;</span><span class="op">,</span>&nbsp;<span class="ident">str</span><span class="op">,</span>&nbsp;<span class="ident">want</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">500</span><span class="keyword">type</span>&nbsp;<span class="ident">TableAttrs</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">TAttr</span>&nbsp;<span class="ident">TAttr</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">TAttr</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">505</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">HTable</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="string">`xml:&#34;http://www.w3.org/TR/html4/&nbsp;table,attr&#34;`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">FTable</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="string">`xml:&#34;http://www.w3schools.com/furniture&nbsp;table,attr&#34;`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Lang</span>&nbsp;&nbsp;&nbsp;<span class="builtintype">string</span>&nbsp;<span class="string">`xml:&#34;http://www.w3.org/XML/1998/namespace&nbsp;lang,attr,omitempty&#34;`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Other1</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="string">`xml:&#34;http://golang.org/xml/&nbsp;other,attr,omitempty&#34;`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Other2</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="string">`xml:&#34;http://golang.org/xmlfoo/&nbsp;other,attr,omitempty&#34;`</span><br>
+<span class="lineno">510</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Other3</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="string">`xml:&#34;http://golang.org/json/&nbsp;other,attr,omitempty&#34;`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Other4</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="string">`xml:&#34;http://golang.org/2/json/&nbsp;other,attr,omitempty&#34;`</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">tableAttrs</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">515</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">xml</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tab</span>&nbsp;<span class="ident">TableAttrs</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ns</span>&nbsp;&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span><span class="op">}</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><br>
+<span class="lineno">520</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">xml</span><span class="op">:</span>&nbsp;<span class="string">`&lt;TableAttrs&nbsp;xmlns:f=&#34;http://www.w3schools.com/furniture&#34;&nbsp;xmlns:h=&#34;http://www.w3.org/TR/html4/&#34;&gt;&lt;TAttr&nbsp;`</span>&nbsp;<span class="op">+</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">`h:table=&#34;hello&#34;&nbsp;f:table=&#34;world&#34;&nbsp;`</span>&nbsp;<span class="op">+</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">`/&gt;&lt;/TableAttrs&gt;`</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tab</span><span class="op">:</span>&nbsp;<span class="ident">TableAttrs</span><span class="op">{</span><span class="ident">TAttr</span><span class="op">{</span><span class="ident">HTable</span><span class="op">:</span>&nbsp;<span class="string">&#34;hello&#34;</span><span class="op">,</span>&nbsp;<span class="ident">FTable</span><span class="op">:</span>&nbsp;<span class="string">&#34;world&#34;</span><span class="op">}</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><span class="op">,</span><br>
+<span class="lineno">525</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">xml</span><span class="op">:</span>&nbsp;<span class="string">`&lt;TableAttrs&gt;&lt;TAttr&nbsp;xmlns:f=&#34;http://www.w3schools.com/furniture&#34;&nbsp;xmlns:h=&#34;http://www.w3.org/TR/html4/&#34;&nbsp;`</span>&nbsp;<span class="op">+</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">`h:table=&#34;hello&#34;&nbsp;f:table=&#34;world&#34;&nbsp;`</span>&nbsp;<span class="op">+</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">`/&gt;&lt;/TableAttrs&gt;`</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tab</span><span class="op">:</span>&nbsp;<span class="ident">TableAttrs</span><span class="op">{</span><span class="ident">TAttr</span><span class="op">{</span><span class="ident">HTable</span><span class="op">:</span>&nbsp;<span class="string">&#34;hello&#34;</span><span class="op">,</span>&nbsp;<span class="ident">FTable</span><span class="op">:</span>&nbsp;<span class="string">&#34;world&#34;</span><span class="op">}</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno">530</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">xml</span><span class="op">:</span>&nbsp;<span class="string">`&lt;TableAttrs&gt;&lt;TAttr&nbsp;`</span>&nbsp;<span class="op">+</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">`h:table=&#34;hello&#34;&nbsp;f:table=&#34;world&#34;&nbsp;xmlns:f=&#34;http://www.w3schools.com/furniture&#34;&nbsp;xmlns:h=&#34;http://www.w3.org/TR/html4/&#34;&nbsp;`</span>&nbsp;<span class="op">+</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">`/&gt;&lt;/TableAttrs&gt;`</span><span class="op">,</span><br>
+<span class="lineno">535</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tab</span><span class="op">:</span>&nbsp;<span class="ident">TableAttrs</span><span class="op">{</span><span class="ident">TAttr</span><span class="op">{</span><span class="ident">HTable</span><span class="op">:</span>&nbsp;<span class="string">&#34;hello&#34;</span><span class="op">,</span>&nbsp;<span class="ident">FTable</span><span class="op">:</span>&nbsp;<span class="string">&#34;world&#34;</span><span class="op">}</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Default&nbsp;space&nbsp;does&nbsp;not&nbsp;apply&nbsp;to&nbsp;attribute&nbsp;names.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">xml</span><span class="op">:</span>&nbsp;<span class="string">`&lt;TableAttrs&nbsp;xmlns=&#34;http://www.w3schools.com/furniture&#34;&nbsp;xmlns:h=&#34;http://www.w3.org/TR/html4/&#34;&gt;&lt;TAttr&nbsp;`</span>&nbsp;<span class="op">+</span><br>
+<span class="lineno">540</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">`h:table=&#34;hello&#34;&nbsp;table=&#34;world&#34;&nbsp;`</span>&nbsp;<span class="op">+</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">`/&gt;&lt;/TableAttrs&gt;`</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tab</span><span class="op">:</span>&nbsp;<span class="ident">TableAttrs</span><span class="op">{</span><span class="ident">TAttr</span><span class="op">{</span><span class="ident">HTable</span><span class="op">:</span>&nbsp;<span class="string">&#34;hello&#34;</span><span class="op">,</span>&nbsp;<span class="ident">FTable</span><span class="op">:</span>&nbsp;<span class="string">&#34;&#34;</span><span class="op">}</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><br>
+<span class="lineno">545</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Default&nbsp;space&nbsp;does&nbsp;not&nbsp;apply&nbsp;to&nbsp;attribute&nbsp;names.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">xml</span><span class="op">:</span>&nbsp;<span class="string">`&lt;TableAttrs&nbsp;xmlns:f=&#34;http://www.w3schools.com/furniture&#34;&gt;&lt;TAttr&nbsp;xmlns=&#34;http://www.w3.org/TR/html4/&#34;&nbsp;`</span>&nbsp;<span class="op">+</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">`table=&#34;hello&#34;&nbsp;f:table=&#34;world&#34;&nbsp;`</span>&nbsp;<span class="op">+</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">`/&gt;&lt;/TableAttrs&gt;`</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tab</span><span class="op">:</span>&nbsp;<span class="ident">TableAttrs</span><span class="op">{</span><span class="ident">TAttr</span><span class="op">{</span><span class="ident">HTable</span><span class="op">:</span>&nbsp;<span class="string">&#34;&#34;</span><span class="op">,</span>&nbsp;<span class="ident">FTable</span><span class="op">:</span>&nbsp;<span class="string">&#34;world&#34;</span><span class="op">}</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno">550</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">xml</span><span class="op">:</span>&nbsp;<span class="string">`&lt;TableAttrs&gt;&lt;TAttr&nbsp;`</span>&nbsp;<span class="op">+</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">`table=&#34;bogus&#34;&nbsp;`</span>&nbsp;<span class="op">+</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">`/&gt;&lt;/TableAttrs&gt;`</span><span class="op">,</span><br>
+<span class="lineno">555</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tab</span><span class="op">:</span>&nbsp;<span class="ident">TableAttrs</span><span class="op">{</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Default&nbsp;space&nbsp;does&nbsp;not&nbsp;apply&nbsp;to&nbsp;attribute&nbsp;names.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">xml</span><span class="op">:</span>&nbsp;<span class="string">`&lt;TableAttrs&nbsp;xmlns:h=&#34;http://www.w3.org/TR/html4/&#34;&gt;&lt;TAttr&nbsp;`</span>&nbsp;<span class="op">+</span><br>
+<span class="lineno">560</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">`h:table=&#34;hello&#34;&nbsp;table=&#34;world&#34;&nbsp;`</span>&nbsp;<span class="op">+</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">`/&gt;&lt;/TableAttrs&gt;`</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tab</span><span class="op">:</span>&nbsp;<span class="ident">TableAttrs</span><span class="op">{</span><span class="ident">TAttr</span><span class="op">{</span><span class="ident">HTable</span><span class="op">:</span>&nbsp;<span class="string">&#34;hello&#34;</span><span class="op">,</span>&nbsp;<span class="ident">FTable</span><span class="op">:</span>&nbsp;<span class="string">&#34;&#34;</span><span class="op">}</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ns</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">&#34;http://www.w3schools.com/furniture&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><span class="op">,</span><br>
+<span class="lineno">565</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Default&nbsp;space&nbsp;does&nbsp;not&nbsp;apply&nbsp;to&nbsp;attribute&nbsp;names.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">xml</span><span class="op">:</span>&nbsp;<span class="string">`&lt;TableAttrs&nbsp;xmlns:f=&#34;http://www.w3schools.com/furniture&#34;&gt;&lt;TAttr&nbsp;`</span>&nbsp;<span class="op">+</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">`table=&#34;hello&#34;&nbsp;f:table=&#34;world&#34;&nbsp;`</span>&nbsp;<span class="op">+</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">`/&gt;&lt;/TableAttrs&gt;`</span><span class="op">,</span><br>
+<span class="lineno">570</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tab</span><span class="op">:</span>&nbsp;<span class="ident">TableAttrs</span><span class="op">{</span><span class="ident">TAttr</span><span class="op">{</span><span class="ident">HTable</span><span class="op">:</span>&nbsp;<span class="string">&#34;&#34;</span><span class="op">,</span>&nbsp;<span class="ident">FTable</span><span class="op">:</span>&nbsp;<span class="string">&#34;world&#34;</span><span class="op">}</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ns</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">&#34;http://www.w3.org/TR/html4/&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">xml</span><span class="op">:</span>&nbsp;<span class="string">`&lt;TableAttrs&gt;&lt;TAttr&nbsp;`</span>&nbsp;<span class="op">+</span><br>
+<span class="lineno">575</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">`table=&#34;bogus&#34;&nbsp;`</span>&nbsp;<span class="op">+</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">`/&gt;&lt;/TableAttrs&gt;`</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tab</span><span class="op">:</span>&nbsp;<span class="ident">TableAttrs</span><span class="op">{</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ns</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">&#34;something&nbsp;else&nbsp;entirely&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><span class="op">,</span><br>
+<span class="lineno">580</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">TestUnmarshalNSAttr</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span><span class="op">,</span>&nbsp;<span class="ident">tt</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">tableAttrs</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">dst</span>&nbsp;<span class="ident">TableAttrs</span><br>
+<span class="lineno">585</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">tt</span><span class="op">.</span><span class="ident">ns</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="string">&#34;&#34;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">NewDecoder</span><span class="op">(</span><span class="ident">strings</span><span class="op">.</span><span class="ident">NewReader</span><span class="op">(</span><span class="ident">tt</span><span class="op">.</span><span class="ident">xml</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span><span class="op">.</span><span class="ident">DefaultSpace</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">tt</span><span class="op">.</span><span class="ident">ns</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">d</span><span class="op">.</span><span class="ident">Decode</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">dst</span><span class="op">)</span><br>
+<span class="lineno">590</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">Unmarshal</span><span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">(</span><span class="ident">tt</span><span class="op">.</span><span class="ident">xml</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="op">&amp;</span><span class="ident">dst</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Errorf</span><span class="op">(</span><span class="string">&#34;#%d:&nbsp;Unmarshal:&nbsp;%v&#34;</span><span class="op">,</span>&nbsp;<span class="ident">i</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno">595</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">continue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">want</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">tt</span><span class="op">.</span><span class="ident">tab</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">dst</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">want</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Errorf</span><span class="op">(</span><span class="string">&#34;#%d:&nbsp;dst=%+v,&nbsp;want&nbsp;%+v&#34;</span><span class="op">,</span>&nbsp;<span class="ident">i</span><span class="op">,</span>&nbsp;<span class="ident">dst</span><span class="op">,</span>&nbsp;<span class="ident">want</span><span class="op">)</span><br>
+<span class="lineno">600</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">TestMarshalNSAttr</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">605</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">src</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">TableAttrs</span><span class="op">{</span><span class="ident">TAttr</span><span class="op">{</span><span class="string">&#34;hello&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;world&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;en_US&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;other1&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;other2&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;other3&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;other4&#34;</span><span class="op">}</span><span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">data</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">Marshal</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">src</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;Marshal:&nbsp;%v&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">610</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">want</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="string">`&lt;TableAttrs&gt;&lt;TAttr&nbsp;xmlns:html4=&#34;http://www.w3.org/TR/html4/&#34;&nbsp;html4:table=&#34;hello&#34;&nbsp;xmlns:furniture=&#34;http://www.w3schools.com/furniture&#34;&nbsp;furniture:table=&#34;world&#34;&nbsp;xml:lang=&#34;en_US&#34;&nbsp;xmlns:_xml=&#34;http://golang.org/xml/&#34;&nbsp;_xml:other=&#34;other1&#34;&nbsp;xmlns:_xmlfoo=&#34;http://golang.org/xmlfoo/&#34;&nbsp;_xmlfoo:other=&#34;other2&#34;&nbsp;xmlns:json=&#34;http://golang.org/json/&#34;&nbsp;json:other=&#34;other3&#34;&nbsp;xmlns:json_1=&#34;http://golang.org/2/json/&#34;&nbsp;json_1:other=&#34;other4&#34;&gt;&lt;/TAttr&gt;&lt;/TableAttrs&gt;`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">str</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtintype">string</span><span class="op">(</span><span class="ident">data</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">str</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">want</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Errorf</span><span class="op">(</span><span class="string">&#34;Marshal:\nhave:&nbsp;%#q\nwant:&nbsp;%#q\n&#34;</span><span class="op">,</span>&nbsp;<span class="ident">str</span><span class="op">,</span>&nbsp;<span class="ident">want</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">615</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">dst</span>&nbsp;<span class="ident">TableAttrs</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">Unmarshal</span><span class="op">(</span><span class="ident">data</span><span class="op">,</span>&nbsp;<span class="op">&amp;</span><span class="ident">dst</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Errorf</span><span class="op">(</span><span class="string">&#34;Unmarshal:&nbsp;%v&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">620</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">dst</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">src</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Errorf</span><span class="op">(</span><span class="string">&#34;Unmarshal&nbsp;=&nbsp;%q,&nbsp;want&nbsp;%q&#34;</span><span class="op">,</span>&nbsp;<span class="ident">dst</span><span class="op">,</span>&nbsp;<span class="ident">src</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">625</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">MyCharData</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">body</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">630</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">m</span>&nbsp;<span class="op">*</span><span class="ident">MyCharData</span><span class="op">)</span>&nbsp;<span class="ident">UnmarshalXML</span><span class="op">(</span><span class="ident">d</span>&nbsp;<span class="op">*</span><span class="ident">Decoder</span><span class="op">,</span>&nbsp;<span class="ident">start</span>&nbsp;<span class="ident">StartElement</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">d</span><span class="op">.</span><span class="ident">Token</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">EOF</span>&nbsp;<span class="op">{</span>&nbsp;<span class="comment">//&nbsp;found&nbsp;end&nbsp;of&nbsp;element</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">break</span><br>
+<span class="lineno">635</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">char</span><span class="op">,</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">t</span><span class="op">.</span><span class="op">(</span><span class="ident">CharData</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">640</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">m</span><span class="op">.</span><span class="ident">body</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="builtintype">string</span><span class="op">(</span><span class="ident">char</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">645</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">_</span>&nbsp;<span class="ident">Unmarshaler</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">(</span><span class="op">*</span><span class="ident">MyCharData</span><span class="op">)</span><span class="op">(</span><span class="ident">nil</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">m</span>&nbsp;<span class="op">*</span><span class="ident">MyCharData</span><span class="op">)</span>&nbsp;<span class="ident">UnmarshalXMLAttr</span><span class="op">(</span><span class="ident">attr</span>&nbsp;<span class="ident">Attr</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">panic</span><span class="op">(</span><span class="string">&#34;must&nbsp;not&nbsp;call&#34;</span><span class="op">)</span><br>
+<span class="lineno">650</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">MyAttr</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">attr</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">655</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">m</span>&nbsp;<span class="op">*</span><span class="ident">MyAttr</span><span class="op">)</span>&nbsp;<span class="ident">UnmarshalXMLAttr</span><span class="op">(</span><span class="ident">attr</span>&nbsp;<span class="ident">Attr</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">m</span><span class="op">.</span><span class="ident">attr</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">attr</span><span class="op">.</span><span class="ident">Value</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">660</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">_</span>&nbsp;<span class="ident">UnmarshalerAttr</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">(</span><span class="op">*</span><span class="ident">MyAttr</span><span class="op">)</span><span class="op">(</span><span class="ident">nil</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">MyStruct</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Data</span>&nbsp;<span class="op">*</span><span class="ident">MyCharData</span><br>
+<span class="lineno">665</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Attr</span>&nbsp;<span class="op">*</span><span class="ident">MyAttr</span>&nbsp;<span class="string">`xml:&#34;,attr&#34;`</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Data2</span>&nbsp;<span class="ident">MyCharData</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Attr2</span>&nbsp;<span class="ident">MyAttr</span>&nbsp;<span class="string">`xml:&#34;,attr&#34;`</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">670</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">TestUnmarshaler</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">xml</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="string">`&lt;?xml&nbsp;version=&#34;1.0&#34;&nbsp;encoding=&#34;utf-8&#34;?&gt;<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&lt;MyStruct&nbsp;Attr=&#34;attr1&#34;&nbsp;Attr2=&#34;attr2&#34;&gt;<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&lt;Data&gt;hello&nbsp;&lt;!--&nbsp;comment&nbsp;--&gt;world&lt;/Data&gt;<br>
+<span class="lineno">675</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&lt;Data2&gt;howdy&nbsp;&lt;!--&nbsp;comment&nbsp;--&gt;world&lt;/Data2&gt;<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&lt;/MyStruct&gt;<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp`</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">m</span>&nbsp;<span class="ident">MyStruct</span><br>
+<span class="lineno">680</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">Unmarshal</span><span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">(</span><span class="ident">xml</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="op">&amp;</span><span class="ident">m</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatal</span><span class="op">(</span><span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">m</span><span class="op">.</span><span class="ident">Data</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">m</span><span class="op">.</span><span class="ident">Attr</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">m</span><span class="op">.</span><span class="ident">Data</span><span class="op">.</span><span class="ident">body</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="string">&#34;hello&nbsp;world&#34;</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">m</span><span class="op">.</span><span class="ident">Attr</span><span class="op">.</span><span class="ident">attr</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="string">&#34;attr1&#34;</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">m</span><span class="op">.</span><span class="ident">Data2</span><span class="op">.</span><span class="ident">body</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="string">&#34;howdy&nbsp;world&#34;</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">m</span><span class="op">.</span><span class="ident">Attr2</span><span class="op">.</span><span class="ident">attr</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="string">&#34;attr2&#34;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">685</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Errorf</span><span class="op">(</span><span class="string">&#34;m=%#+v\n&#34;</span><span class="op">,</span>&nbsp;<span class="ident">m</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">Pea</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">690</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Cotelydon</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">Pod</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Pea</span>&nbsp;<span class="keyword">interface</span><span class="op">{</span><span class="op">}</span>&nbsp;<span class="string">`xml:&#34;Pea&#34;`</span><br>
+<span class="lineno">695</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;https://code.google.com/p/go/issues/detail?id=6836</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">TestUnmarshalIntoInterface</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pod</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">new</span><span class="op">(</span><span class="ident">Pod</span><span class="op">)</span><br>
+<span class="lineno">700</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pod</span><span class="op">.</span><span class="ident">Pea</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">new</span><span class="op">(</span><span class="ident">Pea</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">xml</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="string">`&lt;Pod&gt;&lt;Pea&gt;&lt;Cotelydon&gt;Green&nbsp;stuff&lt;/Cotelydon&gt;&lt;/Pea&gt;&lt;/Pod&gt;`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">Unmarshal</span><span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">(</span><span class="ident">xml</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">pod</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;failed&nbsp;to&nbsp;unmarshal&nbsp;%q:&nbsp;%v&#34;</span><span class="op">,</span>&nbsp;<span class="ident">xml</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno">705</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pea</span><span class="op">,</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">pod</span><span class="op">.</span><span class="ident">Pea</span><span class="op">.</span><span class="op">(</span><span class="op">*</span><span class="ident">Pea</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">ok</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;unmarshalled&nbsp;into&nbsp;wrong&nbsp;type:&nbsp;have&nbsp;%T&nbsp;want&nbsp;*Pea&#34;</span><span class="op">,</span>&nbsp;<span class="ident">pod</span><span class="op">.</span><span class="ident">Pea</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">710</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">have</span><span class="op">,</span>&nbsp;<span class="ident">want</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">pea</span><span class="op">.</span><span class="ident">Cotelydon</span><span class="op">,</span>&nbsp;<span class="string">&#34;Green&nbsp;stuff&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">have</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">want</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Errorf</span><span class="op">(</span><span class="string">&#34;failed&nbsp;to&nbsp;unmarshal&nbsp;into&nbsp;interface,&nbsp;have&nbsp;%q&nbsp;want&nbsp;%q&#34;</span><span class="op">,</span>&nbsp;<span class="ident">have</span><span class="op">,</span>&nbsp;<span class="ident">want</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

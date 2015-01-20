@@ -1,0 +1,217 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2010&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">math</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;original&nbsp;C&nbsp;code,&nbsp;the&nbsp;long&nbsp;comment,&nbsp;and&nbsp;the&nbsp;constants</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;below&nbsp;are&nbsp;from&nbsp;http://netlib.sandia.gov/cephes/cprob/gamma.c.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;go&nbsp;code&nbsp;is&nbsp;a&nbsp;simplified&nbsp;version&nbsp;of&nbsp;the&nbsp;original&nbsp;C.</span><br>
+<span class="lineno">10</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;tgamma.c</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Gamma&nbsp;function</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">15</span><span class="comment">//&nbsp;SYNOPSIS:</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;double&nbsp;x,&nbsp;y,&nbsp;tgamma();</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;extern&nbsp;int&nbsp;signgam;</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">20</span><span class="comment">//&nbsp;y&nbsp;=&nbsp;tgamma(&nbsp;x&nbsp;);</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;DESCRIPTION:</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Returns&nbsp;gamma&nbsp;function&nbsp;of&nbsp;the&nbsp;argument.&nbsp;&nbsp;The&nbsp;result&nbsp;is</span><br>
+<span class="lineno">25</span><span class="comment">//&nbsp;correctly&nbsp;signed,&nbsp;and&nbsp;the&nbsp;sign&nbsp;(+1&nbsp;or&nbsp;-1)&nbsp;is&nbsp;also</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;returned&nbsp;in&nbsp;a&nbsp;global&nbsp;(extern)&nbsp;variable&nbsp;named&nbsp;signgam.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;This&nbsp;variable&nbsp;is&nbsp;also&nbsp;filled&nbsp;in&nbsp;by&nbsp;the&nbsp;logarithmic&nbsp;gamma</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;function&nbsp;lgamma().</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">30</span><span class="comment">//&nbsp;Arguments&nbsp;|x|&nbsp;&lt;=&nbsp;34&nbsp;are&nbsp;reduced&nbsp;by&nbsp;recurrence&nbsp;and&nbsp;the&nbsp;function</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;approximated&nbsp;by&nbsp;a&nbsp;rational&nbsp;function&nbsp;of&nbsp;degree&nbsp;6/7&nbsp;in&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;interval&nbsp;(2,3).&nbsp;&nbsp;Large&nbsp;arguments&nbsp;are&nbsp;handled&nbsp;by&nbsp;Stirling&#39;s</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;formula.&nbsp;Large&nbsp;negative&nbsp;arguments&nbsp;are&nbsp;made&nbsp;positive&nbsp;using</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;a&nbsp;reflection&nbsp;formula.</span><br>
+<span class="lineno">35</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ACCURACY:</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Relative&nbsp;error:</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;arithmetic&nbsp;&nbsp;&nbsp;domain&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;trials&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;peak&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;rms</span><br>
+<span class="lineno">40</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;DEC&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-34,&nbsp;34&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;10000&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1.3e-16&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2.5e-17</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;IEEE&nbsp;&nbsp;&nbsp;&nbsp;-170,-33&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;20000&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2.3e-15&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3.3e-16</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;IEEE&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-33,&nbsp;&nbsp;33&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;20000&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;9.4e-16&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2.2e-16</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;IEEE&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;33,&nbsp;171.6&nbsp;&nbsp;&nbsp;20000&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2.3e-15&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3.2e-16</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">45</span><span class="comment">//&nbsp;Error&nbsp;for&nbsp;arguments&nbsp;outside&nbsp;the&nbsp;test&nbsp;range&nbsp;will&nbsp;be&nbsp;larger</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;owing&nbsp;to&nbsp;error&nbsp;amplification&nbsp;by&nbsp;the&nbsp;exponential&nbsp;function.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Cephes&nbsp;Math&nbsp;Library&nbsp;Release&nbsp;2.8:&nbsp;&nbsp;June,&nbsp;2000</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Copyright&nbsp;1984,&nbsp;1987,&nbsp;1989,&nbsp;1992,&nbsp;2000&nbsp;by&nbsp;Stephen&nbsp;L.&nbsp;Moshier</span><br>
+<span class="lineno">50</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;readme&nbsp;file&nbsp;at&nbsp;http://netlib.sandia.gov/cephes/&nbsp;says:</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;Some&nbsp;software&nbsp;in&nbsp;this&nbsp;archive&nbsp;may&nbsp;be&nbsp;from&nbsp;the&nbsp;book&nbsp;_Methods&nbsp;and</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Programs&nbsp;for&nbsp;Mathematical&nbsp;Functions_&nbsp;(Prentice-Hall&nbsp;or&nbsp;Simon&nbsp;&amp;&nbsp;Schuster</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;International,&nbsp;1989)&nbsp;or&nbsp;from&nbsp;the&nbsp;Cephes&nbsp;Mathematical&nbsp;Library,&nbsp;a</span><br>
+<span class="lineno">55</span><span class="comment">//&nbsp;commercial&nbsp;product.&nbsp;In&nbsp;either&nbsp;event,&nbsp;it&nbsp;is&nbsp;copyrighted&nbsp;by&nbsp;the&nbsp;author.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;What&nbsp;you&nbsp;see&nbsp;here&nbsp;may&nbsp;be&nbsp;used&nbsp;freely&nbsp;but&nbsp;it&nbsp;comes&nbsp;with&nbsp;no&nbsp;support&nbsp;or</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;guarantee.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;The&nbsp;two&nbsp;known&nbsp;misprints&nbsp;in&nbsp;the&nbsp;book&nbsp;are&nbsp;repaired&nbsp;here&nbsp;in&nbsp;the</span><br>
+<span class="lineno">60</span><span class="comment">//&nbsp;source&nbsp;listings&nbsp;for&nbsp;the&nbsp;gamma&nbsp;function&nbsp;and&nbsp;the&nbsp;incomplete&nbsp;beta</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;integral.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;Stephen&nbsp;L.&nbsp;Moshier</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;moshier@na-net.ornl.gov</span><br>
+<span class="lineno">65</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">_gamP</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">[</span><span class="op">...</span><span class="op">]</span><span class="builtintype">float64</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="num">1.60119522476751861407e-04</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="num">1.19135147006586384913e-03</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="num">1.04213797561761569935e-02</span><span class="op">,</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="num">4.76367800457137231464e-02</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="num">2.07448227648435975150e-01</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="num">4.94214826801497100753e-01</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="num">9.99999999999999996796e-01</span><span class="op">,</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">75</span><span class="keyword">var</span>&nbsp;<span class="ident">_gamQ</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">[</span><span class="op">...</span><span class="op">]</span><span class="builtintype">float64</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">-</span><span class="num">2.31581873324120129819e-05</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="num">5.39605580493303397842e-04</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">-</span><span class="num">4.45641913851797240494e-03</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="num">1.18139785222060435552e-02</span><span class="op">,</span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="num">3.58236398605498653373e-02</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">-</span><span class="num">2.34591795718243348568e-01</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="num">7.14304917030273074085e-02</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="num">1.00000000000000000320e+00</span><span class="op">,</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">85</span><span class="keyword">var</span>&nbsp;<span class="ident">_gamS</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">[</span><span class="op">...</span><span class="op">]</span><span class="builtintype">float64</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="num">7.87311395793093628397e-04</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">-</span><span class="num">2.29549961613378126380e-04</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">-</span><span class="num">2.68132617805781232825e-03</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="num">3.47222221605458667310e-03</span><span class="op">,</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="num">8.33333333333482257126e-02</span><span class="op">,</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Gamma&nbsp;function&nbsp;computed&nbsp;by&nbsp;Stirling&#39;s&nbsp;formula.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;polynomial&nbsp;is&nbsp;valid&nbsp;for&nbsp;33&nbsp;&lt;=&nbsp;x&nbsp;&lt;=&nbsp;172.</span><br>
+<span class="lineno">95</span><span class="keyword">func</span>&nbsp;<span class="ident">stirling</span><span class="op">(</span><span class="ident">x</span>&nbsp;<span class="builtintype">float64</span><span class="op">)</span>&nbsp;<span class="builtintype">float64</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">SqrtTwoPi</span>&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">2.506628274631000502417</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">MaxStirling</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">143.01608</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">)</span><br>
+<span class="lineno">100</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">w</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="num">1</span>&nbsp;<span class="op">/</span>&nbsp;<span class="ident">x</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">w</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">w</span><span class="op">*</span><span class="op">(</span><span class="op">(</span><span class="op">(</span><span class="op">(</span><span class="ident">_gamS</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="op">*</span><span class="ident">w</span><span class="op">+</span><span class="ident">_gamS</span><span class="op">[</span><span class="num">1</span><span class="op">]</span><span class="op">)</span><span class="op">*</span><span class="ident">w</span><span class="op">+</span><span class="ident">_gamS</span><span class="op">[</span><span class="num">2</span><span class="op">]</span><span class="op">)</span><span class="op">*</span><span class="ident">w</span><span class="op">+</span><span class="ident">_gamS</span><span class="op">[</span><span class="num">3</span><span class="op">]</span><span class="op">)</span><span class="op">*</span><span class="ident">w</span><span class="op">+</span><span class="ident">_gamS</span><span class="op">[</span><span class="num">4</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">y</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">Exp</span><span class="op">(</span><span class="ident">x</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="ident">MaxStirling</span>&nbsp;<span class="op">{</span>&nbsp;<span class="comment">//&nbsp;avoid&nbsp;Pow()&nbsp;overflow</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">Pow</span><span class="op">(</span><span class="ident">x</span><span class="op">,</span>&nbsp;<span class="num">0.5</span><span class="op">*</span><span class="ident">x</span><span class="op">-</span><span class="num">0.25</span><span class="op">)</span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">y</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">v</span>&nbsp;<span class="op">*</span>&nbsp;<span class="op">(</span><span class="ident">v</span>&nbsp;<span class="op">/</span>&nbsp;<span class="ident">y</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">y</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">Pow</span><span class="op">(</span><span class="ident">x</span><span class="op">,</span>&nbsp;<span class="ident">x</span><span class="op">-</span><span class="num">0.5</span><span class="op">)</span>&nbsp;<span class="op">/</span>&nbsp;<span class="ident">y</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">y</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">SqrtTwoPi</span>&nbsp;<span class="op">*</span>&nbsp;<span class="ident">y</span>&nbsp;<span class="op">*</span>&nbsp;<span class="ident">w</span><br>
+<span class="lineno">110</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">y</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Gamma&nbsp;returns&nbsp;the&nbsp;Gamma&nbsp;function&nbsp;of&nbsp;x.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">115</span><span class="comment">//&nbsp;Special&nbsp;cases&nbsp;are:</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspGamma(+Inf)&nbsp;=&nbsp;+Inf</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspGamma(+0)&nbsp;=&nbsp;+Inf</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspGamma(-0)&nbsp;=&nbsp;-Inf</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspGamma(x)&nbsp;=&nbsp;NaN&nbsp;for&nbsp;integer&nbsp;x&nbsp;&lt;&nbsp;0</span><br>
+<span class="lineno">120</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspGamma(-Inf)&nbsp;=&nbsp;NaN</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspGamma(NaN)&nbsp;=&nbsp;NaN</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">Gamma</span><span class="op">(</span><span class="ident">x</span>&nbsp;<span class="builtintype">float64</span><span class="op">)</span>&nbsp;<span class="builtintype">float64</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">const</span>&nbsp;<span class="ident">Euler</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0.57721566490153286060651209008240243104215933593992</span>&nbsp;<span class="comment">//&nbsp;A001620</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;special&nbsp;cases</span><br>
+<span class="lineno">125</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">isNegInt</span><span class="op">(</span><span class="ident">x</span><span class="op">)</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">IsInf</span><span class="op">(</span><span class="ident">x</span><span class="op">,</span>&nbsp;<span class="op">-</span><span class="num">1</span><span class="op">)</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">IsNaN</span><span class="op">(</span><span class="ident">x</span><span class="op">)</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">NaN</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">Signbit</span><span class="op">(</span><span class="ident">x</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">130</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">Inf</span><span class="op">(</span><span class="op">-</span><span class="num">1</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">Inf</span><span class="op">(</span><span class="num">1</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="op">-</span><span class="num">170.5674972726612</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">171.61447887182298</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">Inf</span><span class="op">(</span><span class="num">1</span><span class="op">)</span><br>
+<span class="lineno">135</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">q</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">Abs</span><span class="op">(</span><span class="ident">x</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">Floor</span><span class="op">(</span><span class="ident">q</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">q</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">33</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">&gt;=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">140</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">stirling</span><span class="op">(</span><span class="ident">x</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">signgam</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">ip</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtintype">int</span><span class="op">(</span><span class="ident">p</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">ip</span><span class="op">&amp;</span><span class="num">1</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">signgam</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">-</span><span class="num">1</span><br>
+<span class="lineno">145</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">z</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">q</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">p</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">z</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0.5</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">p</span>&nbsp;<span class="op">+</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">z</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">q</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">p</span><br>
+<span class="lineno">150</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">z</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">q</span>&nbsp;<span class="op">*</span>&nbsp;<span class="ident">Sin</span><span class="op">(</span><span class="ident">Pi</span><span class="op">*</span><span class="ident">z</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">z</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">Inf</span><span class="op">(</span><span class="ident">signgam</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">155</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">z</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">Pi</span>&nbsp;<span class="op">/</span>&nbsp;<span class="op">(</span><span class="ident">Abs</span><span class="op">(</span><span class="ident">z</span><span class="op">)</span>&nbsp;<span class="op">*</span>&nbsp;<span class="ident">stirling</span><span class="op">(</span><span class="ident">q</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="builtintype">float64</span><span class="op">(</span><span class="ident">signgam</span><span class="op">)</span>&nbsp;<span class="op">*</span>&nbsp;<span class="ident">z</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Reduce&nbsp;argument</span><br>
+<span class="lineno">160</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">z</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="num">1.0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">&gt;=</span>&nbsp;<span class="num">3</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">x</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">-</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">z</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">z</span>&nbsp;<span class="op">*</span>&nbsp;<span class="ident">x</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">165</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="op">-</span><span class="num">1e-09</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">goto</span>&nbsp;<span class="ident">small</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">z</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">z</span>&nbsp;<span class="op">/</span>&nbsp;<span class="ident">x</span><br>
+<span class="lineno">170</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">x</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">+</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">2</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">1e-09</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">goto</span>&nbsp;<span class="ident">small</span><br>
+<span class="lineno">175</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">z</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">z</span>&nbsp;<span class="op">/</span>&nbsp;<span class="ident">x</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">x</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">+</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">180</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">2</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">z</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">x</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">-</span>&nbsp;<span class="num">2</span><br>
+<span class="lineno">185</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">(</span><span class="op">(</span><span class="op">(</span><span class="op">(</span><span class="op">(</span><span class="ident">x</span><span class="op">*</span><span class="ident">_gamP</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="op">+</span><span class="ident">_gamP</span><span class="op">[</span><span class="num">1</span><span class="op">]</span><span class="op">)</span><span class="op">*</span><span class="ident">x</span><span class="op">+</span><span class="ident">_gamP</span><span class="op">[</span><span class="num">2</span><span class="op">]</span><span class="op">)</span><span class="op">*</span><span class="ident">x</span><span class="op">+</span><span class="ident">_gamP</span><span class="op">[</span><span class="num">3</span><span class="op">]</span><span class="op">)</span><span class="op">*</span><span class="ident">x</span><span class="op">+</span><span class="ident">_gamP</span><span class="op">[</span><span class="num">4</span><span class="op">]</span><span class="op">)</span><span class="op">*</span><span class="ident">x</span><span class="op">+</span><span class="ident">_gamP</span><span class="op">[</span><span class="num">5</span><span class="op">]</span><span class="op">)</span><span class="op">*</span><span class="ident">x</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">_gamP</span><span class="op">[</span><span class="num">6</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">q</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">(</span><span class="op">(</span><span class="op">(</span><span class="op">(</span><span class="op">(</span><span class="op">(</span><span class="ident">x</span><span class="op">*</span><span class="ident">_gamQ</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="op">+</span><span class="ident">_gamQ</span><span class="op">[</span><span class="num">1</span><span class="op">]</span><span class="op">)</span><span class="op">*</span><span class="ident">x</span><span class="op">+</span><span class="ident">_gamQ</span><span class="op">[</span><span class="num">2</span><span class="op">]</span><span class="op">)</span><span class="op">*</span><span class="ident">x</span><span class="op">+</span><span class="ident">_gamQ</span><span class="op">[</span><span class="num">3</span><span class="op">]</span><span class="op">)</span><span class="op">*</span><span class="ident">x</span><span class="op">+</span><span class="ident">_gamQ</span><span class="op">[</span><span class="num">4</span><span class="op">]</span><span class="op">)</span><span class="op">*</span><span class="ident">x</span><span class="op">+</span><span class="ident">_gamQ</span><span class="op">[</span><span class="num">5</span><span class="op">]</span><span class="op">)</span><span class="op">*</span><span class="ident">x</span><span class="op">+</span><span class="ident">_gamQ</span><span class="op">[</span><span class="num">6</span><span class="op">]</span><span class="op">)</span><span class="op">*</span><span class="ident">x</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">_gamQ</span><span class="op">[</span><span class="num">7</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">z</span>&nbsp;<span class="op">*</span>&nbsp;<span class="ident">p</span>&nbsp;<span class="op">/</span>&nbsp;<span class="ident">q</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="ident">small</span><span class="op">:</span><br>
+<span class="lineno">190</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">Inf</span><span class="op">(</span><span class="num">1</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">z</span>&nbsp;<span class="op">/</span>&nbsp;<span class="op">(</span><span class="op">(</span><span class="num">1</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">Euler</span><span class="op">*</span><span class="ident">x</span><span class="op">)</span>&nbsp;<span class="op">*</span>&nbsp;<span class="ident">x</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">195</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">isNegInt</span><span class="op">(</span><span class="ident">x</span>&nbsp;<span class="builtintype">float64</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">xf</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">Modf</span><span class="op">(</span><span class="ident">x</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">xf</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno">200</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

@@ -1,0 +1,150 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2009&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="comment">//&nbsp;Package&nbsp;crc32&nbsp;implements&nbsp;the&nbsp;32-bit&nbsp;cyclic&nbsp;redundancy&nbsp;check,&nbsp;or&nbsp;CRC-32,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;checksum.&nbsp;See&nbsp;http://en.wikipedia.org/wiki/Cyclic_redundancy_check&nbsp;for</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;information.</span><br>
+<span class="lineno"></span><span class="keyword">package</span>&nbsp;<span class="ident">crc32</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">10</span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;hash&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;sync&#34;</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">15</span><span class="comment">//&nbsp;The&nbsp;size&nbsp;of&nbsp;a&nbsp;CRC-32&nbsp;checksum&nbsp;in&nbsp;bytes.</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">Size</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">4</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Predefined&nbsp;polynomials.</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;IEEE&nbsp;is&nbsp;by&nbsp;far&nbsp;and&nbsp;away&nbsp;the&nbsp;most&nbsp;common&nbsp;CRC-32&nbsp;polynomial.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Used&nbsp;by&nbsp;ethernet&nbsp;(IEEE&nbsp;802.3),&nbsp;v.42,&nbsp;fddi,&nbsp;gzip,&nbsp;zip,&nbsp;png,&nbsp;...</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">IEEE</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0xedb88320</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Castagnoli&#39;s&nbsp;polynomial,&nbsp;used&nbsp;in&nbsp;iSCSI.</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Has&nbsp;better&nbsp;error&nbsp;detection&nbsp;characteristics&nbsp;than&nbsp;IEEE.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;http://dx.doi.org/10.1109/26.231911</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Castagnoli</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0x82f63b78</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Koopman&#39;s&nbsp;polynomial.</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Also&nbsp;has&nbsp;better&nbsp;error&nbsp;detection&nbsp;characteristics&nbsp;than&nbsp;IEEE.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;http://dx.doi.org/10.1109/DSN.2002.1028931</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Koopman</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0xeb31d82e</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">35</span><span class="comment">//&nbsp;Table&nbsp;is&nbsp;a&nbsp;256-word&nbsp;table&nbsp;representing&nbsp;the&nbsp;polynomial&nbsp;for&nbsp;efficient&nbsp;processing.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">Table</span>&nbsp;<span class="op">[</span><span class="num">256</span><span class="op">]</span><span class="builtintype">uint32</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;castagnoliTable&nbsp;points&nbsp;to&nbsp;a&nbsp;lazily&nbsp;initialized&nbsp;Table&nbsp;for&nbsp;the&nbsp;Castagnoli</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;polynomial.&nbsp;MakeTable&nbsp;will&nbsp;always&nbsp;return&nbsp;this&nbsp;value&nbsp;when&nbsp;asked&nbsp;to&nbsp;make&nbsp;a</span><br>
+<span class="lineno">40</span><span class="comment">//&nbsp;Castagnoli&nbsp;table&nbsp;so&nbsp;we&nbsp;can&nbsp;compare&nbsp;against&nbsp;it&nbsp;to&nbsp;find&nbsp;when&nbsp;the&nbsp;caller&nbsp;is</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;using&nbsp;this&nbsp;polynomial.</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">castagnoliTable</span>&nbsp;<span class="op">*</span><span class="ident">Table</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">castagnoliOnce</span>&nbsp;<span class="ident">sync</span><span class="op">.</span><span class="ident">Once</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">45</span><span class="keyword">func</span>&nbsp;<span class="ident">castagnoliInit</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">castagnoliTable</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">makeTable</span><span class="op">(</span><span class="ident">Castagnoli</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;IEEETable&nbsp;is&nbsp;the&nbsp;table&nbsp;for&nbsp;the&nbsp;IEEE&nbsp;polynomial.</span><br>
+<span class="lineno">50</span><span class="keyword">var</span>&nbsp;<span class="ident">IEEETable</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">makeTable</span><span class="op">(</span><span class="ident">IEEE</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;MakeTable&nbsp;returns&nbsp;the&nbsp;Table&nbsp;constructed&nbsp;from&nbsp;the&nbsp;specified&nbsp;polynomial.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">MakeTable</span><span class="op">(</span><span class="ident">poly</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">Table</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="ident">poly</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">IEEE</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">IEEETable</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">Castagnoli</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">castagnoliOnce</span><span class="op">.</span><span class="ident">Do</span><span class="op">(</span><span class="ident">castagnoliInit</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">castagnoliTable</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">makeTable</span><span class="op">(</span><span class="ident">poly</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;makeTable&nbsp;returns&nbsp;the&nbsp;Table&nbsp;constructed&nbsp;from&nbsp;the&nbsp;specified&nbsp;polynomial.</span><br>
+<span class="lineno">65</span><span class="keyword">func</span>&nbsp;<span class="ident">makeTable</span><span class="op">(</span><span class="ident">poly</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">Table</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">new</span><span class="op">(</span><span class="ident">Table</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="num">0</span><span class="op">;</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">256</span><span class="op">;</span>&nbsp;<span class="ident">i</span><span class="op">++</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">crc</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtintype">uint32</span><span class="op">(</span><span class="ident">i</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">j</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="num">0</span><span class="op">;</span>&nbsp;<span class="ident">j</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">8</span><span class="op">;</span>&nbsp;<span class="ident">j</span><span class="op">++</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">crc</span><span class="op">&amp;</span><span class="num">1</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">1</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">crc</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">(</span><span class="ident">crc</span>&nbsp;<span class="op">&gt;&gt;</span>&nbsp;<span class="num">1</span><span class="op">)</span>&nbsp;<span class="op">^</span>&nbsp;<span class="ident">poly</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">crc</span>&nbsp;<span class="op">&gt;&gt;=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">crc</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">t</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">80</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;digest&nbsp;represents&nbsp;the&nbsp;partial&nbsp;evaluation&nbsp;of&nbsp;a&nbsp;checksum.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">digest</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">crc</span>&nbsp;<span class="builtintype">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tab</span>&nbsp;<span class="op">*</span><span class="ident">Table</span><br>
+<span class="lineno">85</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;New&nbsp;creates&nbsp;a&nbsp;new&nbsp;hash.Hash32&nbsp;computing&nbsp;the&nbsp;CRC-32&nbsp;checksum</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;using&nbsp;the&nbsp;polynomial&nbsp;represented&nbsp;by&nbsp;the&nbsp;Table.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">New</span><span class="op">(</span><span class="ident">tab</span>&nbsp;<span class="op">*</span><span class="ident">Table</span><span class="op">)</span>&nbsp;<span class="ident">hash</span><span class="op">.</span><span class="ident">Hash32</span>&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="op">&amp;</span><span class="ident">digest</span><span class="op">{</span><span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">tab</span><span class="op">}</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno">90</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;NewIEEE&nbsp;creates&nbsp;a&nbsp;new&nbsp;hash.Hash32&nbsp;computing&nbsp;the&nbsp;CRC-32&nbsp;checksum</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;using&nbsp;the&nbsp;IEEE&nbsp;polynomial.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">NewIEEE</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="ident">hash</span><span class="op">.</span><span class="ident">Hash32</span>&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="ident">New</span><span class="op">(</span><span class="ident">IEEETable</span><span class="op">)</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">95</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">d</span>&nbsp;<span class="op">*</span><span class="ident">digest</span><span class="op">)</span>&nbsp;<span class="ident">Size</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="ident">Size</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">d</span>&nbsp;<span class="op">*</span><span class="ident">digest</span><span class="op">)</span>&nbsp;<span class="ident">BlockSize</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="num">1</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">d</span>&nbsp;<span class="op">*</span><span class="ident">digest</span><span class="op">)</span>&nbsp;<span class="ident">Reset</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span>&nbsp;<span class="ident">d</span><span class="op">.</span><span class="ident">crc</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno">100</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">update</span><span class="op">(</span><span class="ident">crc</span>&nbsp;<span class="builtintype">uint32</span><span class="op">,</span>&nbsp;<span class="ident">tab</span>&nbsp;<span class="op">*</span><span class="ident">Table</span><span class="op">,</span>&nbsp;<span class="ident">p</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="builtintype">uint32</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">crc</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">^</span><span class="ident">crc</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">v</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">p</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">crc</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">tab</span><span class="op">[</span><span class="builtintype">byte</span><span class="op">(</span><span class="ident">crc</span><span class="op">)</span><span class="op">^</span><span class="ident">v</span><span class="op">]</span>&nbsp;<span class="op">^</span>&nbsp;<span class="op">(</span><span class="ident">crc</span>&nbsp;<span class="op">&gt;&gt;</span>&nbsp;<span class="num">8</span><span class="op">)</span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="op">^</span><span class="ident">crc</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Update&nbsp;returns&nbsp;the&nbsp;result&nbsp;of&nbsp;adding&nbsp;the&nbsp;bytes&nbsp;in&nbsp;p&nbsp;to&nbsp;the&nbsp;crc.</span><br>
+<span class="lineno">110</span><span class="keyword">func</span>&nbsp;<span class="ident">Update</span><span class="op">(</span><span class="ident">crc</span>&nbsp;<span class="builtintype">uint32</span><span class="op">,</span>&nbsp;<span class="ident">tab</span>&nbsp;<span class="op">*</span><span class="ident">Table</span><span class="op">,</span>&nbsp;<span class="ident">p</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="builtintype">uint32</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">tab</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">castagnoliTable</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">updateCastagnoli</span><span class="op">(</span><span class="ident">crc</span><span class="op">,</span>&nbsp;<span class="ident">p</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">update</span><span class="op">(</span><span class="ident">crc</span><span class="op">,</span>&nbsp;<span class="ident">tab</span><span class="op">,</span>&nbsp;<span class="ident">p</span><span class="op">)</span><br>
+<span class="lineno">115</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">d</span>&nbsp;<span class="op">*</span><span class="ident">digest</span><span class="op">)</span>&nbsp;<span class="ident">Write</span><span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">n</span>&nbsp;<span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span><span class="op">.</span><span class="ident">crc</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">Update</span><span class="op">(</span><span class="ident">d</span><span class="op">.</span><span class="ident">crc</span><span class="op">,</span>&nbsp;<span class="ident">d</span><span class="op">.</span><span class="ident">tab</span><span class="op">,</span>&nbsp;<span class="ident">p</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">p</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno">120</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">d</span>&nbsp;<span class="op">*</span><span class="ident">digest</span><span class="op">)</span>&nbsp;<span class="ident">Sum32</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">uint32</span>&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="ident">d</span><span class="op">.</span><span class="ident">crc</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">d</span>&nbsp;<span class="op">*</span><span class="ident">digest</span><span class="op">)</span>&nbsp;<span class="ident">Sum</span><span class="op">(</span><span class="ident">in</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">125</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">d</span><span class="op">.</span><span class="ident">Sum32</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="builtinfunc">append</span><span class="op">(</span><span class="ident">in</span><span class="op">,</span>&nbsp;<span class="builtintype">byte</span><span class="op">(</span><span class="ident">s</span><span class="op">&gt;&gt;</span><span class="num">24</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="builtintype">byte</span><span class="op">(</span><span class="ident">s</span><span class="op">&gt;&gt;</span><span class="num">16</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="builtintype">byte</span><span class="op">(</span><span class="ident">s</span><span class="op">&gt;&gt;</span><span class="num">8</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="builtintype">byte</span><span class="op">(</span><span class="ident">s</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Checksum&nbsp;returns&nbsp;the&nbsp;CRC-32&nbsp;checksum&nbsp;of&nbsp;data</span><br>
+<span class="lineno">130</span><span class="comment">//&nbsp;using&nbsp;the&nbsp;polynomial&nbsp;represented&nbsp;by&nbsp;the&nbsp;Table.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">Checksum</span><span class="op">(</span><span class="ident">data</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="ident">tab</span>&nbsp;<span class="op">*</span><span class="ident">Table</span><span class="op">)</span>&nbsp;<span class="builtintype">uint32</span>&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="ident">Update</span><span class="op">(</span><span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">tab</span><span class="op">,</span>&nbsp;<span class="ident">data</span><span class="op">)</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ChecksumIEEE&nbsp;returns&nbsp;the&nbsp;CRC-32&nbsp;checksum&nbsp;of&nbsp;data</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;using&nbsp;the&nbsp;IEEE&nbsp;polynomial.</span><br>
+<span class="lineno">135</span><span class="keyword">func</span>&nbsp;<span class="ident">ChecksumIEEE</span><span class="op">(</span><span class="ident">data</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="builtintype">uint32</span>&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="ident">update</span><span class="op">(</span><span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">IEEETable</span><span class="op">,</span>&nbsp;<span class="ident">data</span><span class="op">)</span>&nbsp;<span class="op">}</span>
+</div>
+</body>
+</html>

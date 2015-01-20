@@ -1,0 +1,103 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2009&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="comment">//&nbsp;This&nbsp;file&nbsp;prints&nbsp;execution&nbsp;times&nbsp;for&nbsp;the&nbsp;Mul&nbsp;benchmark</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;given&nbsp;different&nbsp;Karatsuba&nbsp;thresholds.&nbsp;The&nbsp;result&nbsp;may&nbsp;be</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;used&nbsp;to&nbsp;manually&nbsp;fine-tune&nbsp;the&nbsp;threshold&nbsp;constant.&nbsp;The</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;results&nbsp;are&nbsp;somewhat&nbsp;fragile;&nbsp;use&nbsp;repeated&nbsp;runs&nbsp;to&nbsp;get</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;a&nbsp;clear&nbsp;picture.</span><br>
+<span class="lineno">10</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Usage:&nbsp;go&nbsp;test&nbsp;-run=TestCalibrate&nbsp;-calibrate</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">package</span>&nbsp;<span class="ident">big</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">15</span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;flag&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;fmt&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;testing&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;time&#34;</span><br>
+<span class="lineno">20</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">calibrate</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">flag</span><span class="op">.</span><span class="ident">Bool</span><span class="op">(</span><span class="string">&#34;calibrate&#34;</span><span class="op">,</span>&nbsp;<span class="ident">false</span><span class="op">,</span>&nbsp;<span class="string">&#34;run&nbsp;calibration&nbsp;test&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">karatsubaLoad</span><span class="op">(</span><span class="ident">b</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">B</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">BenchmarkMul</span><span class="op">(</span><span class="ident">b</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;measureKaratsuba&nbsp;returns&nbsp;the&nbsp;time&nbsp;to&nbsp;run&nbsp;a&nbsp;Karatsuba-relevant&nbsp;benchmark</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;given&nbsp;Karatsuba&nbsp;threshold&nbsp;th.</span><br>
+<span class="lineno">30</span><span class="keyword">func</span>&nbsp;<span class="ident">measureKaratsuba</span><span class="op">(</span><span class="ident">th</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="ident">time</span><span class="op">.</span><span class="ident">Duration</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">th</span><span class="op">,</span>&nbsp;<span class="ident">karatsubaThreshold</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">karatsubaThreshold</span><span class="op">,</span>&nbsp;<span class="ident">th</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">res</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">testing</span><span class="op">.</span><span class="ident">Benchmark</span><span class="op">(</span><span class="ident">karatsubaLoad</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">karatsubaThreshold</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">th</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">time</span><span class="op">.</span><span class="ident">Duration</span><span class="op">(</span><span class="ident">res</span><span class="op">.</span><span class="ident">NsPerOp</span><span class="op">(</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno">35</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">computeThresholds</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fmt</span><span class="op">.</span><span class="ident">Printf</span><span class="op">(</span><span class="string">&#34;Multiplication&nbsp;times&nbsp;for&nbsp;varying&nbsp;Karatsuba&nbsp;thresholds\n&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fmt</span><span class="op">.</span><span class="ident">Printf</span><span class="op">(</span><span class="string">&#34;(run&nbsp;repeatedly&nbsp;for&nbsp;good&nbsp;results)\n&#34;</span><span class="op">)</span><br>
+<span class="lineno">40</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;determine&nbsp;Tk,&nbsp;the&nbsp;work&nbsp;load&nbsp;execution&nbsp;time&nbsp;using&nbsp;basic&nbsp;multiplication</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Tb</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">measureKaratsuba</span><span class="op">(</span><span class="num">1e9</span><span class="op">)</span>&nbsp;<span class="comment">//&nbsp;th&nbsp;==&nbsp;1e9&nbsp;=&gt;&nbsp;Karatsuba&nbsp;multiplication&nbsp;disabled</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fmt</span><span class="op">.</span><span class="ident">Printf</span><span class="op">(</span><span class="string">&#34;Tb&nbsp;=&nbsp;%10s\n&#34;</span><span class="op">,</span>&nbsp;<span class="ident">Tb</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;thresholds</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">th</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="num">4</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">th1</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">-</span><span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">th2</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">-</span><span class="num">1</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">deltaOld</span>&nbsp;<span class="ident">time</span><span class="op">.</span><span class="ident">Duration</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">count</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">-</span><span class="num">1</span><span class="op">;</span>&nbsp;<span class="ident">count</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">th</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">128</span><span class="op">;</span>&nbsp;<span class="ident">count</span><span class="op">--</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;determine&nbsp;Tk,&nbsp;the&nbsp;work&nbsp;load&nbsp;execution&nbsp;time&nbsp;using&nbsp;Karatsuba&nbsp;multiplication</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Tk</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">measureKaratsuba</span><span class="op">(</span><span class="ident">th</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;improvement&nbsp;over&nbsp;Tb</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">delta</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">(</span><span class="ident">Tb</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">Tk</span><span class="op">)</span>&nbsp;<span class="op">*</span>&nbsp;<span class="num">100</span>&nbsp;<span class="op">/</span>&nbsp;<span class="ident">Tb</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fmt</span><span class="op">.</span><span class="ident">Printf</span><span class="op">(</span><span class="string">&#34;th&nbsp;=&nbsp;%3d&nbsp;&nbsp;Tk&nbsp;=&nbsp;%10s&nbsp;&nbsp;%4d%%&#34;</span><span class="op">,</span>&nbsp;<span class="ident">th</span><span class="op">,</span>&nbsp;<span class="ident">Tk</span><span class="op">,</span>&nbsp;<span class="ident">delta</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;determine&nbsp;break-even&nbsp;point</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">Tk</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">Tb</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">th1</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">th1</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">th</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fmt</span><span class="op">.</span><span class="ident">Print</span><span class="op">(</span><span class="string">&#34;&nbsp;&nbsp;break-even&nbsp;point&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">65</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;determine&nbsp;diminishing&nbsp;return</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">delta</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">delta</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">deltaOld</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">th2</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">th2</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">th</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fmt</span><span class="op">.</span><span class="ident">Print</span><span class="op">(</span><span class="string">&#34;&nbsp;&nbsp;diminishing&nbsp;return&#34;</span><span class="op">)</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">deltaOld</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">delta</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fmt</span><span class="op">.</span><span class="ident">Println</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;trigger&nbsp;counter</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">th1</span>&nbsp;<span class="op">&gt;=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">th2</span>&nbsp;<span class="op">&gt;=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">count</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">count</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">10</span>&nbsp;<span class="comment">//&nbsp;this&nbsp;many&nbsp;extra&nbsp;measurements&nbsp;after&nbsp;we&nbsp;got&nbsp;both&nbsp;thresholds</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">th</span><span class="op">++</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">TestCalibrate</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">*</span><span class="ident">calibrate</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">computeThresholds</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

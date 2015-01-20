@@ -1,0 +1,261 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2014&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">runtime</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="string">&#34;unsafe&#34;</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">newsysmon</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">10</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">runtime_init</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">main_init</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">main_main</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">15</span><span class="comment">//&nbsp;The&nbsp;main&nbsp;goroutine.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">main</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">g</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">getg</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Racectx&nbsp;of&nbsp;m0-&gt;g0&nbsp;is&nbsp;used&nbsp;only&nbsp;as&nbsp;the&nbsp;parent&nbsp;of&nbsp;the&nbsp;main&nbsp;goroutine.</span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;It&nbsp;must&nbsp;not&nbsp;be&nbsp;used&nbsp;for&nbsp;anything&nbsp;else.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">g</span><span class="op">.</span><span class="ident">m</span><span class="op">.</span><span class="ident">g0</span><span class="op">.</span><span class="ident">racectx</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Max&nbsp;stack&nbsp;size&nbsp;is&nbsp;1&nbsp;GB&nbsp;on&nbsp;64-bit,&nbsp;250&nbsp;MB&nbsp;on&nbsp;32-bit.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Using&nbsp;decimal&nbsp;instead&nbsp;of&nbsp;binary&nbsp;GB&nbsp;and&nbsp;MB&nbsp;because</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;they&nbsp;look&nbsp;nicer&nbsp;in&nbsp;the&nbsp;stack&nbsp;overflow&nbsp;failure&nbsp;message.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">ptrSize</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">8</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">maxstacksize</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1000000000</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">maxstacksize</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">250000000</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">onM</span><span class="op">(</span><span class="ident">newsysmon</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Lock&nbsp;the&nbsp;main&nbsp;goroutine&nbsp;onto&nbsp;this,&nbsp;the&nbsp;main&nbsp;OS&nbsp;thread,</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;during&nbsp;initialization.&nbsp;&nbsp;Most&nbsp;programs&nbsp;won&#39;t&nbsp;care,&nbsp;but&nbsp;a&nbsp;few</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;do&nbsp;require&nbsp;certain&nbsp;calls&nbsp;to&nbsp;be&nbsp;made&nbsp;by&nbsp;the&nbsp;main&nbsp;thread.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Those&nbsp;can&nbsp;arrange&nbsp;for&nbsp;main.main&nbsp;to&nbsp;run&nbsp;in&nbsp;the&nbsp;main&nbsp;thread</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;by&nbsp;calling&nbsp;runtime.LockOSThread&nbsp;during&nbsp;initialization</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;to&nbsp;preserve&nbsp;the&nbsp;lock.</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">lockOSThread</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">g</span><span class="op">.</span><span class="ident">m</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="op">&amp;</span><span class="ident">m0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gothrow</span><span class="op">(</span><span class="string">&#34;runtime.main&nbsp;not&nbsp;on&nbsp;m0&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">45</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">runtime_init</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="comment">//&nbsp;must&nbsp;be&nbsp;before&nbsp;defer</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Defer&nbsp;unlock&nbsp;so&nbsp;that&nbsp;runtime.Goexit&nbsp;during&nbsp;init&nbsp;does&nbsp;the&nbsp;unlock&nbsp;too.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">needUnlock</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">defer</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">needUnlock</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">unlockOSThread</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">55</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">memstats</span><span class="op">.</span><span class="ident">enablegc</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">true</span>&nbsp;<span class="comment">//&nbsp;now&nbsp;that&nbsp;runtime&nbsp;is&nbsp;initialized,&nbsp;GC&nbsp;is&nbsp;okay</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">main_init</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">needUnlock</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">unlockOSThread</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">main_main</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">raceenabled</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">racefini</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Make&nbsp;racy&nbsp;client&nbsp;program&nbsp;work:&nbsp;if&nbsp;panicking&nbsp;on</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;another&nbsp;goroutine&nbsp;at&nbsp;the&nbsp;same&nbsp;time&nbsp;as&nbsp;main&nbsp;returns,</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;let&nbsp;the&nbsp;other&nbsp;goroutine&nbsp;finish&nbsp;printing&nbsp;the&nbsp;panic&nbsp;trace.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Once&nbsp;it&nbsp;does,&nbsp;it&nbsp;will&nbsp;exit.&nbsp;See&nbsp;issue&nbsp;3934.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">panicking</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gopark</span><span class="op">(</span><span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="string">&#34;panicwait&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">75</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">exit</span><span class="op">(</span><span class="num">0</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">*</span><span class="builtintype">int32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">x</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">parkunlock_c</span>&nbsp;<span class="builtintype">byte</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">85</span><span class="comment">//&nbsp;start&nbsp;forcegc&nbsp;helper&nbsp;goroutine</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">init</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">go</span>&nbsp;<span class="ident">forcegchelper</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">90</span><span class="keyword">func</span>&nbsp;<span class="ident">forcegchelper</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">forcegc</span><span class="op">.</span><span class="ident">g</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">getg</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">forcegc</span><span class="op">.</span><span class="ident">g</span><span class="op">.</span><span class="ident">issystem</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">lock</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">forcegc</span><span class="op">.</span><span class="ident">lock</span><span class="op">)</span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">forcegc</span><span class="op">.</span><span class="ident">idle</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gothrow</span><span class="op">(</span><span class="string">&#34;forcegc:&nbsp;phase&nbsp;error&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">atomicstore</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">forcegc</span><span class="op">.</span><span class="ident">idle</span><span class="op">,</span>&nbsp;<span class="num">1</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">goparkunlock</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">forcegc</span><span class="op">.</span><span class="ident">lock</span><span class="op">,</span>&nbsp;<span class="string">&#34;force&nbsp;gc&nbsp;(idle)&#34;</span><span class="op">)</span><br>
+<span class="lineno">100</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;this&nbsp;goroutine&nbsp;is&nbsp;explicitly&nbsp;resumed&nbsp;by&nbsp;sysmon</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">debug</span><span class="op">.</span><span class="ident">gctrace</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">println</span><span class="op">(</span><span class="string">&#34;GC&nbsp;forced&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gogc</span><span class="op">(</span><span class="num">1</span><span class="op">)</span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//go:nosplit</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">110</span><span class="comment">//&nbsp;Gosched&nbsp;yields&nbsp;the&nbsp;processor,&nbsp;allowing&nbsp;other&nbsp;goroutines&nbsp;to&nbsp;run.&nbsp;&nbsp;It&nbsp;does&nbsp;not</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;suspend&nbsp;the&nbsp;current&nbsp;goroutine,&nbsp;so&nbsp;execution&nbsp;resumes&nbsp;automatically.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">Gosched</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mcall</span><span class="op">(</span><span class="ident">gosched_m</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">115</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Puts&nbsp;the&nbsp;current&nbsp;goroutine&nbsp;into&nbsp;a&nbsp;waiting&nbsp;state&nbsp;and&nbsp;calls&nbsp;unlockf.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;If&nbsp;unlockf&nbsp;returns&nbsp;false,&nbsp;the&nbsp;goroutine&nbsp;is&nbsp;resumed.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">gopark</span><span class="op">(</span><span class="ident">unlockf</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">,</span>&nbsp;<span class="ident">lock</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">,</span>&nbsp;<span class="ident">reason</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">acquirem</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">120</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">mp</span><span class="op">.</span><span class="ident">curg</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">status</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">readgstatus</span><span class="op">(</span><span class="ident">gp</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">status</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">_Grunning</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">status</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">_Gscanrunning</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gothrow</span><span class="op">(</span><span class="string">&#34;gopark:&nbsp;bad&nbsp;g&nbsp;status&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">125</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mp</span><span class="op">.</span><span class="ident">waitlock</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">lock</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mp</span><span class="op">.</span><span class="ident">waitunlockf</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">unlockf</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gp</span><span class="op">.</span><span class="ident">waitreason</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">reason</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">releasem</span><span class="op">(</span><span class="ident">mp</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;can&#39;t&nbsp;do&nbsp;anything&nbsp;that&nbsp;might&nbsp;move&nbsp;the&nbsp;G&nbsp;between&nbsp;Ms&nbsp;here.</span><br>
+<span class="lineno">130</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mcall</span><span class="op">(</span><span class="ident">park_m</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Puts&nbsp;the&nbsp;current&nbsp;goroutine&nbsp;into&nbsp;a&nbsp;waiting&nbsp;state&nbsp;and&nbsp;unlocks&nbsp;the&nbsp;lock.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;goroutine&nbsp;can&nbsp;be&nbsp;made&nbsp;runnable&nbsp;again&nbsp;by&nbsp;calling&nbsp;goready(gp).</span><br>
+<span class="lineno">135</span><span class="keyword">func</span>&nbsp;<span class="ident">goparkunlock</span><span class="op">(</span><span class="ident">lock</span>&nbsp;<span class="op">*</span><span class="ident">mutex</span><span class="op">,</span>&nbsp;<span class="ident">reason</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gopark</span><span class="op">(</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">parkunlock_c</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="ident">lock</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">reason</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">goready</span><span class="op">(</span><span class="ident">gp</span>&nbsp;<span class="op">*</span><span class="ident">g</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">140</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">acquirem</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mp</span><span class="op">.</span><span class="ident">ptrarg</span><span class="op">[</span><span class="num">0</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="ident">gp</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">onM</span><span class="op">(</span><span class="ident">ready_m</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">releasem</span><span class="op">(</span><span class="ident">mp</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">145</span><br>
+<span class="lineno"></span><span class="comment">//go:nosplit</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">acquireSudog</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">sudog</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">gomcache</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">sudogcache</span><br>
+<span class="lineno">150</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">s</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">elem</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gothrow</span><span class="op">(</span><span class="string">&#34;acquireSudog:&nbsp;found&nbsp;s.elem&nbsp;!=&nbsp;nil&nbsp;in&nbsp;cache&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">sudogcache</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">next</span><br>
+<span class="lineno">155</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">next</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">s</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Delicate&nbsp;dance:&nbsp;the&nbsp;semaphore&nbsp;implementation&nbsp;calls</span><br>
+<span class="lineno">160</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;acquireSudog,&nbsp;acquireSudog&nbsp;calls&nbsp;new(sudog),</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;new&nbsp;calls&nbsp;malloc,&nbsp;malloc&nbsp;can&nbsp;call&nbsp;the&nbsp;garbage&nbsp;collector,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;and&nbsp;the&nbsp;garbage&nbsp;collector&nbsp;calls&nbsp;the&nbsp;semaphore&nbsp;implementation</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;in&nbsp;stoptheworld.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Break&nbsp;the&nbsp;cycle&nbsp;by&nbsp;doing&nbsp;acquirem/releasem&nbsp;around&nbsp;new(sudog).</span><br>
+<span class="lineno">165</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;The&nbsp;acquirem/releasem&nbsp;increments&nbsp;m.locks&nbsp;during&nbsp;new(sudog),</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;which&nbsp;keeps&nbsp;the&nbsp;garbage&nbsp;collector&nbsp;from&nbsp;being&nbsp;invoked.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">acquirem</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">new</span><span class="op">(</span><span class="ident">sudog</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">releasem</span><span class="op">(</span><span class="ident">mp</span><span class="op">)</span><br>
+<span class="lineno">170</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">p</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//go:nosplit</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">releaseSudog</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">sudog</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">175</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">elem</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gothrow</span><span class="op">(</span><span class="string">&#34;runtime:&nbsp;sudog&nbsp;with&nbsp;non-nil&nbsp;elem&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">selectdone</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gothrow</span><span class="op">(</span><span class="string">&#34;runtime:&nbsp;sudog&nbsp;with&nbsp;non-nil&nbsp;selectdone&#34;</span><span class="op">)</span><br>
+<span class="lineno">180</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">next</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gothrow</span><span class="op">(</span><span class="string">&#34;runtime:&nbsp;sudog&nbsp;with&nbsp;non-nil&nbsp;next&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">prev</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">185</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gothrow</span><span class="op">(</span><span class="string">&#34;runtime:&nbsp;sudog&nbsp;with&nbsp;non-nil&nbsp;prev&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">waitlink</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gothrow</span><span class="op">(</span><span class="string">&#34;runtime:&nbsp;sudog&nbsp;with&nbsp;non-nil&nbsp;waitlink&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">190</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">getg</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">gp</span><span class="op">.</span><span class="ident">param</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gothrow</span><span class="op">(</span><span class="string">&#34;runtime:&nbsp;releaseSudog&nbsp;with&nbsp;non-nil&nbsp;gp.param&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">gomcache</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">195</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">next</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">sudogcache</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">sudogcache</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">s</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;funcPC&nbsp;returns&nbsp;the&nbsp;entry&nbsp;PC&nbsp;of&nbsp;the&nbsp;function&nbsp;f.</span><br>
+<span class="lineno">200</span><span class="comment">//&nbsp;It&nbsp;assumes&nbsp;that&nbsp;f&nbsp;is&nbsp;a&nbsp;func&nbsp;value.&nbsp;Otherwise&nbsp;the&nbsp;behavior&nbsp;is&nbsp;undefined.</span><br>
+<span class="lineno"></span><span class="comment">//go:nosplit</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">funcPC</span><span class="op">(</span><span class="ident">f</span>&nbsp;<span class="keyword">interface</span><span class="op">{</span><span class="op">}</span><span class="op">)</span>&nbsp;<span class="builtintype">uintptr</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="op">*</span><span class="op">*</span><span class="op">(</span><span class="op">*</span><span class="op">*</span><span class="builtintype">uintptr</span><span class="op">)</span><span class="op">(</span><span class="ident">add</span><span class="op">(</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">f</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">ptrSize</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">205</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;called&nbsp;from&nbsp;assembly</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">badmcall</span><span class="op">(</span><span class="ident">fn</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="op">*</span><span class="ident">g</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gothrow</span><span class="op">(</span><span class="string">&#34;runtime:&nbsp;mcall&nbsp;called&nbsp;on&nbsp;m-&gt;g0&nbsp;stack&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">210</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">badmcall2</span><span class="op">(</span><span class="ident">fn</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="op">*</span><span class="ident">g</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gothrow</span><span class="op">(</span><span class="string">&#34;runtime:&nbsp;mcall&nbsp;function&nbsp;returned&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">215</span><span class="keyword">func</span>&nbsp;<span class="ident">badreflectcall</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">panic</span><span class="op">(</span><span class="string">&#34;runtime:&nbsp;arg&nbsp;size&nbsp;to&nbsp;reflect.call&nbsp;more&nbsp;than&nbsp;1GB&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">lockedOSThread</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">220</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">getg</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">gp</span><span class="op">.</span><span class="ident">lockedm</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">gp</span><span class="op">.</span><span class="ident">m</span><span class="op">.</span><span class="ident">lockedg</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">newP</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">p</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">225</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="builtinfunc">new</span><span class="op">(</span><span class="ident">p</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">newM</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">m</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="builtinfunc">new</span><span class="op">(</span><span class="ident">m</span><span class="op">)</span><br>
+<span class="lineno">230</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">newG</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">g</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="builtinfunc">new</span><span class="op">(</span><span class="ident">g</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">235</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">allgadd</span><span class="op">(</span><span class="ident">gp</span>&nbsp;<span class="op">*</span><span class="ident">g</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">readgstatus</span><span class="op">(</span><span class="ident">gp</span><span class="op">)</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">_Gidle</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gothrow</span><span class="op">(</span><span class="string">&#34;allgadd:&nbsp;bad&nbsp;status&nbsp;Gidle&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">240</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">lock</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">allglock</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">allgs</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">append</span><span class="op">(</span><span class="ident">allgs</span><span class="op">,</span>&nbsp;<span class="ident">gp</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">allg</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">&amp;</span><span class="ident">allgs</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">allglen</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">(</span><span class="builtinfunc">len</span><span class="op">(</span><span class="ident">allgs</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno">245</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">unlock</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">allglock</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

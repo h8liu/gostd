@@ -1,0 +1,74 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2011&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">time</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">init</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;force&nbsp;US/Pacific&nbsp;for&nbsp;time&nbsp;zone&nbsp;tests</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ForceUSPacificForTesting</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">10</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">Interrupt</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">interrupt</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">DaysIn</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">daysIn</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">15</span><span class="keyword">func</span>&nbsp;<span class="ident">empty</span><span class="op">(</span><span class="ident">arg</span>&nbsp;<span class="keyword">interface</span><span class="op">{</span><span class="op">}</span><span class="op">,</span>&nbsp;<span class="ident">seq</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">)</span>&nbsp;<span class="op">{</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Test&nbsp;that&nbsp;a&nbsp;runtimeTimer&nbsp;with&nbsp;a&nbsp;duration&nbsp;so&nbsp;large&nbsp;it&nbsp;overflows</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;does&nbsp;not&nbsp;cause&nbsp;other&nbsp;timers&nbsp;to&nbsp;hang.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">20</span><span class="comment">//&nbsp;This&nbsp;test&nbsp;has&nbsp;to&nbsp;be&nbsp;in&nbsp;internal_test.go&nbsp;since&nbsp;it&nbsp;fiddles&nbsp;with</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;unexported&nbsp;data&nbsp;structures.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">CheckRuntimeTimerOverflow</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;We&nbsp;manually&nbsp;create&nbsp;a&nbsp;runtimeTimer&nbsp;to&nbsp;bypass&nbsp;the&nbsp;overflow</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;detection&nbsp;logic&nbsp;in&nbsp;NewTimer:&nbsp;we&#39;re&nbsp;testing&nbsp;the&nbsp;underlying</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;runtime.addtimer&nbsp;function.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">&amp;</span><span class="ident">runtimeTimer</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">when</span><span class="op">:</span>&nbsp;<span class="ident">runtimeNano</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">+</span>&nbsp;<span class="op">(</span><span class="num">1</span><span class="op">&lt;&lt;</span><span class="num">63</span>&nbsp;<span class="op">-</span>&nbsp;<span class="num">1</span><span class="op">)</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">f</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">empty</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">arg</span><span class="op">:</span>&nbsp;&nbsp;<span class="ident">nil</span><span class="op">,</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">startTimer</span><span class="op">(</span><span class="ident">r</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Start&nbsp;a&nbsp;goroutine&nbsp;that&nbsp;should&nbsp;send&nbsp;on&nbsp;t.C&nbsp;right&nbsp;away.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">NewTimer</span><span class="op">(</span><span class="num">1</span><span class="op">)</span><br>
+<span class="lineno">35</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">defer</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Subsequent&nbsp;tests&nbsp;won&#39;t&nbsp;work&nbsp;correctly&nbsp;if&nbsp;we&nbsp;don&#39;t&nbsp;stop&nbsp;the</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;overflow&nbsp;timer&nbsp;and&nbsp;kick&nbsp;the&nbsp;timer&nbsp;proc&nbsp;back&nbsp;into&nbsp;service.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;The&nbsp;timer&nbsp;proc&nbsp;is&nbsp;now&nbsp;sleeping&nbsp;and&nbsp;can&nbsp;only&nbsp;be&nbsp;awoken&nbsp;by</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;adding&nbsp;a&nbsp;timer&nbsp;to&nbsp;the&nbsp;*beginning*&nbsp;of&nbsp;the&nbsp;heap.&nbsp;We&nbsp;can&#39;t</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;wake&nbsp;it&nbsp;up&nbsp;by&nbsp;calling&nbsp;NewTimer&nbsp;since&nbsp;other&nbsp;tests&nbsp;may&nbsp;have</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;left&nbsp;timers&nbsp;running&nbsp;that&nbsp;should&nbsp;have&nbsp;expired&nbsp;before&nbsp;ours.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Instead&nbsp;we&nbsp;zero&nbsp;the&nbsp;overflow&nbsp;timer&nbsp;duration&nbsp;and&nbsp;start&nbsp;it</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;once&nbsp;more.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stopTimer</span><span class="op">(</span><span class="ident">r</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Stop</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span><span class="op">.</span><span class="ident">when</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">startTimer</span><span class="op">(</span><span class="ident">r</span><span class="op">)</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;If&nbsp;the&nbsp;test&nbsp;fails,&nbsp;we&nbsp;will&nbsp;hang&nbsp;here&nbsp;until&nbsp;the&nbsp;timeout&nbsp;in&nbsp;the&nbsp;testing&nbsp;package</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;fires,&nbsp;which&nbsp;is&nbsp;10&nbsp;minutes.&nbsp;It&nbsp;would&nbsp;be&nbsp;nice&nbsp;to&nbsp;catch&nbsp;the&nbsp;problem&nbsp;sooner,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;but&nbsp;there&nbsp;is&nbsp;no&nbsp;reliable&nbsp;way&nbsp;to&nbsp;guarantee&nbsp;that&nbsp;timerproc&nbsp;schedules&nbsp;without</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;doing&nbsp;something&nbsp;involving&nbsp;timerproc&nbsp;itself.&nbsp;Previous&nbsp;failed&nbsp;attempts&nbsp;have</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;tried&nbsp;calling&nbsp;runtime.Gosched&nbsp;and&nbsp;runtime.GC,&nbsp;but&nbsp;neither&nbsp;is&nbsp;reliable.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;So&nbsp;we&nbsp;fall&nbsp;back&nbsp;to&nbsp;hope:&nbsp;We&nbsp;hope&nbsp;we&nbsp;don&#39;t&nbsp;hang&nbsp;here.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">&lt;-</span><span class="ident">t</span><span class="op">.</span><span class="ident">C</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

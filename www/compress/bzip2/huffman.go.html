@@ -1,0 +1,266 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2011&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">bzip2</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="string">&#34;sort&#34;</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;A&nbsp;huffmanTree&nbsp;is&nbsp;a&nbsp;binary&nbsp;tree&nbsp;which&nbsp;is&nbsp;navigated,&nbsp;bit-by-bit&nbsp;to&nbsp;reach&nbsp;a</span><br>
+<span class="lineno">10</span><span class="comment">//&nbsp;symbol.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">huffmanTree</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;nodes&nbsp;contains&nbsp;all&nbsp;the&nbsp;non-leaf&nbsp;nodes&nbsp;in&nbsp;the&nbsp;tree.&nbsp;nodes[0]&nbsp;is&nbsp;the</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;root&nbsp;of&nbsp;the&nbsp;tree&nbsp;and&nbsp;nextNode&nbsp;contains&nbsp;the&nbsp;index&nbsp;of&nbsp;the&nbsp;next&nbsp;element</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;of&nbsp;nodes&nbsp;to&nbsp;use&nbsp;when&nbsp;the&nbsp;tree&nbsp;is&nbsp;being&nbsp;constructed.</span><br>
+<span class="lineno">15</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nodes</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">[</span><span class="op">]</span><span class="ident">huffmanNode</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nextNode</span>&nbsp;<span class="builtintype">int</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;A&nbsp;huffmanNode&nbsp;is&nbsp;a&nbsp;node&nbsp;in&nbsp;the&nbsp;tree.&nbsp;left&nbsp;and&nbsp;right&nbsp;contain&nbsp;indexes&nbsp;into&nbsp;the</span><br>
+<span class="lineno">20</span><span class="comment">//&nbsp;nodes&nbsp;slice&nbsp;of&nbsp;the&nbsp;tree.&nbsp;If&nbsp;left&nbsp;or&nbsp;right&nbsp;is&nbsp;invalidNodeValue&nbsp;then&nbsp;the&nbsp;child</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;is&nbsp;a&nbsp;left&nbsp;node&nbsp;and&nbsp;its&nbsp;value&nbsp;is&nbsp;in&nbsp;leftValue/rightValue.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;symbols&nbsp;are&nbsp;uint16s&nbsp;because&nbsp;bzip2&nbsp;encodes&nbsp;not&nbsp;only&nbsp;MTF&nbsp;indexes&nbsp;in&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;tree,&nbsp;but&nbsp;also&nbsp;two&nbsp;magic&nbsp;values&nbsp;for&nbsp;run-length&nbsp;encoding&nbsp;and&nbsp;an&nbsp;EOF&nbsp;symbol.</span><br>
+<span class="lineno">25</span><span class="comment">//&nbsp;Thus&nbsp;there&nbsp;are&nbsp;more&nbsp;than&nbsp;256&nbsp;possible&nbsp;symbols.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">huffmanNode</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">left</span><span class="op">,</span>&nbsp;<span class="ident">right</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">uint16</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">leftValue</span><span class="op">,</span>&nbsp;<span class="ident">rightValue</span>&nbsp;<span class="builtintype">uint16</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">30</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;invalidNodeValue&nbsp;is&nbsp;an&nbsp;invalid&nbsp;index&nbsp;which&nbsp;marks&nbsp;a&nbsp;leaf&nbsp;node&nbsp;in&nbsp;the&nbsp;tree.</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">invalidNodeValue</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0xffff</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Decode&nbsp;reads&nbsp;bits&nbsp;from&nbsp;the&nbsp;given&nbsp;bitReader&nbsp;and&nbsp;navigates&nbsp;the&nbsp;tree&nbsp;until&nbsp;a</span><br>
+<span class="lineno">35</span><span class="comment">//&nbsp;symbol&nbsp;is&nbsp;found.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">huffmanTree</span><span class="op">)</span>&nbsp;<span class="ident">Decode</span><span class="op">(</span><span class="ident">br</span>&nbsp;<span class="op">*</span><span class="ident">bitReader</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">v</span>&nbsp;<span class="builtintype">uint16</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nodeIndex</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtintype">uint16</span><span class="op">(</span><span class="num">0</span><span class="op">)</span>&nbsp;<span class="comment">//&nbsp;node&nbsp;0&nbsp;is&nbsp;the&nbsp;root&nbsp;of&nbsp;the&nbsp;tree.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">node</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">&amp;</span><span class="ident">t</span><span class="op">.</span><span class="ident">nodes</span><span class="op">[</span><span class="ident">nodeIndex</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">bit</span><span class="op">,</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">br</span><span class="op">.</span><span class="ident">TryReadBit</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">ok</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">br</span><span class="op">.</span><span class="ident">ReadBit</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">bit</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;bzip2&nbsp;encodes&nbsp;left&nbsp;as&nbsp;a&nbsp;true&nbsp;bit.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">bit</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;left</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">node</span><span class="op">.</span><span class="ident">left</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">invalidNodeValue</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">node</span><span class="op">.</span><span class="ident">leftValue</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nodeIndex</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">node</span><span class="op">.</span><span class="ident">left</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;right</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">node</span><span class="op">.</span><span class="ident">right</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">invalidNodeValue</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">node</span><span class="op">.</span><span class="ident">rightValue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nodeIndex</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">node</span><span class="op">.</span><span class="ident">right</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">60</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;newHuffmanTree&nbsp;builds&nbsp;a&nbsp;Huffman&nbsp;tree&nbsp;from&nbsp;a&nbsp;slice&nbsp;containing&nbsp;the&nbsp;code</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;lengths&nbsp;of&nbsp;each&nbsp;symbol.&nbsp;The&nbsp;maximum&nbsp;code&nbsp;length&nbsp;is&nbsp;32&nbsp;bits.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">newHuffmanTree</span><span class="op">(</span><span class="ident">lengths</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">uint8</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">huffmanTree</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;There&nbsp;are&nbsp;many&nbsp;possible&nbsp;trees&nbsp;that&nbsp;assign&nbsp;the&nbsp;same&nbsp;code&nbsp;length&nbsp;to</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;each&nbsp;symbol&nbsp;(consider&nbsp;reflecting&nbsp;a&nbsp;tree&nbsp;down&nbsp;the&nbsp;middle,&nbsp;for</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;example).&nbsp;Since&nbsp;the&nbsp;code&nbsp;length&nbsp;assignments&nbsp;determine&nbsp;the</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;efficiency&nbsp;of&nbsp;the&nbsp;tree,&nbsp;each&nbsp;of&nbsp;these&nbsp;trees&nbsp;is&nbsp;equally&nbsp;good.&nbsp;In</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;order&nbsp;to&nbsp;minimize&nbsp;the&nbsp;amount&nbsp;of&nbsp;information&nbsp;needed&nbsp;to&nbsp;build&nbsp;a&nbsp;tree</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;bzip2&nbsp;uses&nbsp;a&nbsp;canonical&nbsp;tree&nbsp;so&nbsp;that&nbsp;it&nbsp;can&nbsp;be&nbsp;reconstructed&nbsp;given</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;only&nbsp;the&nbsp;code&nbsp;length&nbsp;assignments.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">lengths</span><span class="op">)</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">2</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">panic</span><span class="op">(</span><span class="string">&#34;newHuffmanTree:&nbsp;too&nbsp;few&nbsp;symbols&#34;</span><span class="op">)</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">t</span>&nbsp;<span class="ident">huffmanTree</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;First&nbsp;we&nbsp;sort&nbsp;the&nbsp;code&nbsp;length&nbsp;assignments&nbsp;by&nbsp;ascending&nbsp;code&nbsp;length,</span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;using&nbsp;the&nbsp;symbol&nbsp;value&nbsp;to&nbsp;break&nbsp;ties.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pairs</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">huffmanSymbolLengthPairs</span><span class="op">(</span><span class="builtinfunc">make</span><span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="ident">huffmanSymbolLengthPair</span><span class="op">,</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">lengths</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span><span class="op">,</span>&nbsp;<span class="ident">length</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">lengths</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pairs</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><span class="op">.</span><span class="ident">value</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtintype">uint16</span><span class="op">(</span><span class="ident">i</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pairs</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><span class="op">.</span><span class="ident">length</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">length</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sort</span><span class="op">.</span><span class="ident">Sort</span><span class="op">(</span><span class="ident">pairs</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Now&nbsp;we&nbsp;assign&nbsp;codes&nbsp;to&nbsp;the&nbsp;symbols,&nbsp;starting&nbsp;with&nbsp;the&nbsp;longest&nbsp;code.</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;We&nbsp;keep&nbsp;the&nbsp;codes&nbsp;packed&nbsp;into&nbsp;a&nbsp;uint32,&nbsp;at&nbsp;the&nbsp;most-significant&nbsp;end.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;So&nbsp;branches&nbsp;are&nbsp;taken&nbsp;from&nbsp;the&nbsp;MSB&nbsp;downwards.&nbsp;This&nbsp;makes&nbsp;it&nbsp;easy&nbsp;to</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;sort&nbsp;them&nbsp;later.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">code</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtintype">uint32</span><span class="op">(</span><span class="num">0</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">length</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtintype">uint8</span><span class="op">(</span><span class="num">32</span><span class="op">)</span><br>
+<span class="lineno">95</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">codes</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">huffmanCodes</span><span class="op">(</span><span class="builtinfunc">make</span><span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="ident">huffmanCode</span><span class="op">,</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">lengths</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">pairs</span><span class="op">)</span>&nbsp;<span class="op">-</span>&nbsp;<span class="num">1</span><span class="op">;</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">&gt;=</span>&nbsp;<span class="num">0</span><span class="op">;</span>&nbsp;<span class="ident">i</span><span class="op">--</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">length</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="ident">pairs</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><span class="op">.</span><span class="ident">length</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;If&nbsp;the&nbsp;code&nbsp;length&nbsp;decreases&nbsp;we&nbsp;shift&nbsp;in&nbsp;order&nbsp;to</span><br>
+<span class="lineno">100</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;zero&nbsp;any&nbsp;bits&nbsp;beyond&nbsp;the&nbsp;end&nbsp;of&nbsp;the&nbsp;code.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">length</span>&nbsp;<span class="op">&gt;&gt;=</span>&nbsp;<span class="num">32</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">pairs</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><span class="op">.</span><span class="ident">length</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">length</span>&nbsp;<span class="op">&lt;&lt;=</span>&nbsp;<span class="num">32</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">pairs</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><span class="op">.</span><span class="ident">length</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">length</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">pairs</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><span class="op">.</span><span class="ident">length</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">codes</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><span class="op">.</span><span class="ident">code</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">code</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">codes</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><span class="op">.</span><span class="ident">codeLen</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">length</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">codes</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><span class="op">.</span><span class="ident">value</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">pairs</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><span class="op">.</span><span class="ident">value</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;We&nbsp;need&nbsp;to&nbsp;&#39;increment&#39;&nbsp;the&nbsp;code,&nbsp;which&nbsp;means&nbsp;treating&nbsp;|code|</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;like&nbsp;a&nbsp;|length|&nbsp;bit&nbsp;number.</span><br>
+<span class="lineno">110</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">code</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="num">1</span>&nbsp;<span class="op">&lt;&lt;</span>&nbsp;<span class="op">(</span><span class="num">32</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">length</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Now&nbsp;we&nbsp;can&nbsp;sort&nbsp;by&nbsp;the&nbsp;code&nbsp;so&nbsp;that&nbsp;the&nbsp;left&nbsp;half&nbsp;of&nbsp;each&nbsp;branch&nbsp;are</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;grouped&nbsp;together,&nbsp;recursively.</span><br>
+<span class="lineno">115</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sort</span><span class="op">.</span><span class="ident">Sort</span><span class="op">(</span><span class="ident">codes</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">nodes</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">make</span><span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="ident">huffmanNode</span><span class="op">,</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">codes</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">buildHuffmanNode</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">t</span><span class="op">,</span>&nbsp;<span class="ident">codes</span><span class="op">,</span>&nbsp;<span class="num">0</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">t</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno">120</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;huffmanSymbolLengthPair&nbsp;contains&nbsp;a&nbsp;symbol&nbsp;and&nbsp;its&nbsp;code&nbsp;length.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">huffmanSymbolLengthPair</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">value</span>&nbsp;&nbsp;<span class="builtintype">uint16</span><br>
+<span class="lineno">125</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">length</span>&nbsp;<span class="builtintype">uint8</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;huffmanSymbolLengthPair&nbsp;is&nbsp;used&nbsp;to&nbsp;provide&nbsp;an&nbsp;interface&nbsp;for&nbsp;sorting.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">huffmanSymbolLengthPairs</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="ident">huffmanSymbolLengthPair</span><br>
+<span class="lineno">130</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">h</span>&nbsp;<span class="ident">huffmanSymbolLengthPairs</span><span class="op">)</span>&nbsp;<span class="ident">Len</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">h</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">135</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">h</span>&nbsp;<span class="ident">huffmanSymbolLengthPairs</span><span class="op">)</span>&nbsp;<span class="ident">Less</span><span class="op">(</span><span class="ident">i</span><span class="op">,</span>&nbsp;<span class="ident">j</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">h</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><span class="op">.</span><span class="ident">length</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">h</span><span class="op">[</span><span class="ident">j</span><span class="op">]</span><span class="op">.</span><span class="ident">length</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">h</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><span class="op">.</span><span class="ident">length</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="ident">h</span><span class="op">[</span><span class="ident">j</span><span class="op">]</span><span class="op">.</span><span class="ident">length</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">140</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">h</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><span class="op">.</span><span class="ident">value</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">h</span><span class="op">[</span><span class="ident">j</span><span class="op">]</span><span class="op">.</span><span class="ident">value</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">145</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">h</span>&nbsp;<span class="ident">huffmanSymbolLengthPairs</span><span class="op">)</span>&nbsp;<span class="ident">Swap</span><span class="op">(</span><span class="ident">i</span><span class="op">,</span>&nbsp;<span class="ident">j</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">h</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><span class="op">,</span>&nbsp;<span class="ident">h</span><span class="op">[</span><span class="ident">j</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">h</span><span class="op">[</span><span class="ident">j</span><span class="op">]</span><span class="op">,</span>&nbsp;<span class="ident">h</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><br>
+<span class="lineno">150</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;huffmanCode&nbsp;contains&nbsp;a&nbsp;symbol,&nbsp;its&nbsp;code&nbsp;and&nbsp;code&nbsp;length.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">huffmanCode</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">code</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">uint32</span><br>
+<span class="lineno">155</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">codeLen</span>&nbsp;<span class="builtintype">uint8</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">value</span>&nbsp;&nbsp;&nbsp;<span class="builtintype">uint16</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;huffmanCodes&nbsp;is&nbsp;used&nbsp;to&nbsp;provide&nbsp;an&nbsp;interface&nbsp;for&nbsp;sorting.</span><br>
+<span class="lineno">160</span><span class="keyword">type</span>&nbsp;<span class="ident">huffmanCodes</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="ident">huffmanCode</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">n</span>&nbsp;<span class="ident">huffmanCodes</span><span class="op">)</span>&nbsp;<span class="ident">Len</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">n</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">165</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">n</span>&nbsp;<span class="ident">huffmanCodes</span><span class="op">)</span>&nbsp;<span class="ident">Less</span><span class="op">(</span><span class="ident">i</span><span class="op">,</span>&nbsp;<span class="ident">j</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">n</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><span class="op">.</span><span class="ident">code</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">n</span><span class="op">[</span><span class="ident">j</span><span class="op">]</span><span class="op">.</span><span class="ident">code</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">170</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">n</span>&nbsp;<span class="ident">huffmanCodes</span><span class="op">)</span>&nbsp;<span class="ident">Swap</span><span class="op">(</span><span class="ident">i</span><span class="op">,</span>&nbsp;<span class="ident">j</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><span class="op">,</span>&nbsp;<span class="ident">n</span><span class="op">[</span><span class="ident">j</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">n</span><span class="op">[</span><span class="ident">j</span><span class="op">]</span><span class="op">,</span>&nbsp;<span class="ident">n</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;buildHuffmanNode&nbsp;takes&nbsp;a&nbsp;slice&nbsp;of&nbsp;sorted&nbsp;huffmanCodes&nbsp;and&nbsp;builds&nbsp;a&nbsp;node&nbsp;in</span><br>
+<span class="lineno">175</span><span class="comment">//&nbsp;the&nbsp;Huffman&nbsp;tree&nbsp;at&nbsp;the&nbsp;given&nbsp;level.&nbsp;It&nbsp;returns&nbsp;the&nbsp;index&nbsp;of&nbsp;the&nbsp;newly</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;constructed&nbsp;node.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">buildHuffmanNode</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">huffmanTree</span><span class="op">,</span>&nbsp;<span class="ident">codes</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="ident">huffmanCode</span><span class="op">,</span>&nbsp;<span class="ident">level</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">nodeIndex</span>&nbsp;<span class="builtintype">uint16</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">test</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtintype">uint32</span><span class="op">(</span><span class="num">1</span><span class="op">)</span>&nbsp;<span class="op">&lt;&lt;</span>&nbsp;<span class="op">(</span><span class="num">31</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">level</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">180</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;We&nbsp;have&nbsp;to&nbsp;search&nbsp;the&nbsp;list&nbsp;of&nbsp;codes&nbsp;to&nbsp;find&nbsp;the&nbsp;divide&nbsp;between&nbsp;the&nbsp;left&nbsp;and&nbsp;right&nbsp;sides.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">firstRightIndex</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">codes</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span><span class="op">,</span>&nbsp;<span class="ident">code</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">codes</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">code</span><span class="op">.</span><span class="ident">code</span><span class="op">&amp;</span><span class="ident">test</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">firstRightIndex</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">i</span><br>
+<span class="lineno">185</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">break</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">left</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">codes</span><span class="op">[</span><span class="op">:</span><span class="ident">firstRightIndex</span><span class="op">]</span><br>
+<span class="lineno">190</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">right</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">codes</span><span class="op">[</span><span class="ident">firstRightIndex</span><span class="op">:</span><span class="op">]</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">left</span><span class="op">)</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">||</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">right</span><span class="op">)</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;There&nbsp;is&nbsp;a&nbsp;superfluous&nbsp;level&nbsp;in&nbsp;the&nbsp;Huffman&nbsp;tree&nbsp;indicating</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;a&nbsp;bug&nbsp;in&nbsp;the&nbsp;encoder.&nbsp;However,&nbsp;this&nbsp;bug&nbsp;has&nbsp;been&nbsp;observed&nbsp;in</span><br>
+<span class="lineno">195</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;the&nbsp;wild&nbsp;so&nbsp;we&nbsp;handle&nbsp;it.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;If&nbsp;this&nbsp;function&nbsp;was&nbsp;called&nbsp;recursively&nbsp;then&nbsp;we&nbsp;know&nbsp;that</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;len(codes)&nbsp;&gt;=&nbsp;2&nbsp;because,&nbsp;otherwise,&nbsp;we&nbsp;would&nbsp;have&nbsp;hit&nbsp;the</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;&#34;leaf&nbsp;node&#34;&nbsp;case,&nbsp;below,&nbsp;and&nbsp;not&nbsp;recursed.</span><br>
+<span class="lineno">200</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;However,&nbsp;for&nbsp;the&nbsp;initial&nbsp;call&nbsp;it&#39;s&nbsp;possible&nbsp;that&nbsp;len(codes)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;is&nbsp;zero&nbsp;or&nbsp;one.&nbsp;Both&nbsp;cases&nbsp;are&nbsp;invalid&nbsp;because&nbsp;a&nbsp;zero&nbsp;length</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;tree&nbsp;cannot&nbsp;encode&nbsp;anything&nbsp;and&nbsp;a&nbsp;length-1&nbsp;tree&nbsp;can&nbsp;only</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;encode&nbsp;EOF&nbsp;and&nbsp;so&nbsp;is&nbsp;superfluous.&nbsp;We&nbsp;reject&nbsp;both.</span><br>
+<span class="lineno">205</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">codes</span><span class="op">)</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">2</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">StructuralError</span><span class="op">(</span><span class="string">&#34;empty&nbsp;Huffman&nbsp;tree&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;In&nbsp;this&nbsp;case&nbsp;the&nbsp;recursion&nbsp;doesn&#39;t&nbsp;always&nbsp;reduce&nbsp;the&nbsp;length</span><br>
+<span class="lineno">210</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;of&nbsp;codes&nbsp;so&nbsp;we&nbsp;need&nbsp;to&nbsp;ensure&nbsp;termination&nbsp;via&nbsp;another</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;mechanism.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">level</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">31</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Since&nbsp;len(codes)&nbsp;&gt;=&nbsp;2&nbsp;the&nbsp;only&nbsp;way&nbsp;that&nbsp;the&nbsp;values</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;can&nbsp;match&nbsp;at&nbsp;all&nbsp;32&nbsp;bits&nbsp;is&nbsp;if&nbsp;they&nbsp;are&nbsp;equal,&nbsp;which</span><br>
+<span class="lineno">215</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;is&nbsp;invalid.&nbsp;This&nbsp;ensures&nbsp;that&nbsp;we&nbsp;never&nbsp;enter</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;infinite&nbsp;recursion.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">StructuralError</span><span class="op">(</span><span class="string">&#34;equal&nbsp;symbols&nbsp;in&nbsp;Huffman&nbsp;tree&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">220</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">left</span><span class="op">)</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">buildHuffmanNode</span><span class="op">(</span><span class="ident">t</span><span class="op">,</span>&nbsp;<span class="ident">right</span><span class="op">,</span>&nbsp;<span class="ident">level</span><span class="op">+</span><span class="num">1</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">buildHuffmanNode</span><span class="op">(</span><span class="ident">t</span><span class="op">,</span>&nbsp;<span class="ident">left</span><span class="op">,</span>&nbsp;<span class="ident">level</span><span class="op">+</span><span class="num">1</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">225</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nodeIndex</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtintype">uint16</span><span class="op">(</span><span class="ident">t</span><span class="op">.</span><span class="ident">nextNode</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">node</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">&amp;</span><span class="ident">t</span><span class="op">.</span><span class="ident">nodes</span><span class="op">[</span><span class="ident">t</span><span class="op">.</span><span class="ident">nextNode</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">nextNode</span><span class="op">++</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">230</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">left</span><span class="op">)</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">1</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;leaf&nbsp;node</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">node</span><span class="op">.</span><span class="ident">left</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">invalidNodeValue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">node</span><span class="op">.</span><span class="ident">leftValue</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">left</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="op">.</span><span class="ident">value</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">235</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">node</span><span class="op">.</span><span class="ident">left</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">buildHuffmanNode</span><span class="op">(</span><span class="ident">t</span><span class="op">,</span>&nbsp;<span class="ident">left</span><span class="op">,</span>&nbsp;<span class="ident">level</span><span class="op">+</span><span class="num">1</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno">240</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">right</span><span class="op">)</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">1</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;leaf&nbsp;node</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">node</span><span class="op">.</span><span class="ident">right</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">invalidNodeValue</span><br>
+<span class="lineno">245</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">node</span><span class="op">.</span><span class="ident">rightValue</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">right</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="op">.</span><span class="ident">value</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">node</span><span class="op">.</span><span class="ident">right</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">buildHuffmanNode</span><span class="op">(</span><span class="ident">t</span><span class="op">,</span>&nbsp;<span class="ident">right</span><span class="op">,</span>&nbsp;<span class="ident">level</span><span class="op">+</span><span class="num">1</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">250</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

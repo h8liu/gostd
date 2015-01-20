@@ -1,0 +1,334 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2009&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="comment">//&nbsp;+build&nbsp;!windows,!nacl,!plan9</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Package&nbsp;syslog&nbsp;provides&nbsp;a&nbsp;simple&nbsp;interface&nbsp;to&nbsp;the&nbsp;system&nbsp;log</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;service.&nbsp;It&nbsp;can&nbsp;send&nbsp;messages&nbsp;to&nbsp;the&nbsp;syslog&nbsp;daemon&nbsp;using&nbsp;UNIX</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;domain&nbsp;sockets,&nbsp;UDP&nbsp;or&nbsp;TCP.</span><br>
+<span class="lineno">10</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Only&nbsp;one&nbsp;call&nbsp;to&nbsp;Dial&nbsp;is&nbsp;necessary.&nbsp;On&nbsp;write&nbsp;failures,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;the&nbsp;syslog&nbsp;client&nbsp;will&nbsp;attempt&nbsp;to&nbsp;reconnect&nbsp;to&nbsp;the&nbsp;server</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;and&nbsp;write&nbsp;again.</span><br>
+<span class="lineno"></span><span class="keyword">package</span>&nbsp;<span class="ident">syslog</span><br>
+<span class="lineno">15</span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;errors&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;fmt&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;log&#34;</span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;net&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;os&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;strings&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;sync&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;time&#34;</span><br>
+<span class="lineno">25</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;Priority&nbsp;is&nbsp;a&nbsp;combination&nbsp;of&nbsp;the&nbsp;syslog&nbsp;facility&nbsp;and</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;severity.&nbsp;For&nbsp;example,&nbsp;LOG_ALERT&nbsp;|&nbsp;LOG_FTP&nbsp;sends&nbsp;an&nbsp;alert&nbsp;severity</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;message&nbsp;from&nbsp;the&nbsp;FTP&nbsp;facility.&nbsp;The&nbsp;default&nbsp;severity&nbsp;is&nbsp;LOG_EMERG;</span><br>
+<span class="lineno">30</span><span class="comment">//&nbsp;the&nbsp;default&nbsp;facility&nbsp;is&nbsp;LOG_KERN.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">Priority</span>&nbsp;<span class="builtintype">int</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">severityMask</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0x07</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">facilityMask</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0xf8</span><br>
+<span class="lineno">35</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Severity.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;From&nbsp;/usr/include/sys/syslog.h.</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;These&nbsp;are&nbsp;the&nbsp;same&nbsp;on&nbsp;Linux,&nbsp;BSD,&nbsp;and&nbsp;OS&nbsp;X.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">LOG_EMERG</span>&nbsp;<span class="ident">Priority</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">iota</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">LOG_ALERT</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">LOG_CRIT</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">LOG_ERR</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">LOG_WARNING</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">LOG_NOTICE</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">LOG_INFO</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">LOG_DEBUG</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno">50</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Facility.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;From&nbsp;/usr/include/sys/syslog.h.</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;These&nbsp;are&nbsp;the&nbsp;same&nbsp;up&nbsp;to&nbsp;LOG_FTP&nbsp;on&nbsp;Linux,&nbsp;BSD,&nbsp;and&nbsp;OS&nbsp;X.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">LOG_KERN</span>&nbsp;<span class="ident">Priority</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">iota</span>&nbsp;<span class="op">&lt;&lt;</span>&nbsp;<span class="num">3</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">LOG_USER</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">LOG_MAIL</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">LOG_DAEMON</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">LOG_AUTH</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">LOG_SYSLOG</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">LOG_LPR</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">LOG_NEWS</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">LOG_UUCP</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">LOG_CRON</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">LOG_AUTHPRIV</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">LOG_FTP</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_</span>&nbsp;<span class="comment">//&nbsp;unused</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_</span>&nbsp;<span class="comment">//&nbsp;unused</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_</span>&nbsp;<span class="comment">//&nbsp;unused</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_</span>&nbsp;<span class="comment">//&nbsp;unused</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">LOG_LOCAL0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">LOG_LOCAL1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">LOG_LOCAL2</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">LOG_LOCAL3</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">LOG_LOCAL4</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">LOG_LOCAL5</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">LOG_LOCAL6</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">LOG_LOCAL7</span><br>
+<span class="lineno">80</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;A&nbsp;Writer&nbsp;is&nbsp;a&nbsp;connection&nbsp;to&nbsp;a&nbsp;syslog&nbsp;server.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">Writer</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">priority</span>&nbsp;<span class="ident">Priority</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tag</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">hostname</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">network</span>&nbsp;&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">raddr</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mu</span>&nbsp;&nbsp;&nbsp;<span class="ident">sync</span><span class="op">.</span><span class="ident">Mutex</span>&nbsp;<span class="comment">//&nbsp;guards&nbsp;conn</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">conn</span>&nbsp;<span class="ident">serverConn</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;This&nbsp;interface&nbsp;and&nbsp;the&nbsp;separate&nbsp;syslog_unix.go&nbsp;file&nbsp;exist&nbsp;for</span><br>
+<span class="lineno">95</span><span class="comment">//&nbsp;Solaris&nbsp;support&nbsp;as&nbsp;implemented&nbsp;by&nbsp;gccgo.&nbsp;&nbsp;On&nbsp;Solaris&nbsp;you&nbsp;can&nbsp;not</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;simply&nbsp;open&nbsp;a&nbsp;TCP&nbsp;connection&nbsp;to&nbsp;the&nbsp;syslog&nbsp;daemon.&nbsp;&nbsp;The&nbsp;gccgo</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;sources&nbsp;have&nbsp;a&nbsp;syslog_solaris.go&nbsp;file&nbsp;that&nbsp;implements&nbsp;unixSyslog&nbsp;to</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;return&nbsp;a&nbsp;type&nbsp;that&nbsp;satisfies&nbsp;this&nbsp;interface&nbsp;and&nbsp;simply&nbsp;calls&nbsp;the&nbsp;C</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;library&nbsp;syslog&nbsp;function.</span><br>
+<span class="lineno">100</span><span class="keyword">type</span>&nbsp;<span class="ident">serverConn</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">writeString</span><span class="op">(</span><span class="ident">p</span>&nbsp;<span class="ident">Priority</span><span class="op">,</span>&nbsp;<span class="ident">hostname</span><span class="op">,</span>&nbsp;<span class="ident">tag</span><span class="op">,</span>&nbsp;<span class="ident">s</span><span class="op">,</span>&nbsp;<span class="ident">nl</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">close</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">105</span><span class="keyword">type</span>&nbsp;<span class="ident">netConn</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">local</span>&nbsp;<span class="builtintype">bool</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">conn</span>&nbsp;&nbsp;<span class="ident">net</span><span class="op">.</span><span class="ident">Conn</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">110</span><span class="comment">//&nbsp;New&nbsp;establishes&nbsp;a&nbsp;new&nbsp;connection&nbsp;to&nbsp;the&nbsp;system&nbsp;log&nbsp;daemon.&nbsp;&nbsp;Each</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;write&nbsp;to&nbsp;the&nbsp;returned&nbsp;writer&nbsp;sends&nbsp;a&nbsp;log&nbsp;message&nbsp;with&nbsp;the&nbsp;given</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;priority&nbsp;and&nbsp;prefix.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">New</span><span class="op">(</span><span class="ident">priority</span>&nbsp;<span class="ident">Priority</span><span class="op">,</span>&nbsp;<span class="ident">tag</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">w</span>&nbsp;<span class="op">*</span><span class="ident">Writer</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">Dial</span><span class="op">(</span><span class="string">&#34;&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;&#34;</span><span class="op">,</span>&nbsp;<span class="ident">priority</span><span class="op">,</span>&nbsp;<span class="ident">tag</span><span class="op">)</span><br>
+<span class="lineno">115</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Dial&nbsp;establishes&nbsp;a&nbsp;connection&nbsp;to&nbsp;a&nbsp;log&nbsp;daemon&nbsp;by&nbsp;connecting&nbsp;to</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;address&nbsp;raddr&nbsp;on&nbsp;the&nbsp;specified&nbsp;network.&nbsp;&nbsp;Each&nbsp;write&nbsp;to&nbsp;the&nbsp;returned</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;writer&nbsp;sends&nbsp;a&nbsp;log&nbsp;message&nbsp;with&nbsp;the&nbsp;given&nbsp;facility,&nbsp;severity&nbsp;and</span><br>
+<span class="lineno">120</span><span class="comment">//&nbsp;tag.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;If&nbsp;network&nbsp;is&nbsp;empty,&nbsp;Dial&nbsp;will&nbsp;connect&nbsp;to&nbsp;the&nbsp;local&nbsp;syslog&nbsp;server.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">Dial</span><span class="op">(</span><span class="ident">network</span><span class="op">,</span>&nbsp;<span class="ident">raddr</span>&nbsp;<span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">priority</span>&nbsp;<span class="ident">Priority</span><span class="op">,</span>&nbsp;<span class="ident">tag</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="op">*</span><span class="ident">Writer</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">priority</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">priority</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="ident">LOG_LOCAL7</span><span class="op">|</span><span class="ident">LOG_DEBUG</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">errors</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="string">&#34;log/syslog:&nbsp;invalid&nbsp;priority&#34;</span><span class="op">)</span><br>
+<span class="lineno">125</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">tag</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#34;&#34;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tag</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">os</span><span class="op">.</span><span class="ident">Args</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">130</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">hostname</span><span class="op">,</span>&nbsp;<span class="ident">_</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">os</span><span class="op">.</span><span class="ident">Hostname</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">w</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">&amp;</span><span class="ident">Writer</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">priority</span><span class="op">:</span>&nbsp;<span class="ident">priority</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tag</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">tag</span><span class="op">,</span><br>
+<span class="lineno">135</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">hostname</span><span class="op">:</span>&nbsp;<span class="ident">hostname</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">network</span><span class="op">:</span>&nbsp;&nbsp;<span class="ident">network</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">raddr</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">raddr</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">140</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">w</span><span class="op">.</span><span class="ident">mu</span><span class="op">.</span><span class="ident">Lock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">defer</span>&nbsp;<span class="ident">w</span><span class="op">.</span><span class="ident">mu</span><span class="op">.</span><span class="ident">Unlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">w</span><span class="op">.</span><span class="ident">connect</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">145</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">w</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">150</span><span class="comment">//&nbsp;connect&nbsp;makes&nbsp;a&nbsp;connection&nbsp;to&nbsp;the&nbsp;syslog&nbsp;server.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;It&nbsp;must&nbsp;be&nbsp;called&nbsp;with&nbsp;w.mu&nbsp;held.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">w</span>&nbsp;<span class="op">*</span><span class="ident">Writer</span><span class="op">)</span>&nbsp;<span class="ident">connect</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">w</span><span class="op">.</span><span class="ident">conn</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;ignore&nbsp;err&nbsp;from&nbsp;close,&nbsp;it&nbsp;makes&nbsp;sense&nbsp;to&nbsp;continue&nbsp;anyway</span><br>
+<span class="lineno">155</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">w</span><span class="op">.</span><span class="ident">conn</span><span class="op">.</span><span class="builtinfunc">close</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">w</span><span class="op">.</span><span class="ident">conn</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">w</span><span class="op">.</span><span class="ident">network</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#34;&#34;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">160</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">w</span><span class="op">.</span><span class="ident">conn</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">unixSyslog</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">w</span><span class="op">.</span><span class="ident">hostname</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#34;&#34;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">w</span><span class="op">.</span><span class="ident">hostname</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">&#34;localhost&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">165</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="ident">net</span><span class="op">.</span><span class="ident">Conn</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">net</span><span class="op">.</span><span class="ident">Dial</span><span class="op">(</span><span class="ident">w</span><span class="op">.</span><span class="ident">network</span><span class="op">,</span>&nbsp;<span class="ident">w</span><span class="op">.</span><span class="ident">raddr</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">w</span><span class="op">.</span><span class="ident">conn</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">&amp;</span><span class="ident">netConn</span><span class="op">{</span><span class="ident">conn</span><span class="op">:</span>&nbsp;<span class="ident">c</span><span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">w</span><span class="op">.</span><span class="ident">hostname</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#34;&#34;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">170</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">w</span><span class="op">.</span><span class="ident">hostname</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">LocalAddr</span><span class="op">(</span><span class="op">)</span><span class="op">.</span><span class="ident">String</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno">175</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Write&nbsp;sends&nbsp;a&nbsp;log&nbsp;message&nbsp;to&nbsp;the&nbsp;syslog&nbsp;daemon.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">w</span>&nbsp;<span class="op">*</span><span class="ident">Writer</span><span class="op">)</span>&nbsp;<span class="ident">Write</span><span class="op">(</span><span class="ident">b</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">w</span><span class="op">.</span><span class="ident">writeAndRetry</span><span class="op">(</span><span class="ident">w</span><span class="op">.</span><span class="ident">priority</span><span class="op">,</span>&nbsp;<span class="builtintype">string</span><span class="op">(</span><span class="ident">b</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno">180</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Close&nbsp;closes&nbsp;a&nbsp;connection&nbsp;to&nbsp;the&nbsp;syslog&nbsp;daemon.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">w</span>&nbsp;<span class="op">*</span><span class="ident">Writer</span><span class="op">)</span>&nbsp;<span class="ident">Close</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">w</span><span class="op">.</span><span class="ident">mu</span><span class="op">.</span><span class="ident">Lock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">185</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">defer</span>&nbsp;<span class="ident">w</span><span class="op">.</span><span class="ident">mu</span><span class="op">.</span><span class="ident">Unlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">w</span><span class="op">.</span><span class="ident">conn</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">w</span><span class="op">.</span><span class="ident">conn</span><span class="op">.</span><span class="builtinfunc">close</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">w</span><span class="op">.</span><span class="ident">conn</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno">190</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">195</span><span class="comment">//&nbsp;Emerg&nbsp;logs&nbsp;a&nbsp;message&nbsp;with&nbsp;severity&nbsp;LOG_EMERG,&nbsp;ignoring&nbsp;the&nbsp;severity</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;passed&nbsp;to&nbsp;New.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">w</span>&nbsp;<span class="op">*</span><span class="ident">Writer</span><span class="op">)</span>&nbsp;<span class="ident">Emerg</span><span class="op">(</span><span class="ident">m</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">w</span><span class="op">.</span><span class="ident">writeAndRetry</span><span class="op">(</span><span class="ident">LOG_EMERG</span><span class="op">,</span>&nbsp;<span class="ident">m</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno">200</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Alert&nbsp;logs&nbsp;a&nbsp;message&nbsp;with&nbsp;severity&nbsp;LOG_ALERT,&nbsp;ignoring&nbsp;the&nbsp;severity</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;passed&nbsp;to&nbsp;New.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">w</span>&nbsp;<span class="op">*</span><span class="ident">Writer</span><span class="op">)</span>&nbsp;<span class="ident">Alert</span><span class="op">(</span><span class="ident">m</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">205</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">w</span><span class="op">.</span><span class="ident">writeAndRetry</span><span class="op">(</span><span class="ident">LOG_ALERT</span><span class="op">,</span>&nbsp;<span class="ident">m</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Crit&nbsp;logs&nbsp;a&nbsp;message&nbsp;with&nbsp;severity&nbsp;LOG_CRIT,&nbsp;ignoring&nbsp;the&nbsp;severity</span><br>
+<span class="lineno">210</span><span class="comment">//&nbsp;passed&nbsp;to&nbsp;New.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">w</span>&nbsp;<span class="op">*</span><span class="ident">Writer</span><span class="op">)</span>&nbsp;<span class="ident">Crit</span><span class="op">(</span><span class="ident">m</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">w</span><span class="op">.</span><span class="ident">writeAndRetry</span><span class="op">(</span><span class="ident">LOG_CRIT</span><span class="op">,</span>&nbsp;<span class="ident">m</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">215</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Err&nbsp;logs&nbsp;a&nbsp;message&nbsp;with&nbsp;severity&nbsp;LOG_ERR,&nbsp;ignoring&nbsp;the&nbsp;severity</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;passed&nbsp;to&nbsp;New.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">w</span>&nbsp;<span class="op">*</span><span class="ident">Writer</span><span class="op">)</span>&nbsp;<span class="ident">Err</span><span class="op">(</span><span class="ident">m</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">w</span><span class="op">.</span><span class="ident">writeAndRetry</span><span class="op">(</span><span class="ident">LOG_ERR</span><span class="op">,</span>&nbsp;<span class="ident">m</span><span class="op">)</span><br>
+<span class="lineno">220</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Warning&nbsp;logs&nbsp;a&nbsp;message&nbsp;with&nbsp;severity&nbsp;LOG_WARNING,&nbsp;ignoring&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;severity&nbsp;passed&nbsp;to&nbsp;New.</span><br>
+<span class="lineno">225</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">w</span>&nbsp;<span class="op">*</span><span class="ident">Writer</span><span class="op">)</span>&nbsp;<span class="ident">Warning</span><span class="op">(</span><span class="ident">m</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">w</span><span class="op">.</span><span class="ident">writeAndRetry</span><span class="op">(</span><span class="ident">LOG_WARNING</span><span class="op">,</span>&nbsp;<span class="ident">m</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">230</span><span class="comment">//&nbsp;Notice&nbsp;logs&nbsp;a&nbsp;message&nbsp;with&nbsp;severity&nbsp;LOG_NOTICE,&nbsp;ignoring&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;severity&nbsp;passed&nbsp;to&nbsp;New.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">w</span>&nbsp;<span class="op">*</span><span class="ident">Writer</span><span class="op">)</span>&nbsp;<span class="ident">Notice</span><span class="op">(</span><span class="ident">m</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">w</span><span class="op">.</span><span class="ident">writeAndRetry</span><span class="op">(</span><span class="ident">LOG_NOTICE</span><span class="op">,</span>&nbsp;<span class="ident">m</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno">235</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Info&nbsp;logs&nbsp;a&nbsp;message&nbsp;with&nbsp;severity&nbsp;LOG_INFO,&nbsp;ignoring&nbsp;the&nbsp;severity</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;passed&nbsp;to&nbsp;New.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">w</span>&nbsp;<span class="op">*</span><span class="ident">Writer</span><span class="op">)</span>&nbsp;<span class="ident">Info</span><span class="op">(</span><span class="ident">m</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">240</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">w</span><span class="op">.</span><span class="ident">writeAndRetry</span><span class="op">(</span><span class="ident">LOG_INFO</span><span class="op">,</span>&nbsp;<span class="ident">m</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Debug&nbsp;logs&nbsp;a&nbsp;message&nbsp;with&nbsp;severity&nbsp;LOG_DEBUG,&nbsp;ignoring&nbsp;the&nbsp;severity</span><br>
+<span class="lineno">245</span><span class="comment">//&nbsp;passed&nbsp;to&nbsp;New.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">w</span>&nbsp;<span class="op">*</span><span class="ident">Writer</span><span class="op">)</span>&nbsp;<span class="ident">Debug</span><span class="op">(</span><span class="ident">m</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">w</span><span class="op">.</span><span class="ident">writeAndRetry</span><span class="op">(</span><span class="ident">LOG_DEBUG</span><span class="op">,</span>&nbsp;<span class="ident">m</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">250</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">w</span>&nbsp;<span class="op">*</span><span class="ident">Writer</span><span class="op">)</span>&nbsp;<span class="ident">writeAndRetry</span><span class="op">(</span><span class="ident">p</span>&nbsp;<span class="ident">Priority</span><span class="op">,</span>&nbsp;<span class="ident">s</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pr</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">(</span><span class="ident">w</span><span class="op">.</span><span class="ident">priority</span>&nbsp;<span class="op">&amp;</span>&nbsp;<span class="ident">facilityMask</span><span class="op">)</span>&nbsp;<span class="op">|</span>&nbsp;<span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">&amp;</span>&nbsp;<span class="ident">severityMask</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">w</span><span class="op">.</span><span class="ident">mu</span><span class="op">.</span><span class="ident">Lock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">255</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">defer</span>&nbsp;<span class="ident">w</span><span class="op">.</span><span class="ident">mu</span><span class="op">.</span><span class="ident">Unlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">w</span><span class="op">.</span><span class="ident">conn</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">n</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">w</span><span class="op">.</span><span class="ident">write</span><span class="op">(</span><span class="ident">pr</span><span class="op">,</span>&nbsp;<span class="ident">s</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">n</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno">260</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">w</span><span class="op">.</span><span class="ident">connect</span><span class="op">(</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">265</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">w</span><span class="op">.</span><span class="ident">write</span><span class="op">(</span><span class="ident">pr</span><span class="op">,</span>&nbsp;<span class="ident">s</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;write&nbsp;generates&nbsp;and&nbsp;writes&nbsp;a&nbsp;syslog&nbsp;formatted&nbsp;string.&nbsp;The</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;format&nbsp;is&nbsp;as&nbsp;follows:&nbsp;&lt;PRI&gt;TIMESTAMP&nbsp;HOSTNAME&nbsp;TAG[PID]:&nbsp;MSG</span><br>
+<span class="lineno">270</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">w</span>&nbsp;<span class="op">*</span><span class="ident">Writer</span><span class="op">)</span>&nbsp;<span class="ident">write</span><span class="op">(</span><span class="ident">p</span>&nbsp;<span class="ident">Priority</span><span class="op">,</span>&nbsp;<span class="ident">msg</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;ensure&nbsp;it&nbsp;ends&nbsp;in&nbsp;a&nbsp;\n</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nl</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="string">&#34;&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">strings</span><span class="op">.</span><span class="ident">HasSuffix</span><span class="op">(</span><span class="ident">msg</span><span class="op">,</span>&nbsp;<span class="string">&#34;\n&#34;</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nl</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">&#34;\n&#34;</span><br>
+<span class="lineno">275</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">w</span><span class="op">.</span><span class="ident">conn</span><span class="op">.</span><span class="ident">writeString</span><span class="op">(</span><span class="ident">p</span><span class="op">,</span>&nbsp;<span class="ident">w</span><span class="op">.</span><span class="ident">hostname</span><span class="op">,</span>&nbsp;<span class="ident">w</span><span class="op">.</span><span class="ident">tag</span><span class="op">,</span>&nbsp;<span class="ident">msg</span><span class="op">,</span>&nbsp;<span class="ident">nl</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno">280</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Note:&nbsp;return&nbsp;the&nbsp;length&nbsp;of&nbsp;the&nbsp;input,&nbsp;not&nbsp;the&nbsp;number&nbsp;of</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;bytes&nbsp;printed&nbsp;by&nbsp;Fprintf,&nbsp;because&nbsp;this&nbsp;must&nbsp;behave&nbsp;like</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;an&nbsp;io.Writer.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">msg</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno">285</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">n</span>&nbsp;<span class="op">*</span><span class="ident">netConn</span><span class="op">)</span>&nbsp;<span class="ident">writeString</span><span class="op">(</span><span class="ident">p</span>&nbsp;<span class="ident">Priority</span><span class="op">,</span>&nbsp;<span class="ident">hostname</span><span class="op">,</span>&nbsp;<span class="ident">tag</span><span class="op">,</span>&nbsp;<span class="ident">msg</span><span class="op">,</span>&nbsp;<span class="ident">nl</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">n</span><span class="op">.</span><span class="ident">local</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Compared&nbsp;to&nbsp;the&nbsp;network&nbsp;form&nbsp;below,&nbsp;the&nbsp;changes&nbsp;are:</span><br>
+<span class="lineno">290</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp1.&nbsp;Use&nbsp;time.Stamp&nbsp;instead&nbsp;of&nbsp;time.RFC3339.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp2.&nbsp;Drop&nbsp;the&nbsp;hostname&nbsp;field&nbsp;from&nbsp;the&nbsp;Fprintf.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">timestamp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">time</span><span class="op">.</span><span class="ident">Now</span><span class="op">(</span><span class="op">)</span><span class="op">.</span><span class="ident">Format</span><span class="op">(</span><span class="ident">time</span><span class="op">.</span><span class="ident">Stamp</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">fmt</span><span class="op">.</span><span class="ident">Fprintf</span><span class="op">(</span><span class="ident">n</span><span class="op">.</span><span class="ident">conn</span><span class="op">,</span>&nbsp;<span class="string">&#34;&lt;%d&gt;%s&nbsp;%s[%d]:&nbsp;%s%s&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">,</span>&nbsp;<span class="ident">timestamp</span><span class="op">,</span><br>
+<span class="lineno">295</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tag</span><span class="op">,</span>&nbsp;<span class="ident">os</span><span class="op">.</span><span class="ident">Getpid</span><span class="op">(</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">msg</span><span class="op">,</span>&nbsp;<span class="ident">nl</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">timestamp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">time</span><span class="op">.</span><span class="ident">Now</span><span class="op">(</span><span class="op">)</span><span class="op">.</span><span class="ident">Format</span><span class="op">(</span><span class="ident">time</span><span class="op">.</span><span class="ident">RFC3339</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">fmt</span><span class="op">.</span><span class="ident">Fprintf</span><span class="op">(</span><span class="ident">n</span><span class="op">.</span><span class="ident">conn</span><span class="op">,</span>&nbsp;<span class="string">&#34;&lt;%d&gt;%s&nbsp;%s&nbsp;%s[%d]:&nbsp;%s%s&#34;</span><span class="op">,</span><br>
+<span class="lineno">300</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">,</span>&nbsp;<span class="ident">timestamp</span><span class="op">,</span>&nbsp;<span class="ident">hostname</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tag</span><span class="op">,</span>&nbsp;<span class="ident">os</span><span class="op">.</span><span class="ident">Getpid</span><span class="op">(</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">msg</span><span class="op">,</span>&nbsp;<span class="ident">nl</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">305</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">n</span>&nbsp;<span class="op">*</span><span class="ident">netConn</span><span class="op">)</span>&nbsp;<span class="builtinfunc">close</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">n</span><span class="op">.</span><span class="ident">conn</span><span class="op">.</span><span class="ident">Close</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;NewLogger&nbsp;creates&nbsp;a&nbsp;log.Logger&nbsp;whose&nbsp;output&nbsp;is&nbsp;written&nbsp;to</span><br>
+<span class="lineno">310</span><span class="comment">//&nbsp;the&nbsp;system&nbsp;log&nbsp;service&nbsp;with&nbsp;the&nbsp;specified&nbsp;priority.&nbsp;The&nbsp;logFlag</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;argument&nbsp;is&nbsp;the&nbsp;flag&nbsp;set&nbsp;passed&nbsp;through&nbsp;to&nbsp;log.New&nbsp;to&nbsp;create</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;the&nbsp;Logger.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">NewLogger</span><span class="op">(</span><span class="ident">p</span>&nbsp;<span class="ident">Priority</span><span class="op">,</span>&nbsp;<span class="ident">logFlag</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="op">*</span><span class="ident">log</span><span class="op">.</span><span class="ident">Logger</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">New</span><span class="op">(</span><span class="ident">p</span><span class="op">,</span>&nbsp;<span class="string">&#34;&#34;</span><span class="op">)</span><br>
+<span class="lineno">315</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">log</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="ident">s</span><span class="op">,</span>&nbsp;<span class="string">&#34;&#34;</span><span class="op">,</span>&nbsp;<span class="ident">logFlag</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

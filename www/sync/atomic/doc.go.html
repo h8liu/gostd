@@ -1,0 +1,164 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2011&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="comment">//&nbsp;Package&nbsp;atomic&nbsp;provides&nbsp;low-level&nbsp;atomic&nbsp;memory&nbsp;primitives</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;useful&nbsp;for&nbsp;implementing&nbsp;synchronization&nbsp;algorithms.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;These&nbsp;functions&nbsp;require&nbsp;great&nbsp;care&nbsp;to&nbsp;be&nbsp;used&nbsp;correctly.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Except&nbsp;for&nbsp;special,&nbsp;low-level&nbsp;applications,&nbsp;synchronization&nbsp;is&nbsp;better</span><br>
+<span class="lineno">10</span><span class="comment">//&nbsp;done&nbsp;with&nbsp;channels&nbsp;or&nbsp;the&nbsp;facilities&nbsp;of&nbsp;the&nbsp;sync&nbsp;package.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Share&nbsp;memory&nbsp;by&nbsp;communicating;</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;don&#39;t&nbsp;communicate&nbsp;by&nbsp;sharing&nbsp;memory.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;swap&nbsp;operation,&nbsp;implemented&nbsp;by&nbsp;the&nbsp;SwapT&nbsp;functions,&nbsp;is&nbsp;the&nbsp;atomic</span><br>
+<span class="lineno">15</span><span class="comment">//&nbsp;equivalent&nbsp;of:</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspold&nbsp;=&nbsp;*addr</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp*addr&nbsp;=&nbsp;new</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspreturn&nbsp;old</span><br>
+<span class="lineno">20</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;compare-and-swap&nbsp;operation,&nbsp;implemented&nbsp;by&nbsp;the&nbsp;CompareAndSwapT</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;functions,&nbsp;is&nbsp;the&nbsp;atomic&nbsp;equivalent&nbsp;of:</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspif&nbsp;*addr&nbsp;==&nbsp;old&nbsp;{</span><br>
+<span class="lineno">25</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp*addr&nbsp;=&nbsp;new</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspreturn&nbsp;true</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp}</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspreturn&nbsp;false</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">30</span><span class="comment">//&nbsp;The&nbsp;add&nbsp;operation,&nbsp;implemented&nbsp;by&nbsp;the&nbsp;AddT&nbsp;functions,&nbsp;is&nbsp;the&nbsp;atomic</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;equivalent&nbsp;of:</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp*addr&nbsp;+=&nbsp;delta</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspreturn&nbsp;*addr</span><br>
+<span class="lineno">35</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;load&nbsp;and&nbsp;store&nbsp;operations,&nbsp;implemented&nbsp;by&nbsp;the&nbsp;LoadT&nbsp;and&nbsp;StoreT</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;functions,&nbsp;are&nbsp;the&nbsp;atomic&nbsp;equivalents&nbsp;of&nbsp;&#34;return&nbsp;*addr&#34;&nbsp;and</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&#34;*addr&nbsp;=&nbsp;val&#34;.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">40</span><span class="keyword">package</span>&nbsp;<span class="ident">atomic</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;unsafe&#34;</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno">45</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;BUG(rsc):&nbsp;On&nbsp;x86-32,&nbsp;the&nbsp;64-bit&nbsp;functions&nbsp;use&nbsp;instructions&nbsp;unavailable&nbsp;before&nbsp;the&nbsp;Pentium&nbsp;MMX.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;On&nbsp;non-Linux&nbsp;ARM,&nbsp;the&nbsp;64-bit&nbsp;functions&nbsp;use&nbsp;instructions&nbsp;unavailable&nbsp;before&nbsp;the&nbsp;ARMv6k&nbsp;core.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">50</span><span class="comment">//&nbsp;On&nbsp;both&nbsp;ARM&nbsp;and&nbsp;x86-32,&nbsp;it&nbsp;is&nbsp;the&nbsp;caller&#39;s&nbsp;responsibility&nbsp;to&nbsp;arrange&nbsp;for&nbsp;64-bit</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;alignment&nbsp;of&nbsp;64-bit&nbsp;words&nbsp;accessed&nbsp;atomically.&nbsp;The&nbsp;first&nbsp;word&nbsp;in&nbsp;a&nbsp;global</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;variable&nbsp;or&nbsp;in&nbsp;an&nbsp;allocated&nbsp;struct&nbsp;or&nbsp;slice&nbsp;can&nbsp;be&nbsp;relied&nbsp;upon&nbsp;to&nbsp;be</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;64-bit&nbsp;aligned.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">55</span><span class="comment">//&nbsp;SwapInt32&nbsp;atomically&nbsp;stores&nbsp;new&nbsp;into&nbsp;*addr&nbsp;and&nbsp;returns&nbsp;the&nbsp;previous&nbsp;*addr&nbsp;value.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">SwapInt32</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="op">*</span><span class="builtintype">int32</span><span class="op">,</span>&nbsp;<span class="builtinfunc">new</span>&nbsp;<span class="builtintype">int32</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">old</span>&nbsp;<span class="builtintype">int32</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;SwapInt64&nbsp;atomically&nbsp;stores&nbsp;new&nbsp;into&nbsp;*addr&nbsp;and&nbsp;returns&nbsp;the&nbsp;previous&nbsp;*addr&nbsp;value.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">SwapInt64</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="op">*</span><span class="ident">int64</span><span class="op">,</span>&nbsp;<span class="builtinfunc">new</span>&nbsp;<span class="ident">int64</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">old</span>&nbsp;<span class="ident">int64</span><span class="op">)</span><br>
+<span class="lineno">60</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;SwapUint32&nbsp;atomically&nbsp;stores&nbsp;new&nbsp;into&nbsp;*addr&nbsp;and&nbsp;returns&nbsp;the&nbsp;previous&nbsp;*addr&nbsp;value.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">SwapUint32</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="op">*</span><span class="builtintype">uint32</span><span class="op">,</span>&nbsp;<span class="builtinfunc">new</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">old</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;SwapUint64&nbsp;atomically&nbsp;stores&nbsp;new&nbsp;into&nbsp;*addr&nbsp;and&nbsp;returns&nbsp;the&nbsp;previous&nbsp;*addr&nbsp;value.</span><br>
+<span class="lineno">65</span><span class="keyword">func</span>&nbsp;<span class="ident">SwapUint64</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="op">*</span><span class="ident">uint64</span><span class="op">,</span>&nbsp;<span class="builtinfunc">new</span>&nbsp;<span class="ident">uint64</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">old</span>&nbsp;<span class="ident">uint64</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;SwapUintptr&nbsp;atomically&nbsp;stores&nbsp;new&nbsp;into&nbsp;*addr&nbsp;and&nbsp;returns&nbsp;the&nbsp;previous&nbsp;*addr&nbsp;value.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">SwapUintptr</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="op">*</span><span class="builtintype">uintptr</span><span class="op">,</span>&nbsp;<span class="builtinfunc">new</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">old</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">70</span><span class="comment">//&nbsp;SwapPointer&nbsp;atomically&nbsp;stores&nbsp;new&nbsp;into&nbsp;*addr&nbsp;and&nbsp;returns&nbsp;the&nbsp;previous&nbsp;*addr&nbsp;value.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">SwapPointer</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="op">*</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">,</span>&nbsp;<span class="builtinfunc">new</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">old</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;CompareAndSwapInt32&nbsp;executes&nbsp;the&nbsp;compare-and-swap&nbsp;operation&nbsp;for&nbsp;an&nbsp;int32&nbsp;value.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">CompareAndSwapInt32</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="op">*</span><span class="builtintype">int32</span><span class="op">,</span>&nbsp;<span class="ident">old</span><span class="op">,</span>&nbsp;<span class="builtinfunc">new</span>&nbsp;<span class="builtintype">int32</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">swapped</span>&nbsp;<span class="builtintype">bool</span><span class="op">)</span><br>
+<span class="lineno">75</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;CompareAndSwapInt64&nbsp;executes&nbsp;the&nbsp;compare-and-swap&nbsp;operation&nbsp;for&nbsp;an&nbsp;int64&nbsp;value.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">CompareAndSwapInt64</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="op">*</span><span class="ident">int64</span><span class="op">,</span>&nbsp;<span class="ident">old</span><span class="op">,</span>&nbsp;<span class="builtinfunc">new</span>&nbsp;<span class="ident">int64</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">swapped</span>&nbsp;<span class="builtintype">bool</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;CompareAndSwapUint32&nbsp;executes&nbsp;the&nbsp;compare-and-swap&nbsp;operation&nbsp;for&nbsp;a&nbsp;uint32&nbsp;value.</span><br>
+<span class="lineno">80</span><span class="keyword">func</span>&nbsp;<span class="ident">CompareAndSwapUint32</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="op">*</span><span class="builtintype">uint32</span><span class="op">,</span>&nbsp;<span class="ident">old</span><span class="op">,</span>&nbsp;<span class="builtinfunc">new</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">swapped</span>&nbsp;<span class="builtintype">bool</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;CompareAndSwapUint64&nbsp;executes&nbsp;the&nbsp;compare-and-swap&nbsp;operation&nbsp;for&nbsp;a&nbsp;uint64&nbsp;value.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">CompareAndSwapUint64</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="op">*</span><span class="ident">uint64</span><span class="op">,</span>&nbsp;<span class="ident">old</span><span class="op">,</span>&nbsp;<span class="builtinfunc">new</span>&nbsp;<span class="ident">uint64</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">swapped</span>&nbsp;<span class="builtintype">bool</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">85</span><span class="comment">//&nbsp;CompareAndSwapUintptr&nbsp;executes&nbsp;the&nbsp;compare-and-swap&nbsp;operation&nbsp;for&nbsp;a&nbsp;uintptr&nbsp;value.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">CompareAndSwapUintptr</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="op">*</span><span class="builtintype">uintptr</span><span class="op">,</span>&nbsp;<span class="ident">old</span><span class="op">,</span>&nbsp;<span class="builtinfunc">new</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">swapped</span>&nbsp;<span class="builtintype">bool</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;CompareAndSwapPointer&nbsp;executes&nbsp;the&nbsp;compare-and-swap&nbsp;operation&nbsp;for&nbsp;a&nbsp;unsafe.Pointer&nbsp;value.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">CompareAndSwapPointer</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="op">*</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">,</span>&nbsp;<span class="ident">old</span><span class="op">,</span>&nbsp;<span class="builtinfunc">new</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">swapped</span>&nbsp;<span class="builtintype">bool</span><span class="op">)</span><br>
+<span class="lineno">90</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;AddInt32&nbsp;atomically&nbsp;adds&nbsp;delta&nbsp;to&nbsp;*addr&nbsp;and&nbsp;returns&nbsp;the&nbsp;new&nbsp;value.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">AddInt32</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="op">*</span><span class="builtintype">int32</span><span class="op">,</span>&nbsp;<span class="ident">delta</span>&nbsp;<span class="builtintype">int32</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="builtinfunc">new</span>&nbsp;<span class="builtintype">int32</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;AddUint32&nbsp;atomically&nbsp;adds&nbsp;delta&nbsp;to&nbsp;*addr&nbsp;and&nbsp;returns&nbsp;the&nbsp;new&nbsp;value.</span><br>
+<span class="lineno">95</span><span class="comment">//&nbsp;To&nbsp;subtract&nbsp;a&nbsp;signed&nbsp;positive&nbsp;constant&nbsp;value&nbsp;c&nbsp;from&nbsp;x,&nbsp;do&nbsp;AddUint32(&amp;x,&nbsp;^uint32(c-1)).</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;In&nbsp;particular,&nbsp;to&nbsp;decrement&nbsp;x,&nbsp;do&nbsp;AddUint32(&amp;x,&nbsp;^uint32(0)).</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">AddUint32</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="op">*</span><span class="builtintype">uint32</span><span class="op">,</span>&nbsp;<span class="ident">delta</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="builtinfunc">new</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;AddInt64&nbsp;atomically&nbsp;adds&nbsp;delta&nbsp;to&nbsp;*addr&nbsp;and&nbsp;returns&nbsp;the&nbsp;new&nbsp;value.</span><br>
+<span class="lineno">100</span><span class="keyword">func</span>&nbsp;<span class="ident">AddInt64</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="op">*</span><span class="ident">int64</span><span class="op">,</span>&nbsp;<span class="ident">delta</span>&nbsp;<span class="ident">int64</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="builtinfunc">new</span>&nbsp;<span class="ident">int64</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;AddUint64&nbsp;atomically&nbsp;adds&nbsp;delta&nbsp;to&nbsp;*addr&nbsp;and&nbsp;returns&nbsp;the&nbsp;new&nbsp;value.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;To&nbsp;subtract&nbsp;a&nbsp;signed&nbsp;positive&nbsp;constant&nbsp;value&nbsp;c&nbsp;from&nbsp;x,&nbsp;do&nbsp;AddUint64(&amp;x,&nbsp;^uint64(c-1)).</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;In&nbsp;particular,&nbsp;to&nbsp;decrement&nbsp;x,&nbsp;do&nbsp;AddUint64(&amp;x,&nbsp;^uint64(0)).</span><br>
+<span class="lineno">105</span><span class="keyword">func</span>&nbsp;<span class="ident">AddUint64</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="op">*</span><span class="ident">uint64</span><span class="op">,</span>&nbsp;<span class="ident">delta</span>&nbsp;<span class="ident">uint64</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="builtinfunc">new</span>&nbsp;<span class="ident">uint64</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;AddUintptr&nbsp;atomically&nbsp;adds&nbsp;delta&nbsp;to&nbsp;*addr&nbsp;and&nbsp;returns&nbsp;the&nbsp;new&nbsp;value.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">AddUintptr</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="op">*</span><span class="builtintype">uintptr</span><span class="op">,</span>&nbsp;<span class="ident">delta</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="builtinfunc">new</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">110</span><span class="comment">//&nbsp;LoadInt32&nbsp;atomically&nbsp;loads&nbsp;*addr.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">LoadInt32</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="op">*</span><span class="builtintype">int32</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">val</span>&nbsp;<span class="builtintype">int32</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;LoadInt64&nbsp;atomically&nbsp;loads&nbsp;*addr.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">LoadInt64</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="op">*</span><span class="ident">int64</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">val</span>&nbsp;<span class="ident">int64</span><span class="op">)</span><br>
+<span class="lineno">115</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;LoadUint32&nbsp;atomically&nbsp;loads&nbsp;*addr.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">LoadUint32</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="op">*</span><span class="builtintype">uint32</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">val</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;LoadUint64&nbsp;atomically&nbsp;loads&nbsp;*addr.</span><br>
+<span class="lineno">120</span><span class="keyword">func</span>&nbsp;<span class="ident">LoadUint64</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="op">*</span><span class="ident">uint64</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">val</span>&nbsp;<span class="ident">uint64</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;LoadUintptr&nbsp;atomically&nbsp;loads&nbsp;*addr.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">LoadUintptr</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="op">*</span><span class="builtintype">uintptr</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">val</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">125</span><span class="comment">//&nbsp;LoadPointer&nbsp;atomically&nbsp;loads&nbsp;*addr.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">LoadPointer</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="op">*</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">val</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;StoreInt32&nbsp;atomically&nbsp;stores&nbsp;val&nbsp;into&nbsp;*addr.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">StoreInt32</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="op">*</span><span class="builtintype">int32</span><span class="op">,</span>&nbsp;<span class="ident">val</span>&nbsp;<span class="builtintype">int32</span><span class="op">)</span><br>
+<span class="lineno">130</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;StoreInt64&nbsp;atomically&nbsp;stores&nbsp;val&nbsp;into&nbsp;*addr.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">StoreInt64</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="op">*</span><span class="ident">int64</span><span class="op">,</span>&nbsp;<span class="ident">val</span>&nbsp;<span class="ident">int64</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;StoreUint32&nbsp;atomically&nbsp;stores&nbsp;val&nbsp;into&nbsp;*addr.</span><br>
+<span class="lineno">135</span><span class="keyword">func</span>&nbsp;<span class="ident">StoreUint32</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="op">*</span><span class="builtintype">uint32</span><span class="op">,</span>&nbsp;<span class="ident">val</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;StoreUint64&nbsp;atomically&nbsp;stores&nbsp;val&nbsp;into&nbsp;*addr.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">StoreUint64</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="op">*</span><span class="ident">uint64</span><span class="op">,</span>&nbsp;<span class="ident">val</span>&nbsp;<span class="ident">uint64</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">140</span><span class="comment">//&nbsp;StoreUintptr&nbsp;atomically&nbsp;stores&nbsp;val&nbsp;into&nbsp;*addr.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">StoreUintptr</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="op">*</span><span class="builtintype">uintptr</span><span class="op">,</span>&nbsp;<span class="ident">val</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;StorePointer&nbsp;atomically&nbsp;stores&nbsp;val&nbsp;into&nbsp;*addr.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">StorePointer</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="op">*</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">,</span>&nbsp;<span class="ident">val</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">)</span><br>
+<span class="lineno">145</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Helper&nbsp;for&nbsp;ARM.&nbsp;&nbsp;Linker&nbsp;will&nbsp;discard&nbsp;on&nbsp;other&nbsp;systems</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">panic64</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">panic</span><span class="op">(</span><span class="string">&#34;sync/atomic:&nbsp;broken&nbsp;64-bit&nbsp;atomic&nbsp;operations&nbsp;(buggy&nbsp;QEMU)&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

@@ -1,0 +1,133 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2009&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">os</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;syscall&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;time&#34;</span><br>
+<span class="lineno">10</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Getpagesize&nbsp;returns&nbsp;the&nbsp;underlying&nbsp;system&#39;s&nbsp;memory&nbsp;page&nbsp;size.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">Getpagesize</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="ident">syscall</span><span class="op">.</span><span class="ident">Getpagesize</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">15</span><span class="comment">//&nbsp;A&nbsp;FileInfo&nbsp;describes&nbsp;a&nbsp;file&nbsp;and&nbsp;is&nbsp;returned&nbsp;by&nbsp;Stat&nbsp;and&nbsp;Lstat.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">FileInfo</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Name</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;base&nbsp;name&nbsp;of&nbsp;the&nbsp;file</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Size</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="ident">int64</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;length&nbsp;in&nbsp;bytes&nbsp;for&nbsp;regular&nbsp;files;&nbsp;system-dependent&nbsp;for&nbsp;others</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Mode</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="ident">FileMode</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;file&nbsp;mode&nbsp;bits</span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ModTime</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="ident">time</span><span class="op">.</span><span class="ident">Time</span>&nbsp;<span class="comment">//&nbsp;modification&nbsp;time</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">IsDir</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;abbreviation&nbsp;for&nbsp;Mode().IsDir()</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Sys</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="keyword">interface</span><span class="op">{</span><span class="op">}</span>&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;underlying&nbsp;data&nbsp;source&nbsp;(can&nbsp;return&nbsp;nil)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">25</span><span class="comment">//&nbsp;A&nbsp;FileMode&nbsp;represents&nbsp;a&nbsp;file&#39;s&nbsp;mode&nbsp;and&nbsp;permission&nbsp;bits.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;bits&nbsp;have&nbsp;the&nbsp;same&nbsp;definition&nbsp;on&nbsp;all&nbsp;systems,&nbsp;so&nbsp;that</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;information&nbsp;about&nbsp;files&nbsp;can&nbsp;be&nbsp;moved&nbsp;from&nbsp;one&nbsp;system</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;to&nbsp;another&nbsp;portably.&nbsp;&nbsp;Not&nbsp;all&nbsp;bits&nbsp;apply&nbsp;to&nbsp;all&nbsp;systems.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;only&nbsp;required&nbsp;bit&nbsp;is&nbsp;ModeDir&nbsp;for&nbsp;directories.</span><br>
+<span class="lineno">30</span><span class="keyword">type</span>&nbsp;<span class="ident">FileMode</span>&nbsp;<span class="builtintype">uint32</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;defined&nbsp;file&nbsp;mode&nbsp;bits&nbsp;are&nbsp;the&nbsp;most&nbsp;significant&nbsp;bits&nbsp;of&nbsp;the&nbsp;FileMode.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;nine&nbsp;least-significant&nbsp;bits&nbsp;are&nbsp;the&nbsp;standard&nbsp;Unix&nbsp;rwxrwxrwx&nbsp;permissions.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;values&nbsp;of&nbsp;these&nbsp;bits&nbsp;should&nbsp;be&nbsp;considered&nbsp;part&nbsp;of&nbsp;the&nbsp;public&nbsp;API&nbsp;and</span><br>
+<span class="lineno">35</span><span class="comment">//&nbsp;may&nbsp;be&nbsp;used&nbsp;in&nbsp;wire&nbsp;protocols&nbsp;or&nbsp;disk&nbsp;representations:&nbsp;they&nbsp;must&nbsp;not&nbsp;be</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;changed,&nbsp;although&nbsp;new&nbsp;bits&nbsp;might&nbsp;be&nbsp;added.</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;The&nbsp;single&nbsp;letters&nbsp;are&nbsp;the&nbsp;abbreviations</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;used&nbsp;by&nbsp;the&nbsp;String&nbsp;method&#39;s&nbsp;formatting.</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ModeDir</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">FileMode</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span>&nbsp;<span class="op">&lt;&lt;</span>&nbsp;<span class="op">(</span><span class="num">32</span>&nbsp;<span class="op">-</span>&nbsp;<span class="num">1</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">iota</span><span class="op">)</span>&nbsp;<span class="comment">//&nbsp;d:&nbsp;is&nbsp;a&nbsp;directory</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ModeAppend</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;a:&nbsp;append-only</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ModeExclusive</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;l:&nbsp;exclusive&nbsp;use</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ModeTemporary</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;T:&nbsp;temporary&nbsp;file&nbsp;(not&nbsp;backed&nbsp;up)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ModeSymlink</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;L:&nbsp;symbolic&nbsp;link</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ModeDevice</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;D:&nbsp;device&nbsp;file</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ModeNamedPipe</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;p:&nbsp;named&nbsp;pipe&nbsp;(FIFO)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ModeSocket</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;S:&nbsp;Unix&nbsp;domain&nbsp;socket</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ModeSetuid</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;u:&nbsp;setuid</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ModeSetgid</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;g:&nbsp;setgid</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ModeCharDevice</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;c:&nbsp;Unix&nbsp;character&nbsp;device,&nbsp;when&nbsp;ModeDevice&nbsp;is&nbsp;set</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ModeSticky</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;t:&nbsp;sticky</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Mask&nbsp;for&nbsp;the&nbsp;type&nbsp;bits.&nbsp;For&nbsp;regular&nbsp;files,&nbsp;none&nbsp;will&nbsp;be&nbsp;set.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ModeType</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">ModeDir</span>&nbsp;<span class="op">|</span>&nbsp;<span class="ident">ModeSymlink</span>&nbsp;<span class="op">|</span>&nbsp;<span class="ident">ModeNamedPipe</span>&nbsp;<span class="op">|</span>&nbsp;<span class="ident">ModeSocket</span>&nbsp;<span class="op">|</span>&nbsp;<span class="ident">ModeDevice</span><br>
+<span class="lineno">55</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ModePerm</span>&nbsp;<span class="ident">FileMode</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0777</span>&nbsp;<span class="comment">//&nbsp;permission&nbsp;bits</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">m</span>&nbsp;<span class="ident">FileMode</span><span class="op">)</span>&nbsp;<span class="ident">String</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">const</span>&nbsp;<span class="ident">str</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">&#34;dalTLDpSugct&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">buf</span>&nbsp;<span class="op">[</span><span class="num">32</span><span class="op">]</span><span class="builtintype">byte</span>&nbsp;<span class="comment">//&nbsp;Mode&nbsp;is&nbsp;uint32.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">w</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span><span class="op">,</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">str</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">m</span><span class="op">&amp;</span><span class="op">(</span><span class="num">1</span><span class="op">&lt;&lt;</span><span class="builtintype">uint</span><span class="op">(</span><span class="num">32</span><span class="op">-</span><span class="num">1</span><span class="op">-</span><span class="ident">i</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">buf</span><span class="op">[</span><span class="ident">w</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtintype">byte</span><span class="op">(</span><span class="ident">c</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">w</span><span class="op">++</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">w</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">buf</span><span class="op">[</span><span class="ident">w</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">&#39;-&#39;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">w</span><span class="op">++</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">const</span>&nbsp;<span class="ident">rwx</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">&#34;rwxrwxrwx&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span><span class="op">,</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">rwx</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">m</span><span class="op">&amp;</span><span class="op">(</span><span class="num">1</span><span class="op">&lt;&lt;</span><span class="builtintype">uint</span><span class="op">(</span><span class="num">9</span><span class="op">-</span><span class="num">1</span><span class="op">-</span><span class="ident">i</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">buf</span><span class="op">[</span><span class="ident">w</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtintype">byte</span><span class="op">(</span><span class="ident">c</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">buf</span><span class="op">[</span><span class="ident">w</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">&#39;-&#39;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">w</span><span class="op">++</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="builtintype">string</span><span class="op">(</span><span class="ident">buf</span><span class="op">[</span><span class="op">:</span><span class="ident">w</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">85</span><span class="comment">//&nbsp;IsDir&nbsp;reports&nbsp;whether&nbsp;m&nbsp;describes&nbsp;a&nbsp;directory.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;That&nbsp;is,&nbsp;it&nbsp;tests&nbsp;for&nbsp;the&nbsp;ModeDir&nbsp;bit&nbsp;being&nbsp;set&nbsp;in&nbsp;m.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">m</span>&nbsp;<span class="ident">FileMode</span><span class="op">)</span>&nbsp;<span class="ident">IsDir</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">m</span><span class="op">&amp;</span><span class="ident">ModeDir</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">90</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;IsRegular&nbsp;reports&nbsp;whether&nbsp;m&nbsp;describes&nbsp;a&nbsp;regular&nbsp;file.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;That&nbsp;is,&nbsp;it&nbsp;tests&nbsp;that&nbsp;no&nbsp;mode&nbsp;type&nbsp;bits&nbsp;are&nbsp;set.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">m</span>&nbsp;<span class="ident">FileMode</span><span class="op">)</span>&nbsp;<span class="ident">IsRegular</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">m</span><span class="op">&amp;</span><span class="ident">ModeType</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno">95</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Perm&nbsp;returns&nbsp;the&nbsp;Unix&nbsp;permission&nbsp;bits&nbsp;in&nbsp;m.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">m</span>&nbsp;<span class="ident">FileMode</span><span class="op">)</span>&nbsp;<span class="ident">Perm</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="ident">FileMode</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">m</span>&nbsp;<span class="op">&amp;</span>&nbsp;<span class="ident">ModePerm</span><br>
+<span class="lineno">100</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">fs</span>&nbsp;<span class="op">*</span><span class="ident">fileStat</span><span class="op">)</span>&nbsp;<span class="ident">Name</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="ident">fs</span><span class="op">.</span><span class="ident">name</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">fs</span>&nbsp;<span class="op">*</span><span class="ident">fileStat</span><span class="op">)</span>&nbsp;<span class="ident">IsDir</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="ident">fs</span><span class="op">.</span><span class="ident">Mode</span><span class="op">(</span><span class="op">)</span><span class="op">.</span><span class="ident">IsDir</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">105</span><span class="comment">//&nbsp;SameFile&nbsp;reports&nbsp;whether&nbsp;fi1&nbsp;and&nbsp;fi2&nbsp;describe&nbsp;the&nbsp;same&nbsp;file.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;For&nbsp;example,&nbsp;on&nbsp;Unix&nbsp;this&nbsp;means&nbsp;that&nbsp;the&nbsp;device&nbsp;and&nbsp;inode&nbsp;fields</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;of&nbsp;the&nbsp;two&nbsp;underlying&nbsp;structures&nbsp;are&nbsp;identical;&nbsp;on&nbsp;other&nbsp;systems</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;the&nbsp;decision&nbsp;may&nbsp;be&nbsp;based&nbsp;on&nbsp;the&nbsp;path&nbsp;names.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;SameFile&nbsp;only&nbsp;applies&nbsp;to&nbsp;results&nbsp;returned&nbsp;by&nbsp;this&nbsp;package&#39;s&nbsp;Stat.</span><br>
+<span class="lineno">110</span><span class="comment">//&nbsp;It&nbsp;returns&nbsp;false&nbsp;in&nbsp;other&nbsp;cases.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">SameFile</span><span class="op">(</span><span class="ident">fi1</span><span class="op">,</span>&nbsp;<span class="ident">fi2</span>&nbsp;<span class="ident">FileInfo</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fs1</span><span class="op">,</span>&nbsp;<span class="ident">ok1</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">fi1</span><span class="op">.</span><span class="op">(</span><span class="op">*</span><span class="ident">fileStat</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fs2</span><span class="op">,</span>&nbsp;<span class="ident">ok2</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">fi2</span><span class="op">.</span><span class="op">(</span><span class="op">*</span><span class="ident">fileStat</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">ok1</span>&nbsp;<span class="op">||</span>&nbsp;<span class="op">!</span><span class="ident">ok2</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">115</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">sameFile</span><span class="op">(</span><span class="ident">fs1</span><span class="op">,</span>&nbsp;<span class="ident">fs2</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

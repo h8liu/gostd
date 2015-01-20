@@ -1,0 +1,276 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2009&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="comment">//&nbsp;+build&nbsp;darwin&nbsp;dragonfly&nbsp;freebsd&nbsp;linux&nbsp;netbsd&nbsp;openbsd&nbsp;solaris</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Fork,&nbsp;exec,&nbsp;wait,&nbsp;etc.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">package</span>&nbsp;<span class="ident">syscall</span><br>
+<span class="lineno">10</span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;runtime&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;sync&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;unsafe&#34;</span><br>
+<span class="lineno">15</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Lock&nbsp;synchronizing&nbsp;creation&nbsp;of&nbsp;new&nbsp;file&nbsp;descriptors&nbsp;with&nbsp;fork.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;We&nbsp;want&nbsp;the&nbsp;child&nbsp;in&nbsp;a&nbsp;fork/exec&nbsp;sequence&nbsp;to&nbsp;inherit&nbsp;only&nbsp;the</span><br>
+<span class="lineno">20</span><span class="comment">//&nbsp;file&nbsp;descriptors&nbsp;we&nbsp;intend.&nbsp;&nbsp;To&nbsp;do&nbsp;that,&nbsp;we&nbsp;mark&nbsp;all&nbsp;file</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;descriptors&nbsp;close-on-exec&nbsp;and&nbsp;then,&nbsp;in&nbsp;the&nbsp;child,&nbsp;explicitly</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;unmark&nbsp;the&nbsp;ones&nbsp;we&nbsp;want&nbsp;the&nbsp;exec&#39;ed&nbsp;program&nbsp;to&nbsp;keep.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Unix&nbsp;doesn&#39;t&nbsp;make&nbsp;this&nbsp;easy:&nbsp;there&nbsp;is,&nbsp;in&nbsp;general,&nbsp;no&nbsp;way&nbsp;to</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;allocate&nbsp;a&nbsp;new&nbsp;file&nbsp;descriptor&nbsp;close-on-exec.&nbsp;&nbsp;Instead&nbsp;you</span><br>
+<span class="lineno">25</span><span class="comment">//&nbsp;have&nbsp;to&nbsp;allocate&nbsp;the&nbsp;descriptor&nbsp;and&nbsp;then&nbsp;mark&nbsp;it&nbsp;close-on-exec.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;If&nbsp;a&nbsp;fork&nbsp;happens&nbsp;between&nbsp;those&nbsp;two&nbsp;events,&nbsp;the&nbsp;child&#39;s&nbsp;exec</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;will&nbsp;inherit&nbsp;an&nbsp;unwanted&nbsp;file&nbsp;descriptor.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;This&nbsp;lock&nbsp;solves&nbsp;that&nbsp;race:&nbsp;the&nbsp;create&nbsp;new&nbsp;fd/mark&nbsp;close-on-exec</span><br>
+<span class="lineno">30</span><span class="comment">//&nbsp;operation&nbsp;is&nbsp;done&nbsp;holding&nbsp;ForkLock&nbsp;for&nbsp;reading,&nbsp;and&nbsp;the&nbsp;fork&nbsp;itself</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;is&nbsp;done&nbsp;holding&nbsp;ForkLock&nbsp;for&nbsp;writing.&nbsp;&nbsp;At&nbsp;least,&nbsp;that&#39;s&nbsp;the&nbsp;idea.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;There&nbsp;are&nbsp;some&nbsp;complications.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Some&nbsp;system&nbsp;calls&nbsp;that&nbsp;create&nbsp;new&nbsp;file&nbsp;descriptors&nbsp;can&nbsp;block</span><br>
+<span class="lineno">35</span><span class="comment">//&nbsp;for&nbsp;arbitrarily&nbsp;long&nbsp;times:&nbsp;open&nbsp;on&nbsp;a&nbsp;hung&nbsp;NFS&nbsp;server&nbsp;or&nbsp;named</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;pipe,&nbsp;accept&nbsp;on&nbsp;a&nbsp;socket,&nbsp;and&nbsp;so&nbsp;on.&nbsp;&nbsp;We&nbsp;can&#39;t&nbsp;reasonably&nbsp;grab</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;the&nbsp;lock&nbsp;across&nbsp;those&nbsp;operations.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;It&nbsp;is&nbsp;worse&nbsp;to&nbsp;inherit&nbsp;some&nbsp;file&nbsp;descriptors&nbsp;than&nbsp;others.</span><br>
+<span class="lineno">40</span><span class="comment">//&nbsp;If&nbsp;a&nbsp;non-malicious&nbsp;child&nbsp;accidentally&nbsp;inherits&nbsp;an&nbsp;open&nbsp;ordinary&nbsp;file,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;that&#39;s&nbsp;not&nbsp;a&nbsp;big&nbsp;deal.&nbsp;&nbsp;On&nbsp;the&nbsp;other&nbsp;hand,&nbsp;if&nbsp;a&nbsp;long-lived&nbsp;child</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;accidentally&nbsp;inherits&nbsp;the&nbsp;write&nbsp;end&nbsp;of&nbsp;a&nbsp;pipe,&nbsp;then&nbsp;the&nbsp;reader</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;of&nbsp;that&nbsp;pipe&nbsp;will&nbsp;not&nbsp;see&nbsp;EOF&nbsp;until&nbsp;that&nbsp;child&nbsp;exits,&nbsp;potentially</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;causing&nbsp;the&nbsp;parent&nbsp;program&nbsp;to&nbsp;hang.&nbsp;&nbsp;This&nbsp;is&nbsp;a&nbsp;common&nbsp;problem</span><br>
+<span class="lineno">45</span><span class="comment">//&nbsp;in&nbsp;threaded&nbsp;C&nbsp;programs&nbsp;that&nbsp;use&nbsp;popen.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Luckily,&nbsp;the&nbsp;file&nbsp;descriptors&nbsp;that&nbsp;are&nbsp;most&nbsp;important&nbsp;not&nbsp;to</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;inherit&nbsp;are&nbsp;not&nbsp;the&nbsp;ones&nbsp;that&nbsp;can&nbsp;take&nbsp;an&nbsp;arbitrarily&nbsp;long&nbsp;time</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;to&nbsp;create:&nbsp;pipe&nbsp;returns&nbsp;instantly,&nbsp;and&nbsp;the&nbsp;net&nbsp;package&nbsp;uses</span><br>
+<span class="lineno">50</span><span class="comment">//&nbsp;non-blocking&nbsp;I/O&nbsp;to&nbsp;accept&nbsp;on&nbsp;a&nbsp;listening&nbsp;socket.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;rules&nbsp;for&nbsp;which&nbsp;file&nbsp;descriptor-creating&nbsp;operations&nbsp;use&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ForkLock&nbsp;are&nbsp;as&nbsp;follows:</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;1)&nbsp;Pipe.&nbsp;&nbsp;&nbsp;&nbsp;Does&nbsp;not&nbsp;block.&nbsp;&nbsp;Use&nbsp;the&nbsp;ForkLock.</span><br>
+<span class="lineno">55</span><span class="comment">//&nbsp;2)&nbsp;Socket.&nbsp;&nbsp;Does&nbsp;not&nbsp;block.&nbsp;&nbsp;Use&nbsp;the&nbsp;ForkLock.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;3)&nbsp;Accept.&nbsp;&nbsp;If&nbsp;using&nbsp;non-blocking&nbsp;mode,&nbsp;use&nbsp;the&nbsp;ForkLock.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Otherwise,&nbsp;live&nbsp;with&nbsp;the&nbsp;race.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;4)&nbsp;Open.&nbsp;&nbsp;&nbsp;&nbsp;Can&nbsp;block.&nbsp;&nbsp;Use&nbsp;O_CLOEXEC&nbsp;if&nbsp;available&nbsp;(Linux).</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Otherwise,&nbsp;live&nbsp;with&nbsp;the&nbsp;race.</span><br>
+<span class="lineno">60</span><span class="comment">//&nbsp;5)&nbsp;Dup.&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Does&nbsp;not&nbsp;block.&nbsp;&nbsp;Use&nbsp;the&nbsp;ForkLock.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;On&nbsp;Linux,&nbsp;could&nbsp;use&nbsp;fcntl&nbsp;F_DUPFD_CLOEXEC</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;instead&nbsp;of&nbsp;the&nbsp;ForkLock,&nbsp;but&nbsp;only&nbsp;for&nbsp;dup(fd,&nbsp;-1).</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">ForkLock</span>&nbsp;<span class="ident">sync</span><span class="op">.</span><span class="ident">RWMutex</span><br>
+<span class="lineno">65</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;StringSlicePtr&nbsp;is&nbsp;deprecated.&nbsp;Use&nbsp;SlicePtrFromStrings&nbsp;instead.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;If&nbsp;any&nbsp;string&nbsp;contains&nbsp;a&nbsp;NUL&nbsp;byte&nbsp;this&nbsp;function&nbsp;panics&nbsp;instead</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;of&nbsp;returning&nbsp;an&nbsp;error.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">StringSlicePtr</span><span class="op">(</span><span class="ident">ss</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="op">*</span><span class="builtintype">byte</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">bb</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">make</span><span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="op">*</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">ss</span><span class="op">)</span><span class="op">+</span><span class="num">1</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="num">0</span><span class="op">;</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">ss</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">i</span><span class="op">++</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">bb</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">StringBytePtr</span><span class="op">(</span><span class="ident">ss</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">bb</span><span class="op">[</span><span class="builtinfunc">len</span><span class="op">(</span><span class="ident">ss</span><span class="op">)</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">bb</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;SlicePtrFromStrings&nbsp;converts&nbsp;a&nbsp;slice&nbsp;of&nbsp;strings&nbsp;to&nbsp;a&nbsp;slice&nbsp;of</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;pointers&nbsp;to&nbsp;NUL-terminated&nbsp;byte&nbsp;slices.&nbsp;If&nbsp;any&nbsp;string&nbsp;contains</span><br>
+<span class="lineno">80</span><span class="comment">//&nbsp;a&nbsp;NUL&nbsp;byte,&nbsp;it&nbsp;returns&nbsp;(nil,&nbsp;EINVAL).</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">SlicePtrFromStrings</span><span class="op">(</span><span class="ident">ss</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="op">*</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">bb</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">make</span><span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="op">*</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">ss</span><span class="op">)</span><span class="op">+</span><span class="num">1</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="num">0</span><span class="op">;</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">ss</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">i</span><span class="op">++</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">bb</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">BytePtrFromString</span><span class="op">(</span><span class="ident">ss</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">bb</span><span class="op">[</span><span class="builtinfunc">len</span><span class="op">(</span><span class="ident">ss</span><span class="op">)</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">bb</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">CloseOnExec</span><span class="op">(</span><span class="ident">fd</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="op">{</span>&nbsp;<span class="ident">fcntl</span><span class="op">(</span><span class="ident">fd</span><span class="op">,</span>&nbsp;<span class="ident">F_SETFD</span><span class="op">,</span>&nbsp;<span class="ident">FD_CLOEXEC</span><span class="op">)</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno">95</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">SetNonblock</span><span class="op">(</span><span class="ident">fd</span>&nbsp;<span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">nonblocking</span>&nbsp;<span class="builtintype">bool</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">flag</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">fcntl</span><span class="op">(</span><span class="ident">fd</span><span class="op">,</span>&nbsp;<span class="ident">F_GETFL</span><span class="op">,</span>&nbsp;<span class="num">0</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno">100</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">nonblocking</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">flag</span>&nbsp;<span class="op">|=</span>&nbsp;<span class="ident">O_NONBLOCK</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">flag</span>&nbsp;<span class="op">&amp;=</span>&nbsp;<span class="op">^</span><span class="ident">O_NONBLOCK</span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">fcntl</span><span class="op">(</span><span class="ident">fd</span><span class="op">,</span>&nbsp;<span class="ident">F_SETFL</span><span class="op">,</span>&nbsp;<span class="ident">flag</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">110</span><span class="comment">//&nbsp;Credential&nbsp;holds&nbsp;user&nbsp;and&nbsp;group&nbsp;identities&nbsp;to&nbsp;be&nbsp;assumed</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;by&nbsp;a&nbsp;child&nbsp;process&nbsp;started&nbsp;by&nbsp;StartProcess.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">Credential</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Uid</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">uint32</span>&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;User&nbsp;ID.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Gid</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">uint32</span>&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;Group&nbsp;ID.</span><br>
+<span class="lineno">115</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Groups</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">uint32</span>&nbsp;<span class="comment">//&nbsp;Supplementary&nbsp;group&nbsp;IDs.</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ProcAttr&nbsp;holds&nbsp;attributes&nbsp;that&nbsp;will&nbsp;be&nbsp;applied&nbsp;to&nbsp;a&nbsp;new&nbsp;process&nbsp;started</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;by&nbsp;StartProcess.</span><br>
+<span class="lineno">120</span><span class="keyword">type</span>&nbsp;<span class="ident">ProcAttr</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Dir</span>&nbsp;&nbsp;&nbsp;<span class="builtintype">string</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;Current&nbsp;working&nbsp;directory.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Env</span>&nbsp;&nbsp;&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">string</span>&nbsp;&nbsp;<span class="comment">//&nbsp;Environment.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Files</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">uintptr</span>&nbsp;<span class="comment">//&nbsp;File&nbsp;descriptors.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Sys</span>&nbsp;&nbsp;&nbsp;<span class="op">*</span><span class="ident">SysProcAttr</span><br>
+<span class="lineno">125</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">zeroProcAttr</span>&nbsp;<span class="ident">ProcAttr</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">zeroSysProcAttr</span>&nbsp;<span class="ident">SysProcAttr</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">130</span><span class="keyword">func</span>&nbsp;<span class="ident">forkExec</span><span class="op">(</span><span class="ident">argv0</span>&nbsp;<span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">argv</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">attr</span>&nbsp;<span class="op">*</span><span class="ident">ProcAttr</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">pid</span>&nbsp;<span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">p</span>&nbsp;<span class="op">[</span><span class="num">2</span><span class="op">]</span><span class="builtintype">int</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="builtintype">int</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">err1</span>&nbsp;<span class="ident">Errno</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">wstatus</span>&nbsp;<span class="ident">WaitStatus</span><br>
+<span class="lineno">135</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">attr</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">attr</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">&amp;</span><span class="ident">zeroProcAttr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sys</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">attr</span><span class="op">.</span><span class="ident">Sys</span><br>
+<span class="lineno">140</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">sys</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sys</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">&amp;</span><span class="ident">zeroSysProcAttr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">[</span><span class="num">0</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">-</span><span class="num">1</span><br>
+<span class="lineno">145</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">[</span><span class="num">1</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">-</span><span class="num">1</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Convert&nbsp;args&nbsp;to&nbsp;C&nbsp;form.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">argv0p</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">BytePtrFromString</span><span class="op">(</span><span class="ident">argv0</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">150</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">argvp</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">SlicePtrFromStrings</span><span class="op">(</span><span class="ident">argv</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno">155</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">envvp</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">SlicePtrFromStrings</span><span class="op">(</span><span class="ident">attr</span><span class="op">.</span><span class="ident">Env</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">160</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">(</span><span class="ident">runtime</span><span class="op">.</span><span class="ident">GOOS</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#34;freebsd&#34;</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">runtime</span><span class="op">.</span><span class="ident">GOOS</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#34;dragonfly&#34;</span><span class="op">)</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">argv</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="op">)</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">argv0</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">argvp</span><span class="op">[</span><span class="num">0</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">argv0p</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">165</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">chroot</span>&nbsp;<span class="op">*</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">sys</span><span class="op">.</span><span class="ident">Chroot</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="string">&#34;&#34;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">chroot</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">BytePtrFromString</span><span class="op">(</span><span class="ident">sys</span><span class="op">.</span><span class="ident">Chroot</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno">170</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">dir</span>&nbsp;<span class="op">*</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">attr</span><span class="op">.</span><span class="ident">Dir</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="string">&#34;&#34;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dir</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">BytePtrFromString</span><span class="op">(</span><span class="ident">attr</span><span class="op">.</span><span class="ident">Dir</span><span class="op">)</span><br>
+<span class="lineno">175</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">180</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Acquire&nbsp;the&nbsp;fork&nbsp;lock&nbsp;so&nbsp;that&nbsp;no&nbsp;other&nbsp;threads</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;create&nbsp;new&nbsp;fds&nbsp;that&nbsp;are&nbsp;not&nbsp;yet&nbsp;close-on-exec</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;before&nbsp;we&nbsp;fork.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ForkLock</span><span class="op">.</span><span class="ident">Lock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">185</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Allocate&nbsp;child&nbsp;status&nbsp;pipe&nbsp;close&nbsp;on&nbsp;exec.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">forkExecPipe</span><span class="op">(</span><span class="ident">p</span><span class="op">[</span><span class="op">:</span><span class="op">]</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">goto</span>&nbsp;<span class="builtintype">error</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">190</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Kick&nbsp;off&nbsp;child.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pid</span><span class="op">,</span>&nbsp;<span class="ident">err1</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">forkAndExecInChild</span><span class="op">(</span><span class="ident">argv0p</span><span class="op">,</span>&nbsp;<span class="ident">argvp</span><span class="op">,</span>&nbsp;<span class="ident">envvp</span><span class="op">,</span>&nbsp;<span class="ident">chroot</span><span class="op">,</span>&nbsp;<span class="ident">dir</span><span class="op">,</span>&nbsp;<span class="ident">attr</span><span class="op">,</span>&nbsp;<span class="ident">sys</span><span class="op">,</span>&nbsp;<span class="ident">p</span><span class="op">[</span><span class="num">1</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err1</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">Errno</span><span class="op">(</span><span class="ident">err1</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">goto</span>&nbsp;<span class="builtintype">error</span><br>
+<span class="lineno">195</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ForkLock</span><span class="op">.</span><span class="ident">Unlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Read&nbsp;child&nbsp;error&nbsp;status&nbsp;from&nbsp;pipe.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Close</span><span class="op">(</span><span class="ident">p</span><span class="op">[</span><span class="num">1</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno">200</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">readlen</span><span class="op">(</span><span class="ident">p</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="op">,</span>&nbsp;<span class="op">(</span><span class="op">*</span><span class="builtintype">byte</span><span class="op">)</span><span class="op">(</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">err1</span><span class="op">)</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="builtintype">int</span><span class="op">(</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Sizeof</span><span class="op">(</span><span class="ident">err1</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Close</span><span class="op">(</span><span class="ident">p</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="op">==</span>&nbsp;<span class="builtintype">int</span><span class="op">(</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Sizeof</span><span class="op">(</span><span class="ident">err1</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">Errno</span><span class="op">(</span><span class="ident">err1</span><span class="op">)</span><br>
+<span class="lineno">205</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">EPIPE</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">210</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Child&nbsp;failed;&nbsp;wait&nbsp;for&nbsp;it&nbsp;to&nbsp;exit,&nbsp;to&nbsp;make&nbsp;sure</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;the&nbsp;zombies&nbsp;don&#39;t&nbsp;accumulate.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">err1</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">Wait4</span><span class="op">(</span><span class="ident">pid</span><span class="op">,</span>&nbsp;<span class="op">&amp;</span><span class="ident">wstatus</span><span class="op">,</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">err1</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">EINTR</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">err1</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">Wait4</span><span class="op">(</span><span class="ident">pid</span><span class="op">,</span>&nbsp;<span class="op">&amp;</span><span class="ident">wstatus</span><span class="op">,</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><span class="op">)</span><br>
+<span class="lineno">215</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Read&nbsp;got&nbsp;EOF,&nbsp;so&nbsp;pipe&nbsp;closed&nbsp;on&nbsp;exec,&nbsp;so&nbsp;exec&nbsp;succeeded.</span><br>
+<span class="lineno">220</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">pid</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="builtintype">error</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">p</span><span class="op">[</span><span class="num">0</span><span class="op">]</span>&nbsp;<span class="op">&gt;=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Close</span><span class="op">(</span><span class="ident">p</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno">225</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Close</span><span class="op">(</span><span class="ident">p</span><span class="op">[</span><span class="num">1</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ForkLock</span><span class="op">.</span><span class="ident">Unlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">230</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Combination&nbsp;of&nbsp;fork&nbsp;and&nbsp;exec,&nbsp;careful&nbsp;to&nbsp;be&nbsp;thread&nbsp;safe.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">ForkExec</span><span class="op">(</span><span class="ident">argv0</span>&nbsp;<span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">argv</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">attr</span>&nbsp;<span class="op">*</span><span class="ident">ProcAttr</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">pid</span>&nbsp;<span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">forkExec</span><span class="op">(</span><span class="ident">argv0</span><span class="op">,</span>&nbsp;<span class="ident">argv</span><span class="op">,</span>&nbsp;<span class="ident">attr</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">235</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;StartProcess&nbsp;wraps&nbsp;ForkExec&nbsp;for&nbsp;package&nbsp;os.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">StartProcess</span><span class="op">(</span><span class="ident">argv0</span>&nbsp;<span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">argv</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">attr</span>&nbsp;<span class="op">*</span><span class="ident">ProcAttr</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">pid</span>&nbsp;<span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">handle</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pid</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">forkExec</span><span class="op">(</span><span class="ident">argv0</span><span class="op">,</span>&nbsp;<span class="ident">argv</span><span class="op">,</span>&nbsp;<span class="ident">attr</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">pid</span><span class="op">,</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno">240</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Ordinary&nbsp;exec.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">Exec</span><span class="op">(</span><span class="ident">argv0</span>&nbsp;<span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">argv</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">envv</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">argv0p</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">BytePtrFromString</span><span class="op">(</span><span class="ident">argv0</span><span class="op">)</span><br>
+<span class="lineno">245</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">argvp</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">SlicePtrFromStrings</span><span class="op">(</span><span class="ident">argv</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">250</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">envvp</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">SlicePtrFromStrings</span><span class="op">(</span><span class="ident">envv</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno">255</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">err1</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">RawSyscall</span><span class="op">(</span><span class="ident">SYS_EXECVE</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><span class="op">(</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="ident">argv0p</span><span class="op">)</span><span class="op">)</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><span class="op">(</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">argvp</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="op">)</span><span class="op">)</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><span class="op">(</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">envvp</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno">260</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">Errno</span><span class="op">(</span><span class="ident">err1</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

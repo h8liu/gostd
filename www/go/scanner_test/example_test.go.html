@@ -1,0 +1,61 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2012&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">scanner_test</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;fmt&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;go/scanner&#34;</span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;go/token&#34;</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">ExampleScanner_Scan</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;src&nbsp;is&nbsp;the&nbsp;input&nbsp;that&nbsp;we&nbsp;want&nbsp;to&nbsp;tokenize.</span><br>
+<span class="lineno">15</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">src</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">(</span><span class="string">&#34;cos(x)&nbsp;+&nbsp;1i*sin(x)&nbsp;//&nbsp;Euler&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Initialize&nbsp;the&nbsp;scanner.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">s</span>&nbsp;<span class="ident">scanner</span><span class="op">.</span><span class="ident">Scanner</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fset</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">token</span><span class="op">.</span><span class="ident">NewFileSet</span><span class="op">(</span><span class="op">)</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;positions&nbsp;are&nbsp;relative&nbsp;to&nbsp;fset</span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">file</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">fset</span><span class="op">.</span><span class="ident">AddFile</span><span class="op">(</span><span class="string">&#34;&#34;</span><span class="op">,</span>&nbsp;<span class="ident">fset</span><span class="op">.</span><span class="ident">Base</span><span class="op">(</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">src</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="comment">//&nbsp;register&nbsp;input&nbsp;&#34;file&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">Init</span><span class="op">(</span><span class="ident">file</span><span class="op">,</span>&nbsp;<span class="ident">src</span><span class="op">,</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="comment">/*&nbsp;no&nbsp;error&nbsp;handler&nbsp;*/</span><span class="op">,</span>&nbsp;<span class="ident">scanner</span><span class="op">.</span><span class="ident">ScanComments</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Repeated&nbsp;calls&nbsp;to&nbsp;Scan&nbsp;yield&nbsp;the&nbsp;token&nbsp;sequence&nbsp;found&nbsp;in&nbsp;the&nbsp;input.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pos</span><span class="op">,</span>&nbsp;<span class="ident">tok</span><span class="op">,</span>&nbsp;<span class="ident">lit</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">Scan</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">tok</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">token</span><span class="op">.</span><span class="ident">EOF</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">break</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fmt</span><span class="op">.</span><span class="ident">Printf</span><span class="op">(</span><span class="string">&#34;%s\t%s\t%q\n&#34;</span><span class="op">,</span>&nbsp;<span class="ident">fset</span><span class="op">.</span><span class="ident">Position</span><span class="op">(</span><span class="ident">pos</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">tok</span><span class="op">,</span>&nbsp;<span class="ident">lit</span><span class="op">)</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;output:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;1:1&nbsp;&nbsp;&nbsp;&nbspIDENT&nbsp;&nbsp;&nbsp;&nbsp&#34;cos&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;1:4&nbsp;&nbsp;&nbsp;&nbsp(&nbsp;&nbsp;&nbsp;&nbsp&#34;&#34;</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;1:5&nbsp;&nbsp;&nbsp;&nbspIDENT&nbsp;&nbsp;&nbsp;&nbsp&#34;x&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;1:6&nbsp;&nbsp;&nbsp;&nbsp)&nbsp;&nbsp;&nbsp;&nbsp&#34;&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;1:8&nbsp;&nbsp;&nbsp;&nbsp+&nbsp;&nbsp;&nbsp;&nbsp&#34;&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;1:10&nbsp;&nbsp;&nbsp;&nbspIMAG&nbsp;&nbsp;&nbsp;&nbsp&#34;1i&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;1:12&nbsp;&nbsp;&nbsp;&nbsp*&nbsp;&nbsp;&nbsp;&nbsp&#34;&#34;</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;1:13&nbsp;&nbsp;&nbsp;&nbspIDENT&nbsp;&nbsp;&nbsp;&nbsp&#34;sin&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;1:16&nbsp;&nbsp;&nbsp;&nbsp(&nbsp;&nbsp;&nbsp;&nbsp&#34;&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;1:17&nbsp;&nbsp;&nbsp;&nbspIDENT&nbsp;&nbsp;&nbsp;&nbsp&#34;x&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;1:18&nbsp;&nbsp;&nbsp;&nbsp)&nbsp;&nbsp;&nbsp;&nbsp&#34;&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;1:20&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp&#34;\n&#34;</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;1:20&nbsp;&nbsp;&nbsp;&nbspCOMMENT&nbsp;&nbsp;&nbsp;&nbsp&#34;//&nbsp;Euler&#34;</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

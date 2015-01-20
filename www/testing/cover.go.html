@@ -1,0 +1,127 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2013&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="comment">//&nbsp;Support&nbsp;for&nbsp;test&nbsp;coverage.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">package</span>&nbsp;<span class="ident">testing</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;fmt&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;os&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;sync/atomic&#34;</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">15</span><span class="comment">//&nbsp;CoverBlock&nbsp;records&nbsp;the&nbsp;coverage&nbsp;data&nbsp;for&nbsp;a&nbsp;single&nbsp;basic&nbsp;block.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;NOTE:&nbsp;This&nbsp;struct&nbsp;is&nbsp;internal&nbsp;to&nbsp;the&nbsp;testing&nbsp;infrastructure&nbsp;and&nbsp;may&nbsp;change.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;It&nbsp;is&nbsp;not&nbsp;covered&nbsp;(yet)&nbsp;by&nbsp;the&nbsp;Go&nbsp;1&nbsp;compatibility&nbsp;guidelines.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">CoverBlock</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Line0</span>&nbsp;<span class="builtintype">uint32</span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Col0</span>&nbsp;&nbsp;<span class="builtintype">uint16</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Line1</span>&nbsp;<span class="builtintype">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Col1</span>&nbsp;&nbsp;<span class="builtintype">uint16</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Stmts</span>&nbsp;<span class="builtintype">uint16</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">25</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">cover</span>&nbsp;<span class="ident">Cover</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Cover&nbsp;records&nbsp;information&nbsp;about&nbsp;test&nbsp;coverage&nbsp;checking.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;NOTE:&nbsp;This&nbsp;struct&nbsp;is&nbsp;internal&nbsp;to&nbsp;the&nbsp;testing&nbsp;infrastructure&nbsp;and&nbsp;may&nbsp;change.</span><br>
+<span class="lineno">30</span><span class="comment">//&nbsp;It&nbsp;is&nbsp;not&nbsp;covered&nbsp;(yet)&nbsp;by&nbsp;the&nbsp;Go&nbsp;1&nbsp;compatibility&nbsp;guidelines.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">Cover</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Mode</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Counters</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">map</span><span class="op">[</span><span class="builtintype">string</span><span class="op">]</span><span class="op">[</span><span class="op">]</span><span class="builtintype">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Blocks</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword">map</span><span class="op">[</span><span class="builtintype">string</span><span class="op">]</span><span class="op">[</span><span class="op">]</span><span class="ident">CoverBlock</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">CoveredPackages</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Coverage&nbsp;reports&nbsp;the&nbsp;current&nbsp;code&nbsp;coverage&nbsp;as&nbsp;a&nbsp;fraction&nbsp;in&nbsp;the&nbsp;range&nbsp;[0,&nbsp;1].</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;If&nbsp;coverage&nbsp;is&nbsp;not&nbsp;enabled,&nbsp;Coverage&nbsp;returns&nbsp;0.</span><br>
+<span class="lineno">40</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;When&nbsp;running&nbsp;a&nbsp;large&nbsp;set&nbsp;of&nbsp;sequential&nbsp;test&nbsp;cases,&nbsp;checking&nbsp;Coverage&nbsp;after&nbsp;each&nbsp;one</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;can&nbsp;be&nbsp;useful&nbsp;for&nbsp;identifying&nbsp;which&nbsp;test&nbsp;cases&nbsp;exercise&nbsp;new&nbsp;code&nbsp;paths.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;It&nbsp;is&nbsp;not&nbsp;a&nbsp;replacement&nbsp;for&nbsp;the&nbsp;reports&nbsp;generated&nbsp;by&nbsp;&#39;go&nbsp;test&nbsp;-cover&#39;&nbsp;and</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&#39;go&nbsp;tool&nbsp;cover&#39;.</span><br>
+<span class="lineno">45</span><span class="keyword">func</span>&nbsp;<span class="ident">Coverage</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">float64</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">n</span><span class="op">,</span>&nbsp;<span class="ident">d</span>&nbsp;<span class="ident">int64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">counters</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">cover</span><span class="op">.</span><span class="ident">Counters</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">counters</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">atomic</span><span class="op">.</span><span class="ident">LoadUint32</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">counters</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><span class="op">)</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span><span class="op">++</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span><span class="op">++</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">d</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="builtintype">float64</span><span class="op">(</span><span class="ident">n</span><span class="op">)</span>&nbsp;<span class="op">/</span>&nbsp;<span class="builtintype">float64</span><span class="op">(</span><span class="ident">d</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">60</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;RegisterCover&nbsp;records&nbsp;the&nbsp;coverage&nbsp;data&nbsp;accumulators&nbsp;for&nbsp;the&nbsp;tests.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;NOTE:&nbsp;This&nbsp;function&nbsp;is&nbsp;internal&nbsp;to&nbsp;the&nbsp;testing&nbsp;infrastructure&nbsp;and&nbsp;may&nbsp;change.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;It&nbsp;is&nbsp;not&nbsp;covered&nbsp;(yet)&nbsp;by&nbsp;the&nbsp;Go&nbsp;1&nbsp;compatibility&nbsp;guidelines.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">RegisterCover</span><span class="op">(</span><span class="ident">c</span>&nbsp;<span class="ident">Cover</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">cover</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">c</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;mustBeNil&nbsp;checks&nbsp;the&nbsp;error&nbsp;and,&nbsp;if&nbsp;present,&nbsp;reports&nbsp;it&nbsp;and&nbsp;exits.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">mustBeNil</span><span class="op">(</span><span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fmt</span><span class="op">.</span><span class="ident">Fprintf</span><span class="op">(</span><span class="ident">os</span><span class="op">.</span><span class="ident">Stderr</span><span class="op">,</span>&nbsp;<span class="string">&#34;testing:&nbsp;%s\n&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">os</span><span class="op">.</span><span class="ident">Exit</span><span class="op">(</span><span class="num">2</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">75</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;coverReport&nbsp;reports&nbsp;the&nbsp;coverage&nbsp;percentage&nbsp;and&nbsp;writes&nbsp;a&nbsp;coverage&nbsp;profile&nbsp;if&nbsp;requested.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">coverReport</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">f</span>&nbsp;<span class="op">*</span><span class="ident">os</span><span class="op">.</span><span class="ident">File</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">*</span><span class="ident">coverProfile</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="string">&#34;&#34;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">f</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">os</span><span class="op">.</span><span class="ident">Create</span><span class="op">(</span><span class="ident">toOutputDir</span><span class="op">(</span><span class="op">*</span><span class="ident">coverProfile</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mustBeNil</span><span class="op">(</span><span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fmt</span><span class="op">.</span><span class="ident">Fprintf</span><span class="op">(</span><span class="ident">f</span><span class="op">,</span>&nbsp;<span class="string">&#34;mode:&nbsp;%s\n&#34;</span><span class="op">,</span>&nbsp;<span class="ident">cover</span><span class="op">.</span><span class="ident">Mode</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">defer</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span>&nbsp;<span class="ident">mustBeNil</span><span class="op">(</span><span class="ident">f</span><span class="op">.</span><span class="ident">Close</span><span class="op">(</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">}</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">active</span><span class="op">,</span>&nbsp;<span class="ident">total</span>&nbsp;<span class="ident">int64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">count</span>&nbsp;<span class="builtintype">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">name</span><span class="op">,</span>&nbsp;<span class="ident">counts</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">cover</span><span class="op">.</span><span class="ident">Counters</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">blocks</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">cover</span><span class="op">.</span><span class="ident">Blocks</span><span class="op">[</span><span class="ident">name</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">counts</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stmts</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">int64</span><span class="op">(</span><span class="ident">blocks</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><span class="op">.</span><span class="ident">Stmts</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">total</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="ident">stmts</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">count</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">atomic</span><span class="op">.</span><span class="ident">LoadUint32</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">counts</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><span class="op">)</span>&nbsp;<span class="comment">//&nbsp;For&nbsp;-mode=atomic.</span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">count</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">active</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="ident">stmts</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">f</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">fmt</span><span class="op">.</span><span class="ident">Fprintf</span><span class="op">(</span><span class="ident">f</span><span class="op">,</span>&nbsp;<span class="string">&#34;%s:%d.%d,%d.%d&nbsp;%d&nbsp;%d\n&#34;</span><span class="op">,</span>&nbsp;<span class="ident">name</span><span class="op">,</span><br>
+<span class="lineno">100</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">blocks</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><span class="op">.</span><span class="ident">Line0</span><span class="op">,</span>&nbsp;<span class="ident">blocks</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><span class="op">.</span><span class="ident">Col0</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">blocks</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><span class="op">.</span><span class="ident">Line1</span><span class="op">,</span>&nbsp;<span class="ident">blocks</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><span class="op">.</span><span class="ident">Col1</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stmts</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">count</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mustBeNil</span><span class="op">(</span><span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">total</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">total</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno">110</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fmt</span><span class="op">.</span><span class="ident">Printf</span><span class="op">(</span><span class="string">&#34;coverage:&nbsp;%.1f%%&nbsp;of&nbsp;statements%s\n&#34;</span><span class="op">,</span>&nbsp;<span class="num">100</span><span class="op">*</span><span class="builtintype">float64</span><span class="op">(</span><span class="ident">active</span><span class="op">)</span><span class="op">/</span><span class="builtintype">float64</span><span class="op">(</span><span class="ident">total</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">cover</span><span class="op">.</span><span class="ident">CoveredPackages</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

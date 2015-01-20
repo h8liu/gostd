@@ -1,0 +1,158 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2012&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="comment">//&nbsp;To&nbsp;avoid&nbsp;a&nbsp;cyclic&nbsp;dependency&nbsp;with&nbsp;go/parser,&nbsp;this&nbsp;file&nbsp;is&nbsp;in&nbsp;a&nbsp;separate&nbsp;package.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">package</span>&nbsp;<span class="ident">ast_test</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;bytes&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;fmt&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">.</span>&nbsp;<span class="string">&#34;go/ast&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;go/parser&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;go/token&#34;</span><br>
+<span class="lineno">15</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;sort&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;testing&#34;</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">src</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">`<br>
+<span class="lineno">20</span>//&nbsp;the&nbsp;very&nbsp;first&nbsp;comment<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>//&nbsp;package&nbsp;p<br>
+<span class="lineno"></span>package&nbsp;p&nbsp;/*&nbsp;the&nbsp;name&nbsp;is&nbsp;p&nbsp;*/<br>
+<span class="lineno"></span><br>
+<span class="lineno">25</span>//&nbsp;imports<br>
+<span class="lineno"></span>import&nbsp;(<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&#34;bytes&#34;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;bytes<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&#34;fmt&#34;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;fmt<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&#34;go/ast&#34;<br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp&#34;go/parser&#34;<br>
+<span class="lineno"></span>)<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>//&nbsp;T<br>
+<span class="lineno"></span>type&nbsp;T&nbsp;struct&nbsp;{<br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbspa,&nbsp;b,&nbsp;c&nbsp;int&nbsp;//&nbsp;associated&nbsp;with&nbsp;a,&nbsp;b,&nbsp;c<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp//&nbsp;associated&nbsp;with&nbsp;x,&nbsp;y<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspx,&nbsp;y&nbsp;float64&nbsp;&nbsp;&nbsp;&nbsp;//&nbsp;float&nbsp;values<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspz&nbsp;&nbsp;&nbsp;&nbsp;complex128&nbsp;//&nbsp;complex&nbsp;value<br>
+<span class="lineno"></span>}<br>
+<span class="lineno">40</span>//&nbsp;also&nbsp;associated&nbsp;with&nbsp;T<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>//&nbsp;x<br>
+<span class="lineno"></span>var&nbsp;x&nbsp;=&nbsp;0&nbsp;//&nbsp;x&nbsp;=&nbsp;0<br>
+<span class="lineno"></span>//&nbsp;also&nbsp;associated&nbsp;with&nbsp;x<br>
+<span class="lineno">45</span><br>
+<span class="lineno"></span>//&nbsp;f1<br>
+<span class="lineno"></span>func&nbsp;f1()&nbsp;{<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp/*&nbsp;associated&nbsp;with&nbsp;s1&nbsp;*/<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsps1()<br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp//&nbsp;also&nbsp;associated&nbsp;with&nbsp;s1<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp//&nbsp;associated&nbsp;with&nbsp;s2<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp//&nbsp;also&nbsp;associated&nbsp;with&nbsp;s2<br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsps2()&nbsp;//&nbsp;line&nbsp;comment&nbsp;for&nbsp;s2<br>
+<span class="lineno"></span>}<br>
+<span class="lineno"></span>//&nbsp;associated&nbsp;with&nbsp;f1<br>
+<span class="lineno"></span>//&nbsp;also&nbsp;associated&nbsp;with&nbsp;f1<br>
+<span class="lineno"></span><br>
+<span class="lineno">60</span>//&nbsp;associated&nbsp;with&nbsp;f2<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>//&nbsp;f2<br>
+<span class="lineno"></span>func&nbsp;f2()&nbsp;{<br>
+<span class="lineno"></span>}<br>
+<span class="lineno">65</span><br>
+<span class="lineno"></span>func&nbsp;f3()&nbsp;{<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspi&nbsp;:=&nbsp;1&nbsp;/*&nbsp;1&nbsp;*/&nbsp;+&nbsp;2&nbsp;//&nbsp;addition<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp_&nbsp;=&nbsp;i<br>
+<span class="lineno"></span>}<br>
+<span class="lineno">70</span><br>
+<span class="lineno"></span>//&nbsp;the&nbsp;very&nbsp;last&nbsp;comment<br>
+<span class="lineno"></span>`</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;res&nbsp;maps&nbsp;a&nbsp;key&nbsp;of&nbsp;the&nbsp;form&nbsp;&#34;line&nbsp;number:&nbsp;node&nbsp;type&#34;</span><br>
+<span class="lineno">75</span><span class="comment">//&nbsp;to&nbsp;the&nbsp;associated&nbsp;comments&#39;&nbsp;text.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">res</span>&nbsp;<span class="op">=</span>&nbsp;<span class="keyword">map</span><span class="op">[</span><span class="builtintype">string</span><span class="op">]</span><span class="builtintype">string</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;&nbsp;5:&nbsp;*ast.File&#34;</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;the&nbsp;very&nbsp;first&nbsp;comment\npackage&nbsp;p\n&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;&nbsp;5:&nbsp;*ast.Ident&#34;</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;&nbsp;the&nbsp;name&nbsp;is&nbsp;p\n&#34;</span><span class="op">,</span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;&nbsp;8:&nbsp;*ast.GenDecl&#34;</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;imports\n&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;&nbsp;9:&nbsp;*ast.ImportSpec&#34;</span><span class="op">:</span>&nbsp;<span class="string">&#34;bytes\n&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;10:&nbsp;*ast.ImportSpec&#34;</span><span class="op">:</span>&nbsp;<span class="string">&#34;fmt\n&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;16:&nbsp;*ast.GenDecl&#34;</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;T\nalso&nbsp;associated&nbsp;with&nbsp;T\n&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;17:&nbsp;*ast.Field&#34;</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;associated&nbsp;with&nbsp;a,&nbsp;b,&nbsp;c\n&#34;</span><span class="op">,</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;19:&nbsp;*ast.Field&#34;</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;associated&nbsp;with&nbsp;x,&nbsp;y\nfloat&nbsp;values\n&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;20:&nbsp;*ast.Field&#34;</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;complex&nbsp;value\n&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;25:&nbsp;*ast.GenDecl&#34;</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;x\nx&nbsp;=&nbsp;0\nalso&nbsp;associated&nbsp;with&nbsp;x\n&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;29:&nbsp;*ast.FuncDecl&#34;</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;<span class="string">&#34;f1\nassociated&nbsp;with&nbsp;f1\nalso&nbsp;associated&nbsp;with&nbsp;f1\n&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;31:&nbsp;*ast.ExprStmt&#34;</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;<span class="string">&#34;&nbsp;associated&nbsp;with&nbsp;s1\nalso&nbsp;associated&nbsp;with&nbsp;s1\n&#34;</span><span class="op">,</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;37:&nbsp;*ast.ExprStmt&#34;</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;<span class="string">&#34;associated&nbsp;with&nbsp;s2\nalso&nbsp;associated&nbsp;with&nbsp;s2\nline&nbsp;comment&nbsp;for&nbsp;s2\n&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;45:&nbsp;*ast.FuncDecl&#34;</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;<span class="string">&#34;associated&nbsp;with&nbsp;f2\nf2\n&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;49:&nbsp;*ast.AssignStmt&#34;</span><span class="op">:</span>&nbsp;<span class="string">&#34;addition\n&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;49:&nbsp;*ast.BasicLit&#34;</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;<span class="string">&#34;&nbsp;1\n&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;50:&nbsp;*ast.Ident&#34;</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;the&nbsp;very&nbsp;last&nbsp;comment\n&#34;</span><span class="op">,</span><br>
+<span class="lineno">95</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">ctext</span><span class="op">(</span><span class="ident">list</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="op">*</span><span class="ident">CommentGroup</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">buf</span>&nbsp;<span class="ident">bytes</span><span class="op">.</span><span class="ident">Buffer</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">g</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">list</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">100</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">buf</span><span class="op">.</span><span class="ident">WriteString</span><span class="op">(</span><span class="ident">g</span><span class="op">.</span><span class="ident">Text</span><span class="op">(</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">buf</span><span class="op">.</span><span class="ident">String</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">105</span><span class="keyword">func</span>&nbsp;<span class="ident">TestCommentMap</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fset</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">token</span><span class="op">.</span><span class="ident">NewFileSet</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">f</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">parser</span><span class="op">.</span><span class="ident">ParseFile</span><span class="op">(</span><span class="ident">fset</span><span class="op">,</span>&nbsp;<span class="string">&#34;&#34;</span><span class="op">,</span>&nbsp;<span class="ident">src</span><span class="op">,</span>&nbsp;<span class="ident">parser</span><span class="op">.</span><span class="ident">ParseComments</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatal</span><span class="op">(</span><span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno">110</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">cmap</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">NewCommentMap</span><span class="op">(</span><span class="ident">fset</span><span class="op">,</span>&nbsp;<span class="ident">f</span><span class="op">,</span>&nbsp;<span class="ident">f</span><span class="op">.</span><span class="ident">Comments</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;very&nbsp;correct&nbsp;association&nbsp;of&nbsp;comments</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">n</span><span class="op">,</span>&nbsp;<span class="ident">list</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">cmap</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">115</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">key</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">fmt</span><span class="op">.</span><span class="ident">Sprintf</span><span class="op">(</span><span class="string">&#34;%2d:&nbsp;%T&#34;</span><span class="op">,</span>&nbsp;<span class="ident">fset</span><span class="op">.</span><span class="ident">Position</span><span class="op">(</span><span class="ident">n</span><span class="op">.</span><span class="ident">Pos</span><span class="op">(</span><span class="op">)</span><span class="op">)</span><span class="op">.</span><span class="ident">Line</span><span class="op">,</span>&nbsp;<span class="ident">n</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">got</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">ctext</span><span class="op">(</span><span class="ident">list</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">want</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">res</span><span class="op">[</span><span class="ident">key</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">got</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">want</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Errorf</span><span class="op">(</span><span class="string">&#34;%s:&nbsp;got&nbsp;%q;&nbsp;want&nbsp;%q&#34;</span><span class="op">,</span>&nbsp;<span class="ident">key</span><span class="op">,</span>&nbsp;<span class="ident">got</span><span class="op">,</span>&nbsp;<span class="ident">want</span><span class="op">)</span><br>
+<span class="lineno">120</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;verify&nbsp;that&nbsp;no&nbsp;comments&nbsp;got&nbsp;lost</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">cmap</span><span class="op">.</span><span class="ident">Comments</span><span class="op">(</span><span class="op">)</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">f</span><span class="op">.</span><span class="ident">Comments</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">125</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Errorf</span><span class="op">(</span><span class="string">&#34;got&nbsp;%d&nbsp;comment&nbsp;groups&nbsp;in&nbsp;map;&nbsp;want&nbsp;%d&#34;</span><span class="op">,</span>&nbsp;<span class="ident">n</span><span class="op">,</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">f</span><span class="op">.</span><span class="ident">Comments</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;support&nbsp;code&nbsp;to&nbsp;update&nbsp;test:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;set&nbsp;genMap&nbsp;to&nbsp;true&nbsp;to&nbsp;generate&nbsp;res&nbsp;map</span><br>
+<span class="lineno">130</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">const</span>&nbsp;<span class="ident">genMap</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">genMap</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">out</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">make</span><span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">cmap</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">n</span><span class="op">,</span>&nbsp;<span class="ident">list</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">cmap</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">out</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">append</span><span class="op">(</span><span class="ident">out</span><span class="op">,</span>&nbsp;<span class="ident">fmt</span><span class="op">.</span><span class="ident">Sprintf</span><span class="op">(</span><span class="string">&#34;\t\&#34;%2d:&nbsp;%T\&#34;:\t%q,&#34;</span><span class="op">,</span>&nbsp;<span class="ident">fset</span><span class="op">.</span><span class="ident">Position</span><span class="op">(</span><span class="ident">n</span><span class="op">.</span><span class="ident">Pos</span><span class="op">(</span><span class="op">)</span><span class="op">)</span><span class="op">.</span><span class="ident">Line</span><span class="op">,</span>&nbsp;<span class="ident">n</span><span class="op">,</span>&nbsp;<span class="ident">ctext</span><span class="op">(</span><span class="ident">list</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno">135</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sort</span><span class="op">.</span><span class="ident">Strings</span><span class="op">(</span><span class="ident">out</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">s</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">out</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fmt</span><span class="op">.</span><span class="ident">Println</span><span class="op">(</span><span class="ident">s</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">140</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;TODO(gri):&nbsp;add&nbsp;tests&nbsp;for&nbsp;Filter.</span>
+</div>
+</body>
+</html>

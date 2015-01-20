@@ -1,0 +1,85 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2009&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">os</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;runtime&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;sync/atomic&#34;</span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;syscall&#34;</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Process&nbsp;stores&nbsp;the&nbsp;information&nbsp;about&nbsp;a&nbsp;process&nbsp;created&nbsp;by&nbsp;StartProcess.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">Process</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">15</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Pid</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">int</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">handle</span>&nbsp;<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">isdone</span>&nbsp;<span class="builtintype">uint32</span>&nbsp;<span class="comment">//&nbsp;process&nbsp;has&nbsp;been&nbsp;successfully&nbsp;waited&nbsp;on,&nbsp;non&nbsp;zero&nbsp;if&nbsp;true</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">20</span><span class="keyword">func</span>&nbsp;<span class="ident">newProcess</span><span class="op">(</span><span class="ident">pid</span>&nbsp;<span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">handle</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">Process</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">&amp;</span><span class="ident">Process</span><span class="op">{</span><span class="ident">Pid</span><span class="op">:</span>&nbsp;<span class="ident">pid</span><span class="op">,</span>&nbsp;<span class="ident">handle</span><span class="op">:</span>&nbsp;<span class="ident">handle</span><span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">runtime</span><span class="op">.</span><span class="ident">SetFinalizer</span><span class="op">(</span><span class="ident">p</span><span class="op">,</span>&nbsp;<span class="op">(</span><span class="op">*</span><span class="ident">Process</span><span class="op">)</span><span class="op">.</span><span class="ident">Release</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">p</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">25</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">*</span><span class="ident">Process</span><span class="op">)</span>&nbsp;<span class="ident">setDone</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">atomic</span><span class="op">.</span><span class="ident">StoreUint32</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">p</span><span class="op">.</span><span class="ident">isdone</span><span class="op">,</span>&nbsp;<span class="num">1</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">30</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">*</span><span class="ident">Process</span><span class="op">)</span>&nbsp;<span class="ident">done</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">atomic</span><span class="op">.</span><span class="ident">LoadUint32</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">p</span><span class="op">.</span><span class="ident">isdone</span><span class="op">)</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ProcAttr&nbsp;holds&nbsp;the&nbsp;attributes&nbsp;that&nbsp;will&nbsp;be&nbsp;applied&nbsp;to&nbsp;a&nbsp;new&nbsp;process</span><br>
+<span class="lineno">35</span><span class="comment">//&nbsp;started&nbsp;by&nbsp;StartProcess.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">ProcAttr</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;If&nbsp;Dir&nbsp;is&nbsp;non-empty,&nbsp;the&nbsp;child&nbsp;changes&nbsp;into&nbsp;the&nbsp;directory&nbsp;before</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;creating&nbsp;the&nbsp;process.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Dir</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;If&nbsp;Env&nbsp;is&nbsp;non-nil,&nbsp;it&nbsp;gives&nbsp;the&nbsp;environment&nbsp;variables&nbsp;for&nbsp;the</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;new&nbsp;process&nbsp;in&nbsp;the&nbsp;form&nbsp;returned&nbsp;by&nbsp;Environ.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;If&nbsp;it&nbsp;is&nbsp;nil,&nbsp;the&nbsp;result&nbsp;of&nbsp;Environ&nbsp;will&nbsp;be&nbsp;used.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Env</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">string</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Files&nbsp;specifies&nbsp;the&nbsp;open&nbsp;files&nbsp;inherited&nbsp;by&nbsp;the&nbsp;new&nbsp;process.&nbsp;&nbsp;The</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;first&nbsp;three&nbsp;entries&nbsp;correspond&nbsp;to&nbsp;standard&nbsp;input,&nbsp;standard&nbsp;output,&nbsp;and</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;standard&nbsp;error.&nbsp;&nbsp;An&nbsp;implementation&nbsp;may&nbsp;support&nbsp;additional&nbsp;entries,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;depending&nbsp;on&nbsp;the&nbsp;underlying&nbsp;operating&nbsp;system.&nbsp;&nbsp;A&nbsp;nil&nbsp;entry&nbsp;corresponds</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;to&nbsp;that&nbsp;file&nbsp;being&nbsp;closed&nbsp;when&nbsp;the&nbsp;process&nbsp;starts.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Files</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="op">*</span><span class="ident">File</span><br>
+<span class="lineno">50</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Operating&nbsp;system-specific&nbsp;process&nbsp;creation&nbsp;attributes.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Note&nbsp;that&nbsp;setting&nbsp;this&nbsp;field&nbsp;means&nbsp;that&nbsp;your&nbsp;program</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;may&nbsp;not&nbsp;execute&nbsp;properly&nbsp;or&nbsp;even&nbsp;compile&nbsp;on&nbsp;some</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;operating&nbsp;systems.</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Sys</span>&nbsp;<span class="op">*</span><span class="ident">syscall</span><span class="op">.</span><span class="ident">SysProcAttr</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;A&nbsp;Signal&nbsp;represents&nbsp;an&nbsp;operating&nbsp;system&nbsp;signal.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;usual&nbsp;underlying&nbsp;implementation&nbsp;is&nbsp;operating&nbsp;system-dependent:</span><br>
+<span class="lineno">60</span><span class="comment">//&nbsp;on&nbsp;Unix&nbsp;it&nbsp;is&nbsp;syscall.Signal.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">Signal</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">String</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Signal</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="comment">//&nbsp;to&nbsp;distinguish&nbsp;from&nbsp;other&nbsp;Stringers</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">65</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Getpid&nbsp;returns&nbsp;the&nbsp;process&nbsp;id&nbsp;of&nbsp;the&nbsp;caller.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">Getpid</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="ident">syscall</span><span class="op">.</span><span class="ident">Getpid</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Getppid&nbsp;returns&nbsp;the&nbsp;process&nbsp;id&nbsp;of&nbsp;the&nbsp;caller&#39;s&nbsp;parent.</span><br>
+<span class="lineno">70</span><span class="keyword">func</span>&nbsp;<span class="ident">Getppid</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="ident">syscall</span><span class="op">.</span><span class="ident">Getppid</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">}</span>
+</div>
+</body>
+</html>

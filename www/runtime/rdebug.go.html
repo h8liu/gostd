@@ -1,0 +1,52 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2014&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">runtime</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">setMaxStack</span><span class="op">(</span><span class="ident">in</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">out</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">out</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtintype">int</span><span class="op">(</span><span class="ident">maxstacksize</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">maxstacksize</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">(</span><span class="ident">in</span><span class="op">)</span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">out</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">setGCPercent</span><span class="op">(</span><span class="ident">in</span>&nbsp;<span class="builtintype">int32</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">out</span>&nbsp;<span class="builtintype">int32</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">acquirem</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">15</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mp</span><span class="op">.</span><span class="ident">scalararg</span><span class="op">[</span><span class="num">0</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">(</span><span class="builtintype">int</span><span class="op">(</span><span class="ident">in</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">onM</span><span class="op">(</span><span class="ident">setgcpercent_m</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">out</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtintype">int32</span><span class="op">(</span><span class="builtintype">int</span><span class="op">(</span><span class="ident">mp</span><span class="op">.</span><span class="ident">scalararg</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">releasem</span><span class="op">(</span><span class="ident">mp</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">out</span><br>
+<span class="lineno">20</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">setPanicOnFault</span><span class="op">(</span><span class="builtinfunc">new</span>&nbsp;<span class="builtintype">bool</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">old</span>&nbsp;<span class="builtintype">bool</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">acquirem</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">old</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">mp</span><span class="op">.</span><span class="ident">curg</span><span class="op">.</span><span class="ident">paniconfault</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mp</span><span class="op">.</span><span class="ident">curg</span><span class="op">.</span><span class="ident">paniconfault</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">new</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">releasem</span><span class="op">(</span><span class="ident">mp</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">old</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">30</span><span class="keyword">func</span>&nbsp;<span class="ident">setMaxThreads</span><span class="op">(</span><span class="ident">in</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">out</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">acquirem</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mp</span><span class="op">.</span><span class="ident">scalararg</span><span class="op">[</span><span class="num">0</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">(</span><span class="ident">in</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">onM</span><span class="op">(</span><span class="ident">setmaxthreads_m</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">out</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtintype">int</span><span class="op">(</span><span class="ident">mp</span><span class="op">.</span><span class="ident">scalararg</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">releasem</span><span class="op">(</span><span class="ident">mp</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">out</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

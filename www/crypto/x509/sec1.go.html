@@ -1,0 +1,98 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2012&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">x509</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;crypto/ecdsa&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;crypto/elliptic&#34;</span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;encoding/asn1&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;errors&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;fmt&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;math/big&#34;</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno">15</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">ecPrivKeyVersion</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ecPrivateKey&nbsp;reflects&nbsp;an&nbsp;ASN.1&nbsp;Elliptic&nbsp;Curve&nbsp;Private&nbsp;Key&nbsp;Structure.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;References:</span><br>
+<span class="lineno">20</span><span class="comment">//&nbsp;&nbsp;&nbsp;RFC5915</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;SEC1&nbsp;-&nbsp;http://www.secg.org/download/aid-780/sec1-v2.pdf</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Per&nbsp;RFC5915&nbsp;the&nbsp;NamedCurveOID&nbsp;is&nbsp;marked&nbsp;as&nbsp;ASN.1&nbsp;OPTIONAL,&nbsp;however&nbsp;in</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;most&nbsp;cases&nbsp;it&nbsp;is&nbsp;not.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">ecPrivateKey</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Version</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">int</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">PrivateKey</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">NamedCurveOID</span>&nbsp;<span class="ident">asn1</span><span class="op">.</span><span class="ident">ObjectIdentifier</span>&nbsp;<span class="string">`asn1:&#34;optional,explicit,tag:0&#34;`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">PublicKey</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">asn1</span><span class="op">.</span><span class="ident">BitString</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">`asn1:&#34;optional,explicit,tag:1&#34;`</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">30</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ParseECPrivateKey&nbsp;parses&nbsp;an&nbsp;ASN.1&nbsp;Elliptic&nbsp;Curve&nbsp;Private&nbsp;Key&nbsp;Structure.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">ParseECPrivateKey</span><span class="op">(</span><span class="ident">der</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">key</span>&nbsp;<span class="op">*</span><span class="ident">ecdsa</span><span class="op">.</span><span class="ident">PrivateKey</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">parseECPrivateKey</span><span class="op">(</span><span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">der</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">35</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;MarshalECPrivateKey&nbsp;marshals&nbsp;an&nbsp;EC&nbsp;private&nbsp;key&nbsp;into&nbsp;ASN.1,&nbsp;DER&nbsp;format.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">MarshalECPrivateKey</span><span class="op">(</span><span class="ident">key</span>&nbsp;<span class="op">*</span><span class="ident">ecdsa</span><span class="op">.</span><span class="ident">PrivateKey</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">oid</span><span class="op">,</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">oidFromNamedCurve</span><span class="op">(</span><span class="ident">key</span><span class="op">.</span><span class="ident">Curve</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">ok</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">errors</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="string">&#34;x509:&nbsp;unknown&nbsp;elliptic&nbsp;curve&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">asn1</span><span class="op">.</span><span class="ident">Marshal</span><span class="op">(</span><span class="ident">ecPrivateKey</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Version</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="num">1</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">PrivateKey</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">key</span><span class="op">.</span><span class="ident">D</span><span class="op">.</span><span class="ident">Bytes</span><span class="op">(</span><span class="op">)</span><span class="op">,</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">NamedCurveOID</span><span class="op">:</span>&nbsp;<span class="ident">oid</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">PublicKey</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">asn1</span><span class="op">.</span><span class="ident">BitString</span><span class="op">{</span><span class="ident">Bytes</span><span class="op">:</span>&nbsp;<span class="ident">elliptic</span><span class="op">.</span><span class="ident">Marshal</span><span class="op">(</span><span class="ident">key</span><span class="op">.</span><span class="ident">Curve</span><span class="op">,</span>&nbsp;<span class="ident">key</span><span class="op">.</span><span class="ident">X</span><span class="op">,</span>&nbsp;<span class="ident">key</span><span class="op">.</span><span class="ident">Y</span><span class="op">)</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">50</span><span class="comment">//&nbsp;parseECPrivateKey&nbsp;parses&nbsp;an&nbsp;ASN.1&nbsp;Elliptic&nbsp;Curve&nbsp;Private&nbsp;Key&nbsp;Structure.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;OID&nbsp;for&nbsp;the&nbsp;named&nbsp;curve&nbsp;may&nbsp;be&nbsp;provided&nbsp;from&nbsp;another&nbsp;source&nbsp;(such&nbsp;as</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;the&nbsp;PKCS8&nbsp;container)&nbsp;-&nbsp;if&nbsp;it&nbsp;is&nbsp;provided&nbsp;then&nbsp;use&nbsp;this&nbsp;instead&nbsp;of&nbsp;the&nbsp;OID</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;that&nbsp;may&nbsp;exist&nbsp;in&nbsp;the&nbsp;EC&nbsp;private&nbsp;key&nbsp;structure.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">parseECPrivateKey</span><span class="op">(</span><span class="ident">namedCurveOID</span>&nbsp;<span class="op">*</span><span class="ident">asn1</span><span class="op">.</span><span class="ident">ObjectIdentifier</span><span class="op">,</span>&nbsp;<span class="ident">der</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">key</span>&nbsp;<span class="op">*</span><span class="ident">ecdsa</span><span class="op">.</span><span class="ident">PrivateKey</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">privKey</span>&nbsp;<span class="ident">ecPrivateKey</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">asn1</span><span class="op">.</span><span class="ident">Unmarshal</span><span class="op">(</span><span class="ident">der</span><span class="op">,</span>&nbsp;<span class="op">&amp;</span><span class="ident">privKey</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">errors</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="string">&#34;x509:&nbsp;failed&nbsp;to&nbsp;parse&nbsp;EC&nbsp;private&nbsp;key:&nbsp;&#34;</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">err</span><span class="op">.</span><span class="ident">Error</span><span class="op">(</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">privKey</span><span class="op">.</span><span class="ident">Version</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">ecPrivKeyVersion</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">fmt</span><span class="op">.</span><span class="ident">Errorf</span><span class="op">(</span><span class="string">&#34;x509:&nbsp;unknown&nbsp;EC&nbsp;private&nbsp;key&nbsp;version&nbsp;%d&#34;</span><span class="op">,</span>&nbsp;<span class="ident">privKey</span><span class="op">.</span><span class="ident">Version</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">curve</span>&nbsp;<span class="ident">elliptic</span><span class="op">.</span><span class="ident">Curve</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">namedCurveOID</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">curve</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">namedCurveFromOID</span><span class="op">(</span><span class="op">*</span><span class="ident">namedCurveOID</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">curve</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">namedCurveFromOID</span><span class="op">(</span><span class="ident">privKey</span><span class="op">.</span><span class="ident">NamedCurveOID</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">curve</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">errors</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="string">&#34;x509:&nbsp;unknown&nbsp;elliptic&nbsp;curve&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">k</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">new</span><span class="op">(</span><span class="ident">big</span><span class="op">.</span><span class="ident">Int</span><span class="op">)</span><span class="op">.</span><span class="ident">SetBytes</span><span class="op">(</span><span class="ident">privKey</span><span class="op">.</span><span class="ident">PrivateKey</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">k</span><span class="op">.</span><span class="ident">Cmp</span><span class="op">(</span><span class="ident">curve</span><span class="op">.</span><span class="ident">Params</span><span class="op">(</span><span class="op">)</span><span class="op">.</span><span class="ident">N</span><span class="op">)</span>&nbsp;<span class="op">&gt;=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">errors</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="string">&#34;x509:&nbsp;invalid&nbsp;elliptic&nbsp;curve&nbsp;private&nbsp;key&nbsp;value&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">priv</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">new</span><span class="op">(</span><span class="ident">ecdsa</span><span class="op">.</span><span class="ident">PrivateKey</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">priv</span><span class="op">.</span><span class="ident">Curve</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">curve</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">priv</span><span class="op">.</span><span class="ident">D</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">k</span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">priv</span><span class="op">.</span><span class="ident">X</span><span class="op">,</span>&nbsp;<span class="ident">priv</span><span class="op">.</span><span class="ident">Y</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">curve</span><span class="op">.</span><span class="ident">ScalarBaseMult</span><span class="op">(</span><span class="ident">privKey</span><span class="op">.</span><span class="ident">PrivateKey</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">priv</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

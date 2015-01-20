@@ -1,0 +1,232 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2011&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">template</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;fmt&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;reflect&#34;</span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;text/template/parse&#34;</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;common&nbsp;holds&nbsp;the&nbsp;information&nbsp;shared&nbsp;by&nbsp;related&nbsp;templates.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">common</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">15</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tmpl</span>&nbsp;<span class="keyword">map</span><span class="op">[</span><span class="builtintype">string</span><span class="op">]</span><span class="op">*</span><span class="ident">Template</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;We&nbsp;use&nbsp;two&nbsp;maps,&nbsp;one&nbsp;for&nbsp;parsing&nbsp;and&nbsp;one&nbsp;for&nbsp;execution.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;This&nbsp;separation&nbsp;makes&nbsp;the&nbsp;API&nbsp;cleaner&nbsp;since&nbsp;it&nbsp;doesn&#39;t</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;expose&nbsp;reflection&nbsp;to&nbsp;the&nbsp;client.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">parseFuncs</span>&nbsp;<span class="ident">FuncMap</span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">execFuncs</span>&nbsp;&nbsp;<span class="keyword">map</span><span class="op">[</span><span class="builtintype">string</span><span class="op">]</span><span class="ident">reflect</span><span class="op">.</span><span class="ident">Value</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Template&nbsp;is&nbsp;the&nbsp;representation&nbsp;of&nbsp;a&nbsp;parsed&nbsp;template.&nbsp;The&nbsp;*parse.Tree</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;field&nbsp;is&nbsp;exported&nbsp;only&nbsp;for&nbsp;use&nbsp;by&nbsp;html/template&nbsp;and&nbsp;should&nbsp;be&nbsp;treated</span><br>
+<span class="lineno">25</span><span class="comment">//&nbsp;as&nbsp;unexported&nbsp;by&nbsp;all&nbsp;other&nbsp;clients.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">Template</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">name</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">parse</span><span class="op">.</span><span class="ident">Tree</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">common</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">leftDelim</span>&nbsp;&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">rightDelim</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;New&nbsp;allocates&nbsp;a&nbsp;new&nbsp;template&nbsp;with&nbsp;the&nbsp;given&nbsp;name.</span><br>
+<span class="lineno">35</span><span class="keyword">func</span>&nbsp;<span class="ident">New</span><span class="op">(</span><span class="ident">name</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">Template</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="op">&amp;</span><span class="ident">Template</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">name</span><span class="op">:</span>&nbsp;<span class="ident">name</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">40</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Name&nbsp;returns&nbsp;the&nbsp;name&nbsp;of&nbsp;the&nbsp;template.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">Template</span><span class="op">)</span>&nbsp;<span class="ident">Name</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">t</span><span class="op">.</span><span class="ident">name</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">45</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;New&nbsp;allocates&nbsp;a&nbsp;new&nbsp;template&nbsp;associated&nbsp;with&nbsp;the&nbsp;given&nbsp;one&nbsp;and&nbsp;with&nbsp;the&nbsp;same</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;delimiters.&nbsp;The&nbsp;association,&nbsp;which&nbsp;is&nbsp;transitive,&nbsp;allows&nbsp;one&nbsp;template&nbsp;to</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;invoke&nbsp;another&nbsp;with&nbsp;a&nbsp;{{template}}&nbsp;action.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">Template</span><span class="op">)</span>&nbsp;<span class="ident">New</span><span class="op">(</span><span class="ident">name</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">Template</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">init</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="op">&amp;</span><span class="ident">Template</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">name</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">name</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">common</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">t</span><span class="op">.</span><span class="ident">common</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">leftDelim</span><span class="op">:</span>&nbsp;&nbsp;<span class="ident">t</span><span class="op">.</span><span class="ident">leftDelim</span><span class="op">,</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">rightDelim</span><span class="op">:</span>&nbsp;<span class="ident">t</span><span class="op">.</span><span class="ident">rightDelim</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">Template</span><span class="op">)</span>&nbsp;<span class="ident">init</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">t</span><span class="op">.</span><span class="ident">common</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">common</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">new</span><span class="op">(</span><span class="ident">common</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">tmpl</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">make</span><span class="op">(</span><span class="keyword">map</span><span class="op">[</span><span class="builtintype">string</span><span class="op">]</span><span class="op">*</span><span class="ident">Template</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">parseFuncs</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">make</span><span class="op">(</span><span class="ident">FuncMap</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">execFuncs</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">make</span><span class="op">(</span><span class="keyword">map</span><span class="op">[</span><span class="builtintype">string</span><span class="op">]</span><span class="ident">reflect</span><span class="op">.</span><span class="ident">Value</span><span class="op">)</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Clone&nbsp;returns&nbsp;a&nbsp;duplicate&nbsp;of&nbsp;the&nbsp;template,&nbsp;including&nbsp;all&nbsp;associated</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;templates.&nbsp;The&nbsp;actual&nbsp;representation&nbsp;is&nbsp;not&nbsp;copied,&nbsp;but&nbsp;the&nbsp;name&nbsp;space&nbsp;of</span><br>
+<span class="lineno">70</span><span class="comment">//&nbsp;associated&nbsp;templates&nbsp;is,&nbsp;so&nbsp;further&nbsp;calls&nbsp;to&nbsp;Parse&nbsp;in&nbsp;the&nbsp;copy&nbsp;will&nbsp;add</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;templates&nbsp;to&nbsp;the&nbsp;copy&nbsp;but&nbsp;not&nbsp;to&nbsp;the&nbsp;original.&nbsp;Clone&nbsp;can&nbsp;be&nbsp;used&nbsp;to&nbsp;prepare</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;common&nbsp;templates&nbsp;and&nbsp;use&nbsp;them&nbsp;with&nbsp;variant&nbsp;definitions&nbsp;for&nbsp;other&nbsp;templates</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;by&nbsp;adding&nbsp;the&nbsp;variants&nbsp;after&nbsp;the&nbsp;clone&nbsp;is&nbsp;made.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">Template</span><span class="op">)</span>&nbsp;<span class="ident">Clone</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="op">*</span><span class="ident">Template</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nt</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">t</span><span class="op">.</span><span class="builtinfunc">copy</span><span class="op">(</span><span class="ident">nil</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nt</span><span class="op">.</span><span class="ident">init</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nt</span><span class="op">.</span><span class="ident">tmpl</span><span class="op">[</span><span class="ident">t</span><span class="op">.</span><span class="ident">name</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">nt</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">k</span><span class="op">,</span>&nbsp;<span class="ident">v</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">t</span><span class="op">.</span><span class="ident">tmpl</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">k</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">t</span><span class="op">.</span><span class="ident">name</span>&nbsp;<span class="op">{</span>&nbsp;<span class="comment">//&nbsp;Already&nbsp;installed.</span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">continue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;The&nbsp;associated&nbsp;templates&nbsp;share&nbsp;nt&#39;s&nbsp;common&nbsp;structure.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tmpl</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">v</span><span class="op">.</span><span class="builtinfunc">copy</span><span class="op">(</span><span class="ident">nt</span><span class="op">.</span><span class="ident">common</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nt</span><span class="op">.</span><span class="ident">tmpl</span><span class="op">[</span><span class="ident">k</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">tmpl</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">k</span><span class="op">,</span>&nbsp;<span class="ident">v</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">t</span><span class="op">.</span><span class="ident">parseFuncs</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nt</span><span class="op">.</span><span class="ident">parseFuncs</span><span class="op">[</span><span class="ident">k</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">v</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">k</span><span class="op">,</span>&nbsp;<span class="ident">v</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">t</span><span class="op">.</span><span class="ident">execFuncs</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nt</span><span class="op">.</span><span class="ident">execFuncs</span><span class="op">[</span><span class="ident">k</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">v</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nt</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">95</span><span class="comment">//&nbsp;copy&nbsp;returns&nbsp;a&nbsp;shallow&nbsp;copy&nbsp;of&nbsp;t,&nbsp;with&nbsp;common&nbsp;set&nbsp;to&nbsp;the&nbsp;argument.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">Template</span><span class="op">)</span>&nbsp;<span class="builtinfunc">copy</span><span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">common</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">Template</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nt</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">New</span><span class="op">(</span><span class="ident">t</span><span class="op">.</span><span class="ident">name</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nt</span><span class="op">.</span><span class="ident">Tree</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">t</span><span class="op">.</span><span class="ident">Tree</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nt</span><span class="op">.</span><span class="ident">common</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">c</span><br>
+<span class="lineno">100</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nt</span><span class="op">.</span><span class="ident">leftDelim</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">t</span><span class="op">.</span><span class="ident">leftDelim</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nt</span><span class="op">.</span><span class="ident">rightDelim</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">t</span><span class="op">.</span><span class="ident">rightDelim</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nt</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">105</span><span class="comment">//&nbsp;AddParseTree&nbsp;creates&nbsp;a&nbsp;new&nbsp;template&nbsp;with&nbsp;the&nbsp;name&nbsp;and&nbsp;parse&nbsp;tree</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;and&nbsp;associates&nbsp;it&nbsp;with&nbsp;t.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">Template</span><span class="op">)</span>&nbsp;<span class="ident">AddParseTree</span><span class="op">(</span><span class="ident">name</span>&nbsp;<span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">tree</span>&nbsp;<span class="op">*</span><span class="ident">parse</span><span class="op">.</span><span class="ident">Tree</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="op">*</span><span class="ident">Template</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">t</span><span class="op">.</span><span class="ident">common</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">t</span><span class="op">.</span><span class="ident">tmpl</span><span class="op">[</span><span class="ident">name</span><span class="op">]</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">fmt</span><span class="op">.</span><span class="ident">Errorf</span><span class="op">(</span><span class="string">&#34;template:&nbsp;redefinition&nbsp;of&nbsp;template&nbsp;%q&#34;</span><span class="op">,</span>&nbsp;<span class="ident">name</span><span class="op">)</span><br>
+<span class="lineno">110</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nt</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">t</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="ident">name</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nt</span><span class="op">.</span><span class="ident">Tree</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">tree</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">tmpl</span><span class="op">[</span><span class="ident">name</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">nt</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nt</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno">115</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Templates&nbsp;returns&nbsp;a&nbsp;slice&nbsp;of&nbsp;the&nbsp;templates&nbsp;associated&nbsp;with&nbsp;t,&nbsp;including&nbsp;t</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;itself.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">Template</span><span class="op">)</span>&nbsp;<span class="ident">Templates</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="op">*</span><span class="ident">Template</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">120</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">t</span><span class="op">.</span><span class="ident">common</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Return&nbsp;a&nbsp;slice&nbsp;so&nbsp;we&nbsp;don&#39;t&nbsp;expose&nbsp;the&nbsp;map.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">m</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">make</span><span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="op">*</span><span class="ident">Template</span><span class="op">,</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">t</span><span class="op">.</span><span class="ident">tmpl</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno">125</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">v</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">t</span><span class="op">.</span><span class="ident">tmpl</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">m</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">append</span><span class="op">(</span><span class="ident">m</span><span class="op">,</span>&nbsp;<span class="ident">v</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">m</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">130</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Delims&nbsp;sets&nbsp;the&nbsp;action&nbsp;delimiters&nbsp;to&nbsp;the&nbsp;specified&nbsp;strings,&nbsp;to&nbsp;be&nbsp;used&nbsp;in</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;subsequent&nbsp;calls&nbsp;to&nbsp;Parse,&nbsp;ParseFiles,&nbsp;or&nbsp;ParseGlob.&nbsp;Nested&nbsp;template</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;definitions&nbsp;will&nbsp;inherit&nbsp;the&nbsp;settings.&nbsp;An&nbsp;empty&nbsp;delimiter&nbsp;stands&nbsp;for&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;corresponding&nbsp;default:&nbsp;{{&nbsp;or&nbsp;}}.</span><br>
+<span class="lineno">135</span><span class="comment">//&nbsp;The&nbsp;return&nbsp;value&nbsp;is&nbsp;the&nbsp;template,&nbsp;so&nbsp;calls&nbsp;can&nbsp;be&nbsp;chained.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">Template</span><span class="op">)</span>&nbsp;<span class="ident">Delims</span><span class="op">(</span><span class="ident">left</span><span class="op">,</span>&nbsp;<span class="ident">right</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">Template</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">leftDelim</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">left</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">rightDelim</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">right</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">t</span><br>
+<span class="lineno">140</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Funcs&nbsp;adds&nbsp;the&nbsp;elements&nbsp;of&nbsp;the&nbsp;argument&nbsp;map&nbsp;to&nbsp;the&nbsp;template&#39;s&nbsp;function&nbsp;map.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;It&nbsp;panics&nbsp;if&nbsp;a&nbsp;value&nbsp;in&nbsp;the&nbsp;map&nbsp;is&nbsp;not&nbsp;a&nbsp;function&nbsp;with&nbsp;appropriate&nbsp;return</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;type.&nbsp;However,&nbsp;it&nbsp;is&nbsp;legal&nbsp;to&nbsp;overwrite&nbsp;elements&nbsp;of&nbsp;the&nbsp;map.&nbsp;The&nbsp;return</span><br>
+<span class="lineno">145</span><span class="comment">//&nbsp;value&nbsp;is&nbsp;the&nbsp;template,&nbsp;so&nbsp;calls&nbsp;can&nbsp;be&nbsp;chained.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">Template</span><span class="op">)</span>&nbsp;<span class="ident">Funcs</span><span class="op">(</span><span class="ident">funcMap</span>&nbsp;<span class="ident">FuncMap</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">Template</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">init</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">addValueFuncs</span><span class="op">(</span><span class="ident">t</span><span class="op">.</span><span class="ident">execFuncs</span><span class="op">,</span>&nbsp;<span class="ident">funcMap</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">addFuncs</span><span class="op">(</span><span class="ident">t</span><span class="op">.</span><span class="ident">parseFuncs</span><span class="op">,</span>&nbsp;<span class="ident">funcMap</span><span class="op">)</span><br>
+<span class="lineno">150</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">t</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Lookup&nbsp;returns&nbsp;the&nbsp;template&nbsp;with&nbsp;the&nbsp;given&nbsp;name&nbsp;that&nbsp;is&nbsp;associated&nbsp;with&nbsp;t,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;or&nbsp;nil&nbsp;if&nbsp;there&nbsp;is&nbsp;no&nbsp;such&nbsp;template.</span><br>
+<span class="lineno">155</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">Template</span><span class="op">)</span>&nbsp;<span class="ident">Lookup</span><span class="op">(</span><span class="ident">name</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">Template</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">t</span><span class="op">.</span><span class="ident">common</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">t</span><span class="op">.</span><span class="ident">tmpl</span><span class="op">[</span><span class="ident">name</span><span class="op">]</span><br>
+<span class="lineno">160</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Parse&nbsp;parses&nbsp;a&nbsp;string&nbsp;into&nbsp;a&nbsp;template.&nbsp;Nested&nbsp;template&nbsp;definitions&nbsp;will&nbsp;be</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;associated&nbsp;with&nbsp;the&nbsp;top-level&nbsp;template&nbsp;t.&nbsp;Parse&nbsp;may&nbsp;be&nbsp;called&nbsp;multiple&nbsp;times</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;to&nbsp;parse&nbsp;definitions&nbsp;of&nbsp;templates&nbsp;to&nbsp;associate&nbsp;with&nbsp;t.&nbsp;It&nbsp;is&nbsp;an&nbsp;error&nbsp;if&nbsp;a</span><br>
+<span class="lineno">165</span><span class="comment">//&nbsp;resulting&nbsp;template&nbsp;is&nbsp;non-empty&nbsp;(contains&nbsp;content&nbsp;other&nbsp;than&nbsp;template</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;definitions)&nbsp;and&nbsp;would&nbsp;replace&nbsp;a&nbsp;non-empty&nbsp;template&nbsp;with&nbsp;the&nbsp;same&nbsp;name.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;(In&nbsp;multiple&nbsp;calls&nbsp;to&nbsp;Parse&nbsp;with&nbsp;the&nbsp;same&nbsp;receiver&nbsp;template,&nbsp;only&nbsp;one&nbsp;call</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;can&nbsp;contain&nbsp;text&nbsp;other&nbsp;than&nbsp;space,&nbsp;comments,&nbsp;and&nbsp;template&nbsp;definitions.)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">Template</span><span class="op">)</span>&nbsp;<span class="ident">Parse</span><span class="op">(</span><span class="ident">text</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="op">*</span><span class="ident">Template</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">170</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">init</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">trees</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">parse</span><span class="op">.</span><span class="ident">Parse</span><span class="op">(</span><span class="ident">t</span><span class="op">.</span><span class="ident">name</span><span class="op">,</span>&nbsp;<span class="ident">text</span><span class="op">,</span>&nbsp;<span class="ident">t</span><span class="op">.</span><span class="ident">leftDelim</span><span class="op">,</span>&nbsp;<span class="ident">t</span><span class="op">.</span><span class="ident">rightDelim</span><span class="op">,</span>&nbsp;<span class="ident">t</span><span class="op">.</span><span class="ident">parseFuncs</span><span class="op">,</span>&nbsp;<span class="ident">builtins</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">175</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Add&nbsp;the&nbsp;newly&nbsp;parsed&nbsp;trees,&nbsp;including&nbsp;the&nbsp;one&nbsp;for&nbsp;t,&nbsp;into&nbsp;our&nbsp;common&nbsp;structure.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">name</span><span class="op">,</span>&nbsp;<span class="ident">tree</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">trees</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;If&nbsp;the&nbsp;name&nbsp;we&nbsp;parsed&nbsp;is&nbsp;the&nbsp;name&nbsp;of&nbsp;this&nbsp;template,&nbsp;overwrite&nbsp;this&nbsp;template.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;The&nbsp;associate&nbsp;method&nbsp;checks&nbsp;it&#39;s&nbsp;not&nbsp;a&nbsp;redefinition.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tmpl</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">t</span><br>
+<span class="lineno">180</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">name</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">t</span><span class="op">.</span><span class="ident">name</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tmpl</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">t</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="ident">name</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Even&nbsp;if&nbsp;t&nbsp;==&nbsp;tmpl,&nbsp;we&nbsp;need&nbsp;to&nbsp;install&nbsp;it&nbsp;in&nbsp;the&nbsp;common.tmpl&nbsp;map.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">replace</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">t</span><span class="op">.</span><span class="ident">associate</span><span class="op">(</span><span class="ident">tmpl</span><span class="op">,</span>&nbsp;<span class="ident">tree</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">185</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="keyword">if</span>&nbsp;<span class="ident">replace</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tmpl</span><span class="op">.</span><span class="ident">Tree</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">tree</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tmpl</span><span class="op">.</span><span class="ident">leftDelim</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">t</span><span class="op">.</span><span class="ident">leftDelim</span><br>
+<span class="lineno">190</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tmpl</span><span class="op">.</span><span class="ident">rightDelim</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">t</span><span class="op">.</span><span class="ident">rightDelim</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">t</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">195</span><span class="comment">//&nbsp;associate&nbsp;installs&nbsp;the&nbsp;new&nbsp;template&nbsp;into&nbsp;the&nbsp;group&nbsp;of&nbsp;templates&nbsp;associated</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;with&nbsp;t.&nbsp;It&nbsp;is&nbsp;an&nbsp;error&nbsp;to&nbsp;reuse&nbsp;a&nbsp;name&nbsp;except&nbsp;to&nbsp;overwrite&nbsp;an&nbsp;empty</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;template.&nbsp;The&nbsp;two&nbsp;are&nbsp;already&nbsp;known&nbsp;to&nbsp;share&nbsp;the&nbsp;common&nbsp;structure.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;boolean&nbsp;return&nbsp;value&nbsp;reports&nbsp;wither&nbsp;to&nbsp;store&nbsp;this&nbsp;tree&nbsp;as&nbsp;t.Tree.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">Template</span><span class="op">)</span>&nbsp;<span class="ident">associate</span><span class="op">(</span><span class="builtinfunc">new</span>&nbsp;<span class="op">*</span><span class="ident">Template</span><span class="op">,</span>&nbsp;<span class="ident">tree</span>&nbsp;<span class="op">*</span><span class="ident">parse</span><span class="op">.</span><span class="ident">Tree</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="builtintype">bool</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">200</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtinfunc">new</span><span class="op">.</span><span class="ident">common</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">t</span><span class="op">.</span><span class="ident">common</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">panic</span><span class="op">(</span><span class="string">&#34;internal&nbsp;error:&nbsp;associate&nbsp;not&nbsp;common&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">name</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">new</span><span class="op">.</span><span class="ident">name</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">old</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">t</span><span class="op">.</span><span class="ident">tmpl</span><span class="op">[</span><span class="ident">name</span><span class="op">]</span><span class="op">;</span>&nbsp;<span class="ident">old</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">205</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">oldIsEmpty</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">parse</span><span class="op">.</span><span class="ident">IsEmptyTree</span><span class="op">(</span><span class="ident">old</span><span class="op">.</span><span class="ident">Root</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">newIsEmpty</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">parse</span><span class="op">.</span><span class="ident">IsEmptyTree</span><span class="op">(</span><span class="ident">tree</span><span class="op">.</span><span class="ident">Root</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">newIsEmpty</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Whether&nbsp;old&nbsp;is&nbsp;empty&nbsp;or&nbsp;not,&nbsp;new&nbsp;is&nbsp;empty;&nbsp;no&nbsp;reason&nbsp;to&nbsp;replace&nbsp;old.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">false</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno">210</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">oldIsEmpty</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">false</span><span class="op">,</span>&nbsp;<span class="ident">fmt</span><span class="op">.</span><span class="ident">Errorf</span><span class="op">(</span><span class="string">&#34;template:&nbsp;redefinition&nbsp;of&nbsp;template&nbsp;%q&#34;</span><span class="op">,</span>&nbsp;<span class="ident">name</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">215</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">tmpl</span><span class="op">[</span><span class="ident">name</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">new</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">true</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

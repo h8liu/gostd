@@ -1,0 +1,180 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2010&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="comment">//&nbsp;Export&nbsp;guts&nbsp;for&nbsp;testing.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">package</span>&nbsp;<span class="ident">runtime</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="string">&#34;unsafe&#34;</span><br>
+<span class="lineno">10</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">Fadd64</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">fadd64</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">Fsub64</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">fsub64</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">Fmul64</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">fmul64</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">Fdiv64</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">fdiv64</span><br>
+<span class="lineno">15</span><span class="keyword">var</span>&nbsp;<span class="ident">F64to32</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">f64to32</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">F32to64</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">f32to64</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">Fcmp64</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">fcmp64</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">Fintto64</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">fintto64</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">F64toint</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">f64toint</span><br>
+<span class="lineno">20</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;in&nbsp;asm_*.s</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">stackguard</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">sp</span><span class="op">,</span>&nbsp;<span class="ident">limit</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">Entersyscall</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">entersyscall</span><br>
+<span class="lineno">25</span><span class="keyword">var</span>&nbsp;<span class="ident">Exitsyscall</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">exitsyscall</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">LockedOSThread</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">lockedOSThread</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">LFNode</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Next</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">*</span><span class="ident">LFNode</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Pushcnt</span>&nbsp;<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">lfstackpush_m</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">lfstackpop_m</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">35</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">LFStackPush</span><span class="op">(</span><span class="ident">head</span>&nbsp;<span class="op">*</span><span class="ident">uint64</span><span class="op">,</span>&nbsp;<span class="ident">node</span>&nbsp;<span class="op">*</span><span class="ident">LFNode</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">acquirem</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mp</span><span class="op">.</span><span class="ident">ptrarg</span><span class="op">[</span><span class="num">0</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="ident">head</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mp</span><span class="op">.</span><span class="ident">ptrarg</span><span class="op">[</span><span class="num">1</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="ident">node</span><span class="op">)</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">onM</span><span class="op">(</span><span class="ident">lfstackpush_m</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">releasem</span><span class="op">(</span><span class="ident">mp</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">LFStackPop</span><span class="op">(</span><span class="ident">head</span>&nbsp;<span class="op">*</span><span class="ident">uint64</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">LFNode</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">acquirem</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mp</span><span class="op">.</span><span class="ident">ptrarg</span><span class="op">[</span><span class="num">0</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="ident">head</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">onM</span><span class="op">(</span><span class="ident">lfstackpop_m</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">node</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">(</span><span class="op">*</span><span class="ident">LFNode</span><span class="op">)</span><span class="op">(</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="ident">mp</span><span class="op">.</span><span class="ident">ptrarg</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mp</span><span class="op">.</span><span class="ident">ptrarg</span><span class="op">[</span><span class="num">0</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">releasem</span><span class="op">(</span><span class="ident">mp</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">node</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">ParFor</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">body</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">*</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">done</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Nthr</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nthrmax</span>&nbsp;<span class="builtintype">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">thrseq</span>&nbsp;&nbsp;<span class="builtintype">uint32</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Cnt</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Ctx</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">*</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">wait</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">bool</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">65</span><span class="keyword">func</span>&nbsp;<span class="ident">newparfor_m</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">parforsetup_m</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">parfordo_m</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">parforiters_m</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">70</span><span class="keyword">func</span>&nbsp;<span class="ident">NewParFor</span><span class="op">(</span><span class="ident">nthrmax</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">ParFor</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">acquirem</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mp</span><span class="op">.</span><span class="ident">scalararg</span><span class="op">[</span><span class="num">0</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">(</span><span class="ident">nthrmax</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">onM</span><span class="op">(</span><span class="ident">newparfor_m</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">desc</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">(</span><span class="op">*</span><span class="ident">ParFor</span><span class="op">)</span><span class="op">(</span><span class="ident">mp</span><span class="op">.</span><span class="ident">ptrarg</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mp</span><span class="op">.</span><span class="ident">ptrarg</span><span class="op">[</span><span class="num">0</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">releasem</span><span class="op">(</span><span class="ident">mp</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">desc</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">80</span><span class="keyword">func</span>&nbsp;<span class="ident">ParForSetup</span><span class="op">(</span><span class="ident">desc</span>&nbsp;<span class="op">*</span><span class="ident">ParFor</span><span class="op">,</span>&nbsp;<span class="ident">nthr</span><span class="op">,</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="builtintype">uint32</span><span class="op">,</span>&nbsp;<span class="ident">ctx</span>&nbsp;<span class="op">*</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="ident">wait</span>&nbsp;<span class="builtintype">bool</span><span class="op">,</span>&nbsp;<span class="ident">body</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="op">*</span><span class="ident">ParFor</span><span class="op">,</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">acquirem</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mp</span><span class="op">.</span><span class="ident">ptrarg</span><span class="op">[</span><span class="num">0</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="ident">desc</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mp</span><span class="op">.</span><span class="ident">ptrarg</span><span class="op">[</span><span class="num">1</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="ident">ctx</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mp</span><span class="op">.</span><span class="ident">ptrarg</span><span class="op">[</span><span class="num">2</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="ident">funcPC</span><span class="op">(</span><span class="ident">body</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="comment">//&nbsp;TODO(rsc):&nbsp;Should&nbsp;be&nbsp;a&nbsp;scalar.</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mp</span><span class="op">.</span><span class="ident">scalararg</span><span class="op">[</span><span class="num">0</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">(</span><span class="ident">nthr</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mp</span><span class="op">.</span><span class="ident">scalararg</span><span class="op">[</span><span class="num">1</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">(</span><span class="ident">n</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mp</span><span class="op">.</span><span class="ident">scalararg</span><span class="op">[</span><span class="num">2</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">wait</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mp</span><span class="op">.</span><span class="ident">scalararg</span><span class="op">[</span><span class="num">2</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">onM</span><span class="op">(</span><span class="ident">parforsetup_m</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">releasem</span><span class="op">(</span><span class="ident">mp</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">95</span><span class="keyword">func</span>&nbsp;<span class="ident">ParForDo</span><span class="op">(</span><span class="ident">desc</span>&nbsp;<span class="op">*</span><span class="ident">ParFor</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">acquirem</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mp</span><span class="op">.</span><span class="ident">ptrarg</span><span class="op">[</span><span class="num">0</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="ident">desc</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">onM</span><span class="op">(</span><span class="ident">parfordo_m</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">releasem</span><span class="op">(</span><span class="ident">mp</span><span class="op">)</span><br>
+<span class="lineno">100</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">ParForIters</span><span class="op">(</span><span class="ident">desc</span>&nbsp;<span class="op">*</span><span class="ident">ParFor</span><span class="op">,</span>&nbsp;<span class="ident">tid</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="builtintype">uint32</span><span class="op">,</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">acquirem</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mp</span><span class="op">.</span><span class="ident">ptrarg</span><span class="op">[</span><span class="num">0</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="ident">desc</span><span class="op">)</span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mp</span><span class="op">.</span><span class="ident">scalararg</span><span class="op">[</span><span class="num">0</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">(</span><span class="ident">tid</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">onM</span><span class="op">(</span><span class="ident">parforiters_m</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">begin</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtintype">uint32</span><span class="op">(</span><span class="ident">mp</span><span class="op">.</span><span class="ident">scalararg</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">end</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtintype">uint32</span><span class="op">(</span><span class="ident">mp</span><span class="op">.</span><span class="ident">scalararg</span><span class="op">[</span><span class="num">1</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">releasem</span><span class="op">(</span><span class="ident">mp</span><span class="op">)</span><br>
+<span class="lineno">110</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">begin</span><span class="op">,</span>&nbsp;<span class="ident">end</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;in&nbsp;mgc0.c</span><br>
+<span class="lineno"></span><span class="comment">//go:noescape</span><br>
+<span class="lineno">115</span><span class="keyword">func</span>&nbsp;<span class="ident">getgcmask</span><span class="op">(</span><span class="ident">data</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">,</span>&nbsp;<span class="ident">typ</span>&nbsp;<span class="op">*</span><span class="ident">_type</span><span class="op">,</span>&nbsp;<span class="ident">array</span>&nbsp;<span class="op">*</span><span class="op">*</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="builtinfunc">len</span>&nbsp;<span class="op">*</span><span class="builtintype">uint</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">GCMask</span><span class="op">(</span><span class="ident">x</span>&nbsp;<span class="keyword">interface</span><span class="op">{</span><span class="op">}</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">ret</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">e</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">(</span><span class="op">*</span><span class="ident">eface</span><span class="op">)</span><span class="op">(</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">x</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">(</span><span class="op">*</span><span class="ident">slice</span><span class="op">)</span><span class="op">(</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">ret</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno">120</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">onM</span><span class="op">(</span><span class="keyword">func</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">getgcmask</span><span class="op">(</span><span class="ident">e</span><span class="op">.</span><span class="ident">data</span><span class="op">,</span>&nbsp;<span class="ident">e</span><span class="op">.</span><span class="ident">_type</span><span class="op">,</span>&nbsp;<span class="op">&amp;</span><span class="ident">s</span><span class="op">.</span><span class="ident">array</span><span class="op">,</span>&nbsp;<span class="op">&amp;</span><span class="ident">s</span><span class="op">.</span><span class="builtinfunc">len</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="builtinfunc">cap</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="builtinfunc">len</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno">125</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">testSchedLocalQueue</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">testSchedLocalQueueSteal</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">RunSchedLocalQueueTest</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">130</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">onM</span><span class="op">(</span><span class="ident">testSchedLocalQueue</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">RunSchedLocalQueueStealTest</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">onM</span><span class="op">(</span><span class="ident">testSchedLocalQueueSteal</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">135</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">HaveGoodHash</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">haveGoodHash</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">StringHash</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stringHash</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">BytesHash</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">bytesHash</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">Int32Hash</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">int32Hash</span><br>
+<span class="lineno">140</span><span class="keyword">var</span>&nbsp;<span class="ident">Int64Hash</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">int64Hash</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">EfaceHash</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">efaceHash</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">IfaceHash</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">ifaceHash</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">MemclrBytes</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">memclrBytes</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">145</span><span class="keyword">var</span>&nbsp;<span class="ident">HashLoad</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">&amp;</span><span class="ident">hashLoad</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;For&nbsp;testing.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">GogoBytes</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">int32</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">_RuntimeGogoBytes</span><br>
+<span class="lineno">150</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;in&nbsp;string.c</span><br>
+<span class="lineno"></span><span class="comment">//go:noescape</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">gostringw</span><span class="op">(</span><span class="ident">w</span>&nbsp;<span class="op">*</span><span class="builtintype">uint16</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno">155</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;entry&nbsp;point&nbsp;for&nbsp;testing</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">GostringW</span><span class="op">(</span><span class="ident">w</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">uint16</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">s</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">onM</span><span class="op">(</span><span class="keyword">func</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">gostringw</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">w</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno">160</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">Gostringnocopy</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">gostringnocopy</span><br>
+<span class="lineno">165</span><span class="keyword">var</span>&nbsp;<span class="ident">Maxstring</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">&amp;</span><span class="ident">maxstring</span>
+</div>
+</body>
+</html>

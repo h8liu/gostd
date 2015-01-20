@@ -1,0 +1,133 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2010&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">textproto</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;bufio&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;fmt&#34;</span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;io&#34;</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;A&nbsp;Writer&nbsp;implements&nbsp;convenience&nbsp;methods&nbsp;for&nbsp;writing</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;requests&nbsp;or&nbsp;responses&nbsp;to&nbsp;a&nbsp;text&nbsp;protocol&nbsp;network&nbsp;connection.</span><br>
+<span class="lineno">15</span><span class="keyword">type</span>&nbsp;<span class="ident">Writer</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">W</span>&nbsp;&nbsp;&nbsp;<span class="op">*</span><span class="ident">bufio</span><span class="op">.</span><span class="ident">Writer</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dot</span>&nbsp;<span class="op">*</span><span class="ident">dotWriter</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">20</span><span class="comment">//&nbsp;NewWriter&nbsp;returns&nbsp;a&nbsp;new&nbsp;Writer&nbsp;writing&nbsp;to&nbsp;w.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">NewWriter</span><span class="op">(</span><span class="ident">w</span>&nbsp;<span class="op">*</span><span class="ident">bufio</span><span class="op">.</span><span class="ident">Writer</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">Writer</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="op">&amp;</span><span class="ident">Writer</span><span class="op">{</span><span class="ident">W</span><span class="op">:</span>&nbsp;<span class="ident">w</span><span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">25</span><span class="keyword">var</span>&nbsp;<span class="ident">crnl</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">{</span><span class="string">&#39;\r&#39;</span><span class="op">,</span>&nbsp;<span class="string">&#39;\n&#39;</span><span class="op">}</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">dotcrnl</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">{</span><span class="string">&#39;.&#39;</span><span class="op">,</span>&nbsp;<span class="string">&#39;\r&#39;</span><span class="op">,</span>&nbsp;<span class="string">&#39;\n&#39;</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;PrintfLine&nbsp;writes&nbsp;the&nbsp;formatted&nbsp;output&nbsp;followed&nbsp;by&nbsp;\r\n.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">w</span>&nbsp;<span class="op">*</span><span class="ident">Writer</span><span class="op">)</span>&nbsp;<span class="ident">PrintfLine</span><span class="op">(</span><span class="ident">format</span>&nbsp;<span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">args</span>&nbsp;<span class="op">...</span><span class="keyword">interface</span><span class="op">{</span><span class="op">}</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">w</span><span class="op">.</span><span class="ident">closeDot</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fmt</span><span class="op">.</span><span class="ident">Fprintf</span><span class="op">(</span><span class="ident">w</span><span class="op">.</span><span class="ident">W</span><span class="op">,</span>&nbsp;<span class="ident">format</span><span class="op">,</span>&nbsp;<span class="ident">args</span><span class="op">...</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">w</span><span class="op">.</span><span class="ident">W</span><span class="op">.</span><span class="ident">Write</span><span class="op">(</span><span class="ident">crnl</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">w</span><span class="op">.</span><span class="ident">W</span><span class="op">.</span><span class="ident">Flush</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">35</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;DotWriter&nbsp;returns&nbsp;a&nbsp;writer&nbsp;that&nbsp;can&nbsp;be&nbsp;used&nbsp;to&nbsp;write&nbsp;a&nbsp;dot-encoding&nbsp;to&nbsp;w.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;It&nbsp;takes&nbsp;care&nbsp;of&nbsp;inserting&nbsp;leading&nbsp;dots&nbsp;when&nbsp;necessary,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;translating&nbsp;line-ending&nbsp;\n&nbsp;into&nbsp;\r\n,&nbsp;and&nbsp;adding&nbsp;the&nbsp;final&nbsp;.\r\n&nbsp;line</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;when&nbsp;the&nbsp;DotWriter&nbsp;is&nbsp;closed.&nbsp;&nbsp;The&nbsp;caller&nbsp;should&nbsp;close&nbsp;the</span><br>
+<span class="lineno">40</span><span class="comment">//&nbsp;DotWriter&nbsp;before&nbsp;the&nbsp;next&nbsp;call&nbsp;to&nbsp;a&nbsp;method&nbsp;on&nbsp;w.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;See&nbsp;the&nbsp;documentation&nbsp;for&nbsp;Reader&#39;s&nbsp;DotReader&nbsp;method&nbsp;for&nbsp;details&nbsp;about&nbsp;dot-encoding.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">w</span>&nbsp;<span class="op">*</span><span class="ident">Writer</span><span class="op">)</span>&nbsp;<span class="ident">DotWriter</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">WriteCloser</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">w</span><span class="op">.</span><span class="ident">closeDot</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">w</span><span class="op">.</span><span class="ident">dot</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">&amp;</span><span class="ident">dotWriter</span><span class="op">{</span><span class="ident">w</span><span class="op">:</span>&nbsp;<span class="ident">w</span><span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">w</span><span class="op">.</span><span class="ident">dot</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">w</span>&nbsp;<span class="op">*</span><span class="ident">Writer</span><span class="op">)</span>&nbsp;<span class="ident">closeDot</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">w</span><span class="op">.</span><span class="ident">dot</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">w</span><span class="op">.</span><span class="ident">dot</span><span class="op">.</span><span class="ident">Close</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="comment">//&nbsp;sets&nbsp;w.dot&nbsp;=&nbsp;nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">55</span><span class="keyword">type</span>&nbsp;<span class="ident">dotWriter</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">w</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">*</span><span class="ident">Writer</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">state</span>&nbsp;<span class="builtintype">int</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">60</span><span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">wstateBeginLine</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">iota</span>&nbsp;<span class="comment">//&nbsp;beginning&nbsp;of&nbsp;line;&nbsp;initial&nbsp;state;&nbsp;must&nbsp;be&nbsp;zero</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">wstateCR</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;wrote&nbsp;\r&nbsp;(possibly&nbsp;at&nbsp;end&nbsp;of&nbsp;line)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">wstateData</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;writing&nbsp;data&nbsp;in&nbsp;middle&nbsp;of&nbsp;line</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno">65</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">d</span>&nbsp;<span class="op">*</span><span class="ident">dotWriter</span><span class="op">)</span>&nbsp;<span class="ident">Write</span><span class="op">(</span><span class="ident">b</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">n</span>&nbsp;<span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">bw</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">d</span><span class="op">.</span><span class="ident">w</span><span class="op">.</span><span class="ident">W</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">b</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">b</span><span class="op">[</span><span class="ident">n</span><span class="op">]</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="ident">d</span><span class="op">.</span><span class="ident">state</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">wstateBeginLine</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span><span class="op">.</span><span class="ident">state</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">wstateData</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;.&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;escape&nbsp;leading&nbsp;dot</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">bw</span><span class="op">.</span><span class="ident">WriteByte</span><span class="op">(</span><span class="string">&#39;.&#39;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">fallthrough</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">wstateData</span><span class="op">:</span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;\r&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span><span class="op">.</span><span class="ident">state</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">wstateCR</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;\n&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">bw</span><span class="op">.</span><span class="ident">WriteByte</span><span class="op">(</span><span class="string">&#39;\r&#39;</span><span class="op">)</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span><span class="op">.</span><span class="ident">state</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">wstateBeginLine</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">wstateCR</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span><span class="op">.</span><span class="ident">state</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">wstateData</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;\n&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span><span class="op">.</span><span class="ident">state</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">wstateBeginLine</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">bw</span><span class="op">.</span><span class="ident">WriteByte</span><span class="op">(</span><span class="ident">c</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">break</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span><span class="op">++</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno">100</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">d</span>&nbsp;<span class="op">*</span><span class="ident">dotWriter</span><span class="op">)</span>&nbsp;<span class="ident">Close</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">d</span><span class="op">.</span><span class="ident">w</span><span class="op">.</span><span class="ident">dot</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">d</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span><span class="op">.</span><span class="ident">w</span><span class="op">.</span><span class="ident">dot</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">bw</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">d</span><span class="op">.</span><span class="ident">w</span><span class="op">.</span><span class="ident">W</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="ident">d</span><span class="op">.</span><span class="ident">state</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">default</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">bw</span><span class="op">.</span><span class="ident">WriteByte</span><span class="op">(</span><span class="string">&#39;\r&#39;</span><span class="op">)</span><br>
+<span class="lineno">110</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">fallthrough</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">wstateCR</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">bw</span><span class="op">.</span><span class="ident">WriteByte</span><span class="op">(</span><span class="string">&#39;\n&#39;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">fallthrough</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">wstateBeginLine</span><span class="op">:</span><br>
+<span class="lineno">115</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">bw</span><span class="op">.</span><span class="ident">Write</span><span class="op">(</span><span class="ident">dotcrnl</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">bw</span><span class="op">.</span><span class="ident">Flush</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

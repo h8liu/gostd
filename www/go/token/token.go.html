@@ -1,0 +1,323 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2009&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="comment">//&nbsp;Package&nbsp;token&nbsp;defines&nbsp;constants&nbsp;representing&nbsp;the&nbsp;lexical&nbsp;tokens&nbsp;of&nbsp;the&nbsp;Go</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;programming&nbsp;language&nbsp;and&nbsp;basic&nbsp;operations&nbsp;on&nbsp;tokens&nbsp;(printing,&nbsp;predicates).</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="keyword">package</span>&nbsp;<span class="ident">token</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">10</span><span class="keyword">import</span>&nbsp;<span class="string">&#34;strconv&#34;</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Token&nbsp;is&nbsp;the&nbsp;set&nbsp;of&nbsp;lexical&nbsp;tokens&nbsp;of&nbsp;the&nbsp;Go&nbsp;programming&nbsp;language.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">Token</span>&nbsp;<span class="builtintype">int</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">15</span><span class="comment">//&nbsp;The&nbsp;list&nbsp;of&nbsp;tokens.</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Special&nbsp;tokens</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ILLEGAL</span>&nbsp;<span class="ident">Token</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">iota</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">EOF</span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">COMMENT</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">literal_beg</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Identifiers&nbsp;and&nbsp;basic&nbsp;type&nbsp;literals</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;(these&nbsp;tokens&nbsp;stand&nbsp;for&nbsp;classes&nbsp;of&nbsp;literals)</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">IDENT</span>&nbsp;&nbsp;<span class="comment">//&nbsp;main</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">INT</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;12345</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">FLOAT</span>&nbsp;&nbsp;<span class="comment">//&nbsp;123.45</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">IMAG</span>&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;123.45i</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">CHAR</span>&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;&#39;a&#39;</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">STRING</span>&nbsp;<span class="comment">//&nbsp;&#34;abc&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">literal_end</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">operator_beg</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Operators&nbsp;and&nbsp;delimiters</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ADD</span>&nbsp;<span class="comment">//&nbsp;+</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">SUB</span>&nbsp;<span class="comment">//&nbsp;-</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">MUL</span>&nbsp;<span class="comment">//&nbsp;*</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">QUO</span>&nbsp;<span class="comment">//&nbsp;/</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">REM</span>&nbsp;<span class="comment">//&nbsp;%</span><br>
+<span class="lineno">40</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">AND</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;&amp;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">OR</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;|</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">XOR</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;^</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">SHL</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;&lt;&lt;</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">SHR</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;&gt;&gt;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">AND_NOT</span>&nbsp;<span class="comment">//&nbsp;&amp;^</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ADD_ASSIGN</span>&nbsp;<span class="comment">//&nbsp;+=</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">SUB_ASSIGN</span>&nbsp;<span class="comment">//&nbsp;-=</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">MUL_ASSIGN</span>&nbsp;<span class="comment">//&nbsp;*=</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">QUO_ASSIGN</span>&nbsp;<span class="comment">//&nbsp;/=</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">REM_ASSIGN</span>&nbsp;<span class="comment">//&nbsp;%=</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">AND_ASSIGN</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;&amp;=</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">OR_ASSIGN</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;|=</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">XOR_ASSIGN</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;^=</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">SHL_ASSIGN</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;&lt;&lt;=</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">SHR_ASSIGN</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;&gt;&gt;=</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">AND_NOT_ASSIGN</span>&nbsp;<span class="comment">//&nbsp;&amp;^=</span><br>
+<span class="lineno">60</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">LAND</span>&nbsp;&nbsp;<span class="comment">//&nbsp;&amp;&amp;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">LOR</span>&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;||</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ARROW</span>&nbsp;<span class="comment">//&nbsp;&lt;-</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">INC</span>&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;++</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">DEC</span>&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;--</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">EQL</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;==</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">LSS</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;&lt;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">GTR</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;&gt;</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ASSIGN</span>&nbsp;<span class="comment">//&nbsp;=</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">NOT</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;!</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">NEQ</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;!=</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">LEQ</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;&lt;=</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">GEQ</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;&gt;=</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">DEFINE</span>&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;:=</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ELLIPSIS</span>&nbsp;<span class="comment">//&nbsp;...</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">LPAREN</span>&nbsp;<span class="comment">//&nbsp;(</span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">LBRACK</span>&nbsp;<span class="comment">//&nbsp;[</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">LBRACE</span>&nbsp;<span class="comment">//&nbsp;{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">COMMA</span>&nbsp;&nbsp;<span class="comment">//&nbsp;,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">PERIOD</span>&nbsp;<span class="comment">//&nbsp;.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">RPAREN</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">RBRACK</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">RBRACE</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">SEMICOLON</span>&nbsp;<span class="comment">//&nbsp;;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">COLON</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;:</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">operator_end</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">keyword_beg</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Keywords</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">BREAK</span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">CASE</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">CHAN</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">CONST</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">CONTINUE</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">100</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">DEFAULT</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">DEFER</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ELSE</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">FALLTHROUGH</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">FOR</span><br>
+<span class="lineno">105</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">FUNC</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">GO</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">GOTO</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">IF</span><br>
+<span class="lineno">110</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">IMPORT</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">INTERFACE</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">MAP</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">PACKAGE</span><br>
+<span class="lineno">115</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">RANGE</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">RETURN</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">SELECT</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">STRUCT</span><br>
+<span class="lineno">120</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">SWITCH</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">TYPE</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">VAR</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">keyword_end</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno">125</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">tokens</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">[</span><span class="op">...</span><span class="op">]</span><span class="builtintype">string</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ILLEGAL</span><span class="op">:</span>&nbsp;<span class="string">&#34;ILLEGAL&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">EOF</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;EOF&#34;</span><span class="op">,</span><br>
+<span class="lineno">130</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">COMMENT</span><span class="op">:</span>&nbsp;<span class="string">&#34;COMMENT&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">IDENT</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">&#34;IDENT&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">INT</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;INT&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">FLOAT</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">&#34;FLOAT&#34;</span><span class="op">,</span><br>
+<span class="lineno">135</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">IMAG</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;<span class="string">&#34;IMAG&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">CHAR</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;<span class="string">&#34;CHAR&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">STRING</span><span class="op">:</span>&nbsp;<span class="string">&#34;STRING&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ADD</span><span class="op">:</span>&nbsp;<span class="string">&#34;+&#34;</span><span class="op">,</span><br>
+<span class="lineno">140</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">SUB</span><span class="op">:</span>&nbsp;<span class="string">&#34;-&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">MUL</span><span class="op">:</span>&nbsp;<span class="string">&#34;*&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">QUO</span><span class="op">:</span>&nbsp;<span class="string">&#34;/&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">REM</span><span class="op">:</span>&nbsp;<span class="string">&#34;%&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">145</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">AND</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;&amp;&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">OR</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;|&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">XOR</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;^&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">SHL</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;&lt;&lt;&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">SHR</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;&gt;&gt;&#34;</span><span class="op">,</span><br>
+<span class="lineno">150</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">AND_NOT</span><span class="op">:</span>&nbsp;<span class="string">&#34;&amp;^&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ADD_ASSIGN</span><span class="op">:</span>&nbsp;<span class="string">&#34;+=&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">SUB_ASSIGN</span><span class="op">:</span>&nbsp;<span class="string">&#34;-=&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">MUL_ASSIGN</span><span class="op">:</span>&nbsp;<span class="string">&#34;*=&#34;</span><span class="op">,</span><br>
+<span class="lineno">155</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">QUO_ASSIGN</span><span class="op">:</span>&nbsp;<span class="string">&#34;/=&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">REM_ASSIGN</span><span class="op">:</span>&nbsp;<span class="string">&#34;%=&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">AND_ASSIGN</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;&amp;=&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">OR_ASSIGN</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;|=&#34;</span><span class="op">,</span><br>
+<span class="lineno">160</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">XOR_ASSIGN</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;^=&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">SHL_ASSIGN</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;&lt;&lt;=&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">SHR_ASSIGN</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;&gt;&gt;=&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">AND_NOT_ASSIGN</span><span class="op">:</span>&nbsp;<span class="string">&#34;&amp;^=&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">165</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">LAND</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">&#34;&amp;&amp;&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">LOR</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;<span class="string">&#34;||&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ARROW</span><span class="op">:</span>&nbsp;<span class="string">&#34;&lt;-&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">INC</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;<span class="string">&#34;++&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">DEC</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;<span class="string">&#34;--&#34;</span><span class="op">,</span><br>
+<span class="lineno">170</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">EQL</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;==&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">LSS</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;&lt;&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">GTR</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;&gt;&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ASSIGN</span><span class="op">:</span>&nbsp;<span class="string">&#34;=&#34;</span><span class="op">,</span><br>
+<span class="lineno">175</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">NOT</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;!&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">NEQ</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;!=&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">LEQ</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;&lt;=&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">GEQ</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;&gt;=&#34;</span><span class="op">,</span><br>
+<span class="lineno">180</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">DEFINE</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;<span class="string">&#34;:=&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ELLIPSIS</span><span class="op">:</span>&nbsp;<span class="string">&#34;...&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">LPAREN</span><span class="op">:</span>&nbsp;<span class="string">&#34;(&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">LBRACK</span><span class="op">:</span>&nbsp;<span class="string">&#34;[&#34;</span><span class="op">,</span><br>
+<span class="lineno">185</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">LBRACE</span><span class="op">:</span>&nbsp;<span class="string">&#34;{&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">COMMA</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">&#34;,&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">PERIOD</span><span class="op">:</span>&nbsp;<span class="string">&#34;.&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">RPAREN</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;)&#34;</span><span class="op">,</span><br>
+<span class="lineno">190</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">RBRACK</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;]&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">RBRACE</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;}&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">SEMICOLON</span><span class="op">:</span>&nbsp;<span class="string">&#34;;&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">COLON</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;:&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">195</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">BREAK</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;break&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">CASE</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;case&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">CHAN</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;chan&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">CONST</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;const&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">CONTINUE</span><span class="op">:</span>&nbsp;<span class="string">&#34;continue&#34;</span><span class="op">,</span><br>
+<span class="lineno">200</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">DEFAULT</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;default&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">DEFER</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;defer&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ELSE</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;else&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">FALLTHROUGH</span><span class="op">:</span>&nbsp;<span class="string">&#34;fallthrough&#34;</span><span class="op">,</span><br>
+<span class="lineno">205</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">FOR</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;for&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">FUNC</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;<span class="string">&#34;func&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">GO</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;go&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">GOTO</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;<span class="string">&#34;goto&#34;</span><span class="op">,</span><br>
+<span class="lineno">210</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">IF</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;if&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">IMPORT</span><span class="op">:</span>&nbsp;<span class="string">&#34;import&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">INTERFACE</span><span class="op">:</span>&nbsp;<span class="string">&#34;interface&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">MAP</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;map&#34;</span><span class="op">,</span><br>
+<span class="lineno">215</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">PACKAGE</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;<span class="string">&#34;package&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">RANGE</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;range&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">RETURN</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;return&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">SELECT</span><span class="op">:</span>&nbsp;<span class="string">&#34;select&#34;</span><span class="op">,</span><br>
+<span class="lineno">220</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">STRUCT</span><span class="op">:</span>&nbsp;<span class="string">&#34;struct&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">SWITCH</span><span class="op">:</span>&nbsp;<span class="string">&#34;switch&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">TYPE</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;<span class="string">&#34;type&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">VAR</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;var&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">225</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;String&nbsp;returns&nbsp;the&nbsp;string&nbsp;corresponding&nbsp;to&nbsp;the&nbsp;token&nbsp;tok.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;For&nbsp;operators,&nbsp;delimiters,&nbsp;and&nbsp;keywords&nbsp;the&nbsp;string&nbsp;is&nbsp;the&nbsp;actual</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;token&nbsp;character&nbsp;sequence&nbsp;(e.g.,&nbsp;for&nbsp;the&nbsp;token&nbsp;ADD,&nbsp;the&nbsp;string&nbsp;is</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&#34;+&#34;).&nbsp;For&nbsp;all&nbsp;other&nbsp;tokens&nbsp;the&nbsp;string&nbsp;corresponds&nbsp;to&nbsp;the&nbsp;token</span><br>
+<span class="lineno">230</span><span class="comment">//&nbsp;constant&nbsp;name&nbsp;(e.g.&nbsp;for&nbsp;the&nbsp;token&nbsp;IDENT,&nbsp;the&nbsp;string&nbsp;is&nbsp;&#34;IDENT&#34;).</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">tok</span>&nbsp;<span class="ident">Token</span><span class="op">)</span>&nbsp;<span class="ident">String</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="string">&#34;&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">tok</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">tok</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">Token</span><span class="op">(</span><span class="builtinfunc">len</span><span class="op">(</span><span class="ident">tokens</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">235</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">tokens</span><span class="op">[</span><span class="ident">tok</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">s</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#34;&#34;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">&#34;token(&#34;</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">strconv</span><span class="op">.</span><span class="ident">Itoa</span><span class="op">(</span><span class="builtintype">int</span><span class="op">(</span><span class="ident">tok</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">+</span>&nbsp;<span class="string">&#34;)&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">240</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">s</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;A&nbsp;set&nbsp;of&nbsp;constants&nbsp;for&nbsp;precedence-based&nbsp;expression&nbsp;parsing.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Non-operators&nbsp;have&nbsp;lowest&nbsp;precedence,&nbsp;followed&nbsp;by&nbsp;operators</span><br>
+<span class="lineno">245</span><span class="comment">//&nbsp;starting&nbsp;with&nbsp;precedence&nbsp;1&nbsp;up&nbsp;to&nbsp;unary&nbsp;operators.&nbsp;The&nbsp;highest</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;precedence&nbsp;serves&nbsp;as&nbsp;&#34;catch-all&#34;&nbsp;precedence&nbsp;for&nbsp;selector,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;indexing,&nbsp;and&nbsp;other&nbsp;operator&nbsp;and&nbsp;delimiter&nbsp;tokens.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno">250</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">LowestPrec</span>&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="comment">//&nbsp;non-operators</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">UnaryPrec</span>&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">6</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">HighestPrec</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">7</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">255</span><span class="comment">//&nbsp;Precedence&nbsp;returns&nbsp;the&nbsp;operator&nbsp;precedence&nbsp;of&nbsp;the&nbsp;binary</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;operator&nbsp;op.&nbsp;If&nbsp;op&nbsp;is&nbsp;not&nbsp;a&nbsp;binary&nbsp;operator,&nbsp;the&nbsp;result</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;is&nbsp;LowestPrecedence.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">op</span>&nbsp;<span class="ident">Token</span><span class="op">)</span>&nbsp;<span class="ident">Precedence</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">260</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="ident">op</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">LOR</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">LAND</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">2</span><br>
+<span class="lineno">265</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">EQL</span><span class="op">,</span>&nbsp;<span class="ident">NEQ</span><span class="op">,</span>&nbsp;<span class="ident">LSS</span><span class="op">,</span>&nbsp;<span class="ident">LEQ</span><span class="op">,</span>&nbsp;<span class="ident">GTR</span><span class="op">,</span>&nbsp;<span class="ident">GEQ</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">3</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">ADD</span><span class="op">,</span>&nbsp;<span class="ident">SUB</span><span class="op">,</span>&nbsp;<span class="ident">OR</span><span class="op">,</span>&nbsp;<span class="ident">XOR</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">4</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">MUL</span><span class="op">,</span>&nbsp;<span class="ident">QUO</span><span class="op">,</span>&nbsp;<span class="ident">REM</span><span class="op">,</span>&nbsp;<span class="ident">SHL</span><span class="op">,</span>&nbsp;<span class="ident">SHR</span><span class="op">,</span>&nbsp;<span class="ident">AND</span><span class="op">,</span>&nbsp;<span class="ident">AND_NOT</span><span class="op">:</span><br>
+<span class="lineno">270</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">5</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">LowestPrec</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">275</span><span class="keyword">var</span>&nbsp;<span class="ident">keywords</span>&nbsp;<span class="keyword">map</span><span class="op">[</span><span class="builtintype">string</span><span class="op">]</span><span class="ident">Token</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">init</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">keywords</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">make</span><span class="op">(</span><span class="keyword">map</span><span class="op">[</span><span class="builtintype">string</span><span class="op">]</span><span class="ident">Token</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">keyword_beg</span>&nbsp;<span class="op">+</span>&nbsp;<span class="num">1</span><span class="op">;</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">keyword_end</span><span class="op">;</span>&nbsp;<span class="ident">i</span><span class="op">++</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">280</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">keywords</span><span class="op">[</span><span class="ident">tokens</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">i</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Lookup&nbsp;maps&nbsp;an&nbsp;identifier&nbsp;to&nbsp;its&nbsp;keyword&nbsp;token&nbsp;or&nbsp;IDENT&nbsp;(if&nbsp;not&nbsp;a&nbsp;keyword).</span><br>
+<span class="lineno">285</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">Lookup</span><span class="op">(</span><span class="ident">ident</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="ident">Token</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">tok</span><span class="op">,</span>&nbsp;<span class="ident">is_keyword</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">keywords</span><span class="op">[</span><span class="ident">ident</span><span class="op">]</span><span class="op">;</span>&nbsp;<span class="ident">is_keyword</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">tok</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">290</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">IDENT</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Predicates</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">295</span><span class="comment">//&nbsp;IsLiteral&nbsp;returns&nbsp;true&nbsp;for&nbsp;tokens&nbsp;corresponding&nbsp;to&nbsp;identifiers</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;and&nbsp;basic&nbsp;type&nbsp;literals;&nbsp;it&nbsp;returns&nbsp;false&nbsp;otherwise.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">tok</span>&nbsp;<span class="ident">Token</span><span class="op">)</span>&nbsp;<span class="ident">IsLiteral</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="ident">literal_beg</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">tok</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">tok</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">literal_end</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">300</span><span class="comment">//&nbsp;IsOperator&nbsp;returns&nbsp;true&nbsp;for&nbsp;tokens&nbsp;corresponding&nbsp;to&nbsp;operators&nbsp;and</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;delimiters;&nbsp;it&nbsp;returns&nbsp;false&nbsp;otherwise.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">tok</span>&nbsp;<span class="ident">Token</span><span class="op">)</span>&nbsp;<span class="ident">IsOperator</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="ident">operator_beg</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">tok</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">tok</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">operator_end</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">305</span><span class="comment">//&nbsp;IsKeyword&nbsp;returns&nbsp;true&nbsp;for&nbsp;tokens&nbsp;corresponding&nbsp;to&nbsp;keywords;</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;it&nbsp;returns&nbsp;false&nbsp;otherwise.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">tok</span>&nbsp;<span class="ident">Token</span><span class="op">)</span>&nbsp;<span class="ident">IsKeyword</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="ident">keyword_beg</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">tok</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">tok</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">keyword_end</span>&nbsp;<span class="op">}</span>
+</div>
+</body>
+</html>

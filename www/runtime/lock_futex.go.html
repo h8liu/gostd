@@ -1,0 +1,220 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2011&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="comment">//&nbsp;+build&nbsp;dragonfly&nbsp;freebsd&nbsp;linux</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">package</span>&nbsp;<span class="ident">runtime</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="string">&#34;unsafe&#34;</span><br>
+<span class="lineno">10</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;This&nbsp;implementation&nbsp;depends&nbsp;on&nbsp;OS-specific&nbsp;implementations&nbsp;of</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspruntime·futexsleep(uint32&nbsp;*addr,&nbsp;uint32&nbsp;val,&nbsp;int64&nbsp;ns)</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspAtomically,</span><br>
+<span class="lineno">15</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspif(*addr&nbsp;==&nbsp;val)&nbsp;sleep</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspMight&nbsp;be&nbsp;woken&nbsp;up&nbsp;spuriously;&nbsp;that&#39;s&nbsp;allowed.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspDon&#39;t&nbsp;sleep&nbsp;longer&nbsp;than&nbsp;ns;&nbsp;ns&nbsp;&lt;&nbsp;0&nbsp;means&nbsp;forever.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspruntime·futexwakeup(uint32&nbsp;*addr,&nbsp;uint32&nbsp;cnt)</span><br>
+<span class="lineno">20</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspIf&nbsp;any&nbsp;procs&nbsp;are&nbsp;sleeping&nbsp;on&nbsp;addr,&nbsp;wake&nbsp;up&nbsp;at&nbsp;most&nbsp;cnt.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mutex_unlocked</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mutex_locked</span>&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mutex_sleeping</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">2</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">active_spin</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">4</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">active_spin_cnt</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">30</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">passive_spin</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno">30</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Possible&nbsp;lock&nbsp;states&nbsp;are&nbsp;mutex_unlocked,&nbsp;mutex_locked&nbsp;and&nbsp;mutex_sleeping.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;mutex_sleeping&nbsp;means&nbsp;that&nbsp;there&nbsp;is&nbsp;presumably&nbsp;at&nbsp;least&nbsp;one&nbsp;sleeping&nbsp;thread.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Note&nbsp;that&nbsp;there&nbsp;can&nbsp;be&nbsp;spinning&nbsp;threads&nbsp;during&nbsp;all&nbsp;states&nbsp;-&nbsp;they&nbsp;do&nbsp;not</span><br>
+<span class="lineno">35</span><span class="comment">//&nbsp;affect&nbsp;mutex&#39;s&nbsp;state.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">futexsleep</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="op">*</span><span class="builtintype">uint32</span><span class="op">,</span>&nbsp;<span class="ident">val</span>&nbsp;<span class="builtintype">uint32</span><span class="op">,</span>&nbsp;<span class="ident">ns</span>&nbsp;<span class="ident">int64</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">futexwakeup</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="op">*</span><span class="builtintype">uint32</span><span class="op">,</span>&nbsp;<span class="ident">cnt</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">40</span><span class="comment">//&nbsp;We&nbsp;use&nbsp;the&nbsp;uintptr&nbsp;mutex.key&nbsp;and&nbsp;note.key&nbsp;as&nbsp;a&nbsp;uint32.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">key32</span><span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">*</span><span class="builtintype">uintptr</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="builtintype">uint32</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="op">(</span><span class="op">*</span><span class="builtintype">uint32</span><span class="op">)</span><span class="op">(</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="ident">p</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">45</span><span class="keyword">func</span>&nbsp;<span class="ident">lock</span><span class="op">(</span><span class="ident">l</span>&nbsp;<span class="op">*</span><span class="ident">mutex</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">getg</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">gp</span><span class="op">.</span><span class="ident">m</span><span class="op">.</span><span class="ident">locks</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gothrow</span><span class="op">(</span><span class="string">&#34;runtime·lock:&nbsp;lock&nbsp;count&#34;</span><span class="op">)</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gp</span><span class="op">.</span><span class="ident">m</span><span class="op">.</span><span class="ident">locks</span><span class="op">++</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Speculative&nbsp;grab&nbsp;for&nbsp;lock.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">xchg</span><span class="op">(</span><span class="ident">key32</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">l</span><span class="op">.</span><span class="ident">key</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">mutex_locked</span><span class="op">)</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">v</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">mutex_unlocked</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;wait&nbsp;is&nbsp;either&nbsp;MUTEX_LOCKED&nbsp;or&nbsp;MUTEX_SLEEPING</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;depending&nbsp;on&nbsp;whether&nbsp;there&nbsp;is&nbsp;a&nbsp;thread&nbsp;sleeping</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;on&nbsp;this&nbsp;mutex.&nbsp;&nbsp;If&nbsp;we&nbsp;ever&nbsp;change&nbsp;l-&gt;key&nbsp;from</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;MUTEX_SLEEPING&nbsp;to&nbsp;some&nbsp;other&nbsp;value,&nbsp;we&nbsp;must&nbsp;be</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;careful&nbsp;to&nbsp;change&nbsp;it&nbsp;back&nbsp;to&nbsp;MUTEX_SLEEPING&nbsp;before</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;returning,&nbsp;to&nbsp;ensure&nbsp;that&nbsp;the&nbsp;sleeping&nbsp;thread&nbsp;gets</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;its&nbsp;wakeup&nbsp;call.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">wait</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">v</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;On&nbsp;uniprocessors,&nbsp;no&nbsp;point&nbsp;spinning.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;On&nbsp;multiprocessors,&nbsp;spin&nbsp;for&nbsp;ACTIVE_SPIN&nbsp;attempts.</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">spin</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">ncpu</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">1</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">spin</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">active_spin</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Try&nbsp;for&nbsp;lock,&nbsp;spinning.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="num">0</span><span class="op">;</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">spin</span><span class="op">;</span>&nbsp;<span class="ident">i</span><span class="op">++</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">l</span><span class="op">.</span><span class="ident">key</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">mutex_unlocked</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">cas</span><span class="op">(</span><span class="ident">key32</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">l</span><span class="op">.</span><span class="ident">key</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">mutex_unlocked</span><span class="op">,</span>&nbsp;<span class="ident">wait</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">procyield</span><span class="op">(</span><span class="ident">active_spin_cnt</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Try&nbsp;for&nbsp;lock,&nbsp;rescheduling.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="num">0</span><span class="op">;</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">passive_spin</span><span class="op">;</span>&nbsp;<span class="ident">i</span><span class="op">++</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">l</span><span class="op">.</span><span class="ident">key</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">mutex_unlocked</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">cas</span><span class="op">(</span><span class="ident">key32</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">l</span><span class="op">.</span><span class="ident">key</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">mutex_unlocked</span><span class="op">,</span>&nbsp;<span class="ident">wait</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">osyield</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Sleep.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">xchg</span><span class="op">(</span><span class="ident">key32</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">l</span><span class="op">.</span><span class="ident">key</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">mutex_sleeping</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">v</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">mutex_unlocked</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">100</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">wait</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">mutex_sleeping</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">futexsleep</span><span class="op">(</span><span class="ident">key32</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">l</span><span class="op">.</span><span class="ident">key</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">mutex_sleeping</span><span class="op">,</span>&nbsp;<span class="op">-</span><span class="num">1</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">105</span><span class="keyword">func</span>&nbsp;<span class="ident">unlock</span><span class="op">(</span><span class="ident">l</span>&nbsp;<span class="op">*</span><span class="ident">mutex</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">xchg</span><span class="op">(</span><span class="ident">key32</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">l</span><span class="op">.</span><span class="ident">key</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">mutex_unlocked</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">v</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">mutex_unlocked</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gothrow</span><span class="op">(</span><span class="string">&#34;unlock&nbsp;of&nbsp;unlocked&nbsp;lock&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">110</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">v</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">mutex_sleeping</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">futexwakeup</span><span class="op">(</span><span class="ident">key32</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">l</span><span class="op">.</span><span class="ident">key</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="num">1</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">getg</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">115</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gp</span><span class="op">.</span><span class="ident">m</span><span class="op">.</span><span class="ident">locks</span><span class="op">--</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">gp</span><span class="op">.</span><span class="ident">m</span><span class="op">.</span><span class="ident">locks</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gothrow</span><span class="op">(</span><span class="string">&#34;runtime·unlock:&nbsp;lock&nbsp;count&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">gp</span><span class="op">.</span><span class="ident">m</span><span class="op">.</span><span class="ident">locks</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">gp</span><span class="op">.</span><span class="ident">preempt</span>&nbsp;<span class="op">{</span>&nbsp;<span class="comment">//&nbsp;restore&nbsp;the&nbsp;preemption&nbsp;request&nbsp;in&nbsp;case&nbsp;we&#39;ve&nbsp;cleared&nbsp;it&nbsp;in&nbsp;newstack</span><br>
+<span class="lineno">120</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gp</span><span class="op">.</span><span class="ident">stackguard0</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stackPreempt</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;One-time&nbsp;notifications.</span><br>
+<span class="lineno">125</span><span class="keyword">func</span>&nbsp;<span class="ident">noteclear</span><span class="op">(</span><span class="ident">n</span>&nbsp;<span class="op">*</span><span class="ident">note</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span><span class="op">.</span><span class="ident">key</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">notewakeup</span><span class="op">(</span><span class="ident">n</span>&nbsp;<span class="op">*</span><span class="ident">note</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">130</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">old</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">xchg</span><span class="op">(</span><span class="ident">key32</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">n</span><span class="op">.</span><span class="ident">key</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="num">1</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">old</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">print</span><span class="op">(</span><span class="string">&#34;notewakeup&nbsp;-&nbsp;double&nbsp;wakeup&nbsp;(&#34;</span><span class="op">,</span>&nbsp;<span class="ident">old</span><span class="op">,</span>&nbsp;<span class="string">&#34;)\n&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gothrow</span><span class="op">(</span><span class="string">&#34;notewakeup&nbsp;-&nbsp;double&nbsp;wakeup&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">135</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">futexwakeup</span><span class="op">(</span><span class="ident">key32</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">n</span><span class="op">.</span><span class="ident">key</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="num">1</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">notesleep</span><span class="op">(</span><span class="ident">n</span>&nbsp;<span class="op">*</span><span class="ident">note</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">getg</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">140</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">gp</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">gp</span><span class="op">.</span><span class="ident">m</span><span class="op">.</span><span class="ident">g0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gothrow</span><span class="op">(</span><span class="string">&#34;notesleep&nbsp;not&nbsp;on&nbsp;g0&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">atomicload</span><span class="op">(</span><span class="ident">key32</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">n</span><span class="op">.</span><span class="ident">key</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gp</span><span class="op">.</span><span class="ident">m</span><span class="op">.</span><span class="ident">blocked</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno">145</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">futexsleep</span><span class="op">(</span><span class="ident">key32</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">n</span><span class="op">.</span><span class="ident">key</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="op">-</span><span class="num">1</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gp</span><span class="op">.</span><span class="ident">m</span><span class="op">.</span><span class="ident">blocked</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">150</span><span class="comment">//go:nosplit</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">notetsleep_internal</span><span class="op">(</span><span class="ident">n</span>&nbsp;<span class="op">*</span><span class="ident">note</span><span class="op">,</span>&nbsp;<span class="ident">ns</span>&nbsp;<span class="ident">int64</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">getg</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">ns</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">155</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">atomicload</span><span class="op">(</span><span class="ident">key32</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">n</span><span class="op">.</span><span class="ident">key</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gp</span><span class="op">.</span><span class="ident">m</span><span class="op">.</span><span class="ident">blocked</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">futexsleep</span><span class="op">(</span><span class="ident">key32</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">n</span><span class="op">.</span><span class="ident">key</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="op">-</span><span class="num">1</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gp</span><span class="op">.</span><span class="ident">m</span><span class="op">.</span><span class="ident">blocked</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">160</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">atomicload</span><span class="op">(</span><span class="ident">key32</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">n</span><span class="op">.</span><span class="ident">key</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno">165</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">deadline</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">nanotime</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">ns</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gp</span><span class="op">.</span><span class="ident">m</span><span class="op">.</span><span class="ident">blocked</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno">170</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">futexsleep</span><span class="op">(</span><span class="ident">key32</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">n</span><span class="op">.</span><span class="ident">key</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">ns</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gp</span><span class="op">.</span><span class="ident">m</span><span class="op">.</span><span class="ident">blocked</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">atomicload</span><span class="op">(</span><span class="ident">key32</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">n</span><span class="op">.</span><span class="ident">key</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">break</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">175</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">now</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">nanotime</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">now</span>&nbsp;<span class="op">&gt;=</span>&nbsp;<span class="ident">deadline</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">break</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ns</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">deadline</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">now</span><br>
+<span class="lineno">180</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">atomicload</span><span class="op">(</span><span class="ident">key32</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">n</span><span class="op">.</span><span class="ident">key</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">notetsleep</span><span class="op">(</span><span class="ident">n</span>&nbsp;<span class="op">*</span><span class="ident">note</span><span class="op">,</span>&nbsp;<span class="ident">ns</span>&nbsp;<span class="ident">int64</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">185</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">getg</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">gp</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">gp</span><span class="op">.</span><span class="ident">m</span><span class="op">.</span><span class="ident">g0</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">gp</span><span class="op">.</span><span class="ident">m</span><span class="op">.</span><span class="ident">gcing</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gothrow</span><span class="op">(</span><span class="string">&#34;notetsleep&nbsp;not&nbsp;on&nbsp;g0&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">190</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">notetsleep_internal</span><span class="op">(</span><span class="ident">n</span><span class="op">,</span>&nbsp;<span class="ident">ns</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;same&nbsp;as&nbsp;runtime·notetsleep,&nbsp;but&nbsp;called&nbsp;on&nbsp;user&nbsp;g&nbsp;(not&nbsp;g0)</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;calls&nbsp;only&nbsp;nosplit&nbsp;functions&nbsp;between&nbsp;entersyscallblock/exitsyscall</span><br>
+<span class="lineno">195</span><span class="keyword">func</span>&nbsp;<span class="ident">notetsleepg</span><span class="op">(</span><span class="ident">n</span>&nbsp;<span class="op">*</span><span class="ident">note</span><span class="op">,</span>&nbsp;<span class="ident">ns</span>&nbsp;<span class="ident">int64</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">getg</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">gp</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">gp</span><span class="op">.</span><span class="ident">m</span><span class="op">.</span><span class="ident">g0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gothrow</span><span class="op">(</span><span class="string">&#34;notetsleepg&nbsp;on&nbsp;g0&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">200</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">entersyscallblock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ok</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">notetsleep_internal</span><span class="op">(</span><span class="ident">n</span><span class="op">,</span>&nbsp;<span class="ident">ns</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">exitsyscall</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">ok</span><br>
+<span class="lineno">205</span><span class="op">}</span>
+</div>
+</body>
+</html>

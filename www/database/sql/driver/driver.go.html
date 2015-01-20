@@ -1,0 +1,226 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2011&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="comment">//&nbsp;Package&nbsp;driver&nbsp;defines&nbsp;interfaces&nbsp;to&nbsp;be&nbsp;implemented&nbsp;by&nbsp;database</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;drivers&nbsp;as&nbsp;used&nbsp;by&nbsp;package&nbsp;sql.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Most&nbsp;code&nbsp;should&nbsp;use&nbsp;package&nbsp;sql.</span><br>
+<span class="lineno"></span><span class="keyword">package</span>&nbsp;<span class="ident">driver</span><br>
+<span class="lineno">10</span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="string">&#34;errors&#34;</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Value&nbsp;is&nbsp;a&nbsp;value&nbsp;that&nbsp;drivers&nbsp;must&nbsp;be&nbsp;able&nbsp;to&nbsp;handle.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;It&nbsp;is&nbsp;either&nbsp;nil&nbsp;or&nbsp;an&nbsp;instance&nbsp;of&nbsp;one&nbsp;of&nbsp;these&nbsp;types:</span><br>
+<span class="lineno">15</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;int64</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;float64</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;bool</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;[]byte</span><br>
+<span class="lineno">20</span><span class="comment">//&nbsp;&nbsp;&nbsp;string&nbsp;&nbsp;&nbsp;[*]&nbsp;everywhere&nbsp;except&nbsp;from&nbsp;Rows.Next.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;time.Time</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">Value</span>&nbsp;<span class="keyword">interface</span><span class="op">{</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Driver&nbsp;is&nbsp;the&nbsp;interface&nbsp;that&nbsp;must&nbsp;be&nbsp;implemented&nbsp;by&nbsp;a&nbsp;database</span><br>
+<span class="lineno">25</span><span class="comment">//&nbsp;driver.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">Driver</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Open&nbsp;returns&nbsp;a&nbsp;new&nbsp;connection&nbsp;to&nbsp;the&nbsp;database.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;The&nbsp;name&nbsp;is&nbsp;a&nbsp;string&nbsp;in&nbsp;a&nbsp;driver-specific&nbsp;format.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Open&nbsp;may&nbsp;return&nbsp;a&nbsp;cached&nbsp;connection&nbsp;(one&nbsp;previously</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;closed),&nbsp;but&nbsp;doing&nbsp;so&nbsp;is&nbsp;unnecessary;&nbsp;the&nbsp;sql&nbsp;package</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;maintains&nbsp;a&nbsp;pool&nbsp;of&nbsp;idle&nbsp;connections&nbsp;for&nbsp;efficient&nbsp;re-use.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;The&nbsp;returned&nbsp;connection&nbsp;is&nbsp;only&nbsp;used&nbsp;by&nbsp;one&nbsp;goroutine&nbsp;at&nbsp;a</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;time.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Open</span><span class="op">(</span><span class="ident">name</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">Conn</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ErrSkip&nbsp;may&nbsp;be&nbsp;returned&nbsp;by&nbsp;some&nbsp;optional&nbsp;interfaces&#39;&nbsp;methods&nbsp;to</span><br>
+<span class="lineno">40</span><span class="comment">//&nbsp;indicate&nbsp;at&nbsp;runtime&nbsp;that&nbsp;the&nbsp;fast&nbsp;path&nbsp;is&nbsp;unavailable&nbsp;and&nbsp;the&nbsp;sql</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;package&nbsp;should&nbsp;continue&nbsp;as&nbsp;if&nbsp;the&nbsp;optional&nbsp;interface&nbsp;was&nbsp;not</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;implemented.&nbsp;ErrSkip&nbsp;is&nbsp;only&nbsp;supported&nbsp;where&nbsp;explicitly</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;documented.</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">ErrSkip</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">errors</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="string">&#34;driver:&nbsp;skip&nbsp;fast-path;&nbsp;continue&nbsp;as&nbsp;if&nbsp;unimplemented&#34;</span><span class="op">)</span><br>
+<span class="lineno">45</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ErrBadConn&nbsp;should&nbsp;be&nbsp;returned&nbsp;by&nbsp;a&nbsp;driver&nbsp;to&nbsp;signal&nbsp;to&nbsp;the&nbsp;sql</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;package&nbsp;that&nbsp;a&nbsp;driver.Conn&nbsp;is&nbsp;in&nbsp;a&nbsp;bad&nbsp;state&nbsp;(such&nbsp;as&nbsp;the&nbsp;server</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;having&nbsp;earlier&nbsp;closed&nbsp;the&nbsp;connection)&nbsp;and&nbsp;the&nbsp;sql&nbsp;package&nbsp;should</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;retry&nbsp;on&nbsp;a&nbsp;new&nbsp;connection.</span><br>
+<span class="lineno">50</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;To&nbsp;prevent&nbsp;duplicate&nbsp;operations,&nbsp;ErrBadConn&nbsp;should&nbsp;NOT&nbsp;be&nbsp;returned</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;if&nbsp;there&#39;s&nbsp;a&nbsp;possibility&nbsp;that&nbsp;the&nbsp;database&nbsp;server&nbsp;might&nbsp;have</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;performed&nbsp;the&nbsp;operation.&nbsp;Even&nbsp;if&nbsp;the&nbsp;server&nbsp;sends&nbsp;back&nbsp;an&nbsp;error,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;you&nbsp;shouldn&#39;t&nbsp;return&nbsp;ErrBadConn.</span><br>
+<span class="lineno">55</span><span class="keyword">var</span>&nbsp;<span class="ident">ErrBadConn</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">errors</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="string">&#34;driver:&nbsp;bad&nbsp;connection&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Execer&nbsp;is&nbsp;an&nbsp;optional&nbsp;interface&nbsp;that&nbsp;may&nbsp;be&nbsp;implemented&nbsp;by&nbsp;a&nbsp;Conn.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;If&nbsp;a&nbsp;Conn&nbsp;does&nbsp;not&nbsp;implement&nbsp;Execer,&nbsp;the&nbsp;sql&nbsp;package&#39;s&nbsp;DB.Exec&nbsp;will</span><br>
+<span class="lineno">60</span><span class="comment">//&nbsp;first&nbsp;prepare&nbsp;a&nbsp;query,&nbsp;execute&nbsp;the&nbsp;statement,&nbsp;and&nbsp;then&nbsp;close&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;statement.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Exec&nbsp;may&nbsp;return&nbsp;ErrSkip.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">Execer</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Exec</span><span class="op">(</span><span class="ident">query</span>&nbsp;<span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">args</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="ident">Value</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">Result</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Queryer&nbsp;is&nbsp;an&nbsp;optional&nbsp;interface&nbsp;that&nbsp;may&nbsp;be&nbsp;implemented&nbsp;by&nbsp;a&nbsp;Conn.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">70</span><span class="comment">//&nbsp;If&nbsp;a&nbsp;Conn&nbsp;does&nbsp;not&nbsp;implement&nbsp;Queryer,&nbsp;the&nbsp;sql&nbsp;package&#39;s&nbsp;DB.Query&nbsp;will</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;first&nbsp;prepare&nbsp;a&nbsp;query,&nbsp;execute&nbsp;the&nbsp;statement,&nbsp;and&nbsp;then&nbsp;close&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;statement.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Query&nbsp;may&nbsp;return&nbsp;ErrSkip.</span><br>
+<span class="lineno">75</span><span class="keyword">type</span>&nbsp;<span class="ident">Queryer</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Query</span><span class="op">(</span><span class="ident">query</span>&nbsp;<span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">args</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="ident">Value</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">Rows</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Conn&nbsp;is&nbsp;a&nbsp;connection&nbsp;to&nbsp;a&nbsp;database.&nbsp;It&nbsp;is&nbsp;not&nbsp;used&nbsp;concurrently</span><br>
+<span class="lineno">80</span><span class="comment">//&nbsp;by&nbsp;multiple&nbsp;goroutines.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Conn&nbsp;is&nbsp;assumed&nbsp;to&nbsp;be&nbsp;stateful.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">Conn</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Prepare&nbsp;returns&nbsp;a&nbsp;prepared&nbsp;statement,&nbsp;bound&nbsp;to&nbsp;this&nbsp;connection.</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Prepare</span><span class="op">(</span><span class="ident">query</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">Stmt</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Close&nbsp;invalidates&nbsp;and&nbsp;potentially&nbsp;stops&nbsp;any&nbsp;current</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;prepared&nbsp;statements&nbsp;and&nbsp;transactions,&nbsp;marking&nbsp;this</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;connection&nbsp;as&nbsp;no&nbsp;longer&nbsp;in&nbsp;use.</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Because&nbsp;the&nbsp;sql&nbsp;package&nbsp;maintains&nbsp;a&nbsp;free&nbsp;pool&nbsp;of</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;connections&nbsp;and&nbsp;only&nbsp;calls&nbsp;Close&nbsp;when&nbsp;there&#39;s&nbsp;a&nbsp;surplus&nbsp;of</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;idle&nbsp;connections,&nbsp;it&nbsp;shouldn&#39;t&nbsp;be&nbsp;necessary&nbsp;for&nbsp;drivers&nbsp;to</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;do&nbsp;their&nbsp;own&nbsp;connection&nbsp;caching.</span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Close</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Begin&nbsp;starts&nbsp;and&nbsp;returns&nbsp;a&nbsp;new&nbsp;transaction.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Begin</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">Tx</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">100</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Result&nbsp;is&nbsp;the&nbsp;result&nbsp;of&nbsp;a&nbsp;query&nbsp;execution.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">Result</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;LastInsertId&nbsp;returns&nbsp;the&nbsp;database&#39;s&nbsp;auto-generated&nbsp;ID</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;after,&nbsp;for&nbsp;example,&nbsp;an&nbsp;INSERT&nbsp;into&nbsp;a&nbsp;table&nbsp;with&nbsp;primary</span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;key.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">LastInsertId</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">int64</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;RowsAffected&nbsp;returns&nbsp;the&nbsp;number&nbsp;of&nbsp;rows&nbsp;affected&nbsp;by&nbsp;the</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;query.</span><br>
+<span class="lineno">110</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">RowsAffected</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">int64</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Stmt&nbsp;is&nbsp;a&nbsp;prepared&nbsp;statement.&nbsp;It&nbsp;is&nbsp;bound&nbsp;to&nbsp;a&nbsp;Conn&nbsp;and&nbsp;not</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;used&nbsp;by&nbsp;multiple&nbsp;goroutines&nbsp;concurrently.</span><br>
+<span class="lineno">115</span><span class="keyword">type</span>&nbsp;<span class="ident">Stmt</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Close&nbsp;closes&nbsp;the&nbsp;statement.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;As&nbsp;of&nbsp;Go&nbsp;1.1,&nbsp;a&nbsp;Stmt&nbsp;will&nbsp;not&nbsp;be&nbsp;closed&nbsp;if&nbsp;it&#39;s&nbsp;in&nbsp;use</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;by&nbsp;any&nbsp;queries.</span><br>
+<span class="lineno">120</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Close</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;NumInput&nbsp;returns&nbsp;the&nbsp;number&nbsp;of&nbsp;placeholder&nbsp;parameters.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;If&nbsp;NumInput&nbsp;returns&nbsp;&gt;=&nbsp;0,&nbsp;the&nbsp;sql&nbsp;package&nbsp;will&nbsp;sanity&nbsp;check</span><br>
+<span class="lineno">125</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;argument&nbsp;counts&nbsp;from&nbsp;callers&nbsp;and&nbsp;return&nbsp;errors&nbsp;to&nbsp;the&nbsp;caller</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;before&nbsp;the&nbsp;statement&#39;s&nbsp;Exec&nbsp;or&nbsp;Query&nbsp;methods&nbsp;are&nbsp;called.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;NumInput&nbsp;may&nbsp;also&nbsp;return&nbsp;-1,&nbsp;if&nbsp;the&nbsp;driver&nbsp;doesn&#39;t&nbsp;know</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;its&nbsp;number&nbsp;of&nbsp;placeholders.&nbsp;In&nbsp;that&nbsp;case,&nbsp;the&nbsp;sql&nbsp;package</span><br>
+<span class="lineno">130</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;will&nbsp;not&nbsp;sanity&nbsp;check&nbsp;Exec&nbsp;or&nbsp;Query&nbsp;argument&nbsp;counts.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">NumInput</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Exec&nbsp;executes&nbsp;a&nbsp;query&nbsp;that&nbsp;doesn&#39;t&nbsp;return&nbsp;rows,&nbsp;such</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;as&nbsp;an&nbsp;INSERT&nbsp;or&nbsp;UPDATE.</span><br>
+<span class="lineno">135</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Exec</span><span class="op">(</span><span class="ident">args</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="ident">Value</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">Result</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Query&nbsp;executes&nbsp;a&nbsp;query&nbsp;that&nbsp;may&nbsp;return&nbsp;rows,&nbsp;such&nbsp;as&nbsp;a</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;SELECT.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Query</span><span class="op">(</span><span class="ident">args</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="ident">Value</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">Rows</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span><br>
+<span class="lineno">140</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ColumnConverter&nbsp;may&nbsp;be&nbsp;optionally&nbsp;implemented&nbsp;by&nbsp;Stmt&nbsp;if&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;statement&nbsp;is&nbsp;aware&nbsp;of&nbsp;its&nbsp;own&nbsp;columns&#39;&nbsp;types&nbsp;and&nbsp;can&nbsp;convert&nbsp;from</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;any&nbsp;type&nbsp;to&nbsp;a&nbsp;driver&nbsp;Value.</span><br>
+<span class="lineno">145</span><span class="keyword">type</span>&nbsp;<span class="ident">ColumnConverter</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;ColumnConverter&nbsp;returns&nbsp;a&nbsp;ValueConverter&nbsp;for&nbsp;the&nbsp;provided</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;column&nbsp;index.&nbsp;&nbsp;If&nbsp;the&nbsp;type&nbsp;of&nbsp;a&nbsp;specific&nbsp;column&nbsp;isn&#39;t&nbsp;known</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;or&nbsp;shouldn&#39;t&nbsp;be&nbsp;handled&nbsp;specially,&nbsp;DefaultValueConverter</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;can&nbsp;be&nbsp;returned.</span><br>
+<span class="lineno">150</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ColumnConverter</span><span class="op">(</span><span class="ident">idx</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="ident">ValueConverter</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Rows&nbsp;is&nbsp;an&nbsp;iterator&nbsp;over&nbsp;an&nbsp;executed&nbsp;query&#39;s&nbsp;results.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">Rows</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">155</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Columns&nbsp;returns&nbsp;the&nbsp;names&nbsp;of&nbsp;the&nbsp;columns.&nbsp;The&nbsp;number&nbsp;of</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;columns&nbsp;of&nbsp;the&nbsp;result&nbsp;is&nbsp;inferred&nbsp;from&nbsp;the&nbsp;length&nbsp;of&nbsp;the</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;slice.&nbsp;&nbsp;If&nbsp;a&nbsp;particular&nbsp;column&nbsp;name&nbsp;isn&#39;t&nbsp;known,&nbsp;an&nbsp;empty</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;string&nbsp;should&nbsp;be&nbsp;returned&nbsp;for&nbsp;that&nbsp;entry.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Columns</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">string</span><br>
+<span class="lineno">160</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Close&nbsp;closes&nbsp;the&nbsp;rows&nbsp;iterator.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Close</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Next&nbsp;is&nbsp;called&nbsp;to&nbsp;populate&nbsp;the&nbsp;next&nbsp;row&nbsp;of&nbsp;data&nbsp;into</span><br>
+<span class="lineno">165</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;the&nbsp;provided&nbsp;slice.&nbsp;The&nbsp;provided&nbsp;slice&nbsp;will&nbsp;be&nbsp;the&nbsp;same</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;size&nbsp;as&nbsp;the&nbsp;Columns()&nbsp;are&nbsp;wide.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;The&nbsp;dest&nbsp;slice&nbsp;may&nbsp;be&nbsp;populated&nbsp;only&nbsp;with</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;a&nbsp;driver&nbsp;Value&nbsp;type,&nbsp;but&nbsp;excluding&nbsp;string.</span><br>
+<span class="lineno">170</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;All&nbsp;string&nbsp;values&nbsp;must&nbsp;be&nbsp;converted&nbsp;to&nbsp;[]byte.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Next&nbsp;should&nbsp;return&nbsp;io.EOF&nbsp;when&nbsp;there&nbsp;are&nbsp;no&nbsp;more&nbsp;rows.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Next</span><span class="op">(</span><span class="ident">dest</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="ident">Value</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">175</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Tx&nbsp;is&nbsp;a&nbsp;transaction.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">Tx</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Commit</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Rollback</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span><br>
+<span class="lineno">180</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;RowsAffected&nbsp;implements&nbsp;Result&nbsp;for&nbsp;an&nbsp;INSERT&nbsp;or&nbsp;UPDATE&nbsp;operation</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;which&nbsp;mutates&nbsp;a&nbsp;number&nbsp;of&nbsp;rows.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">RowsAffected</span>&nbsp;<span class="ident">int64</span><br>
+<span class="lineno">185</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">_</span>&nbsp;<span class="ident">Result</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">RowsAffected</span><span class="op">(</span><span class="num">0</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">RowsAffected</span><span class="op">)</span>&nbsp;<span class="ident">LastInsertId</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">int64</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">errors</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="string">&#34;no&nbsp;LastInsertId&nbsp;available&#34;</span><span class="op">)</span><br>
+<span class="lineno">190</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">v</span>&nbsp;<span class="ident">RowsAffected</span><span class="op">)</span>&nbsp;<span class="ident">RowsAffected</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">int64</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">int64</span><span class="op">(</span><span class="ident">v</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">195</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ResultNoRows&nbsp;is&nbsp;a&nbsp;pre-defined&nbsp;Result&nbsp;for&nbsp;drivers&nbsp;to&nbsp;return&nbsp;when&nbsp;a&nbsp;DDL</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;command&nbsp;(such&nbsp;as&nbsp;a&nbsp;CREATE&nbsp;TABLE)&nbsp;succeeds.&nbsp;It&nbsp;returns&nbsp;an&nbsp;error&nbsp;for&nbsp;both</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;LastInsertId&nbsp;and&nbsp;RowsAffected.</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">ResultNoRows</span>&nbsp;<span class="ident">noRows</span><br>
+<span class="lineno">200</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">noRows</span>&nbsp;<span class="keyword">struct</span><span class="op">{</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">_</span>&nbsp;<span class="ident">Result</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">noRows</span><span class="op">{</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">205</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">noRows</span><span class="op">)</span>&nbsp;<span class="ident">LastInsertId</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">int64</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">errors</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="string">&#34;no&nbsp;LastInsertId&nbsp;available&nbsp;after&nbsp;DDL&nbsp;statement&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">noRows</span><span class="op">)</span>&nbsp;<span class="ident">RowsAffected</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">int64</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">210</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">errors</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="string">&#34;no&nbsp;RowsAffected&nbsp;available&nbsp;after&nbsp;DDL&nbsp;statement&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

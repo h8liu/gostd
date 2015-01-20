@@ -1,0 +1,146 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2012&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="comment">//&nbsp;DO&nbsp;NOT&nbsp;EDIT.&nbsp;This&nbsp;file&nbsp;is&nbsp;generated&nbsp;by&nbsp;mksyntaxgo&nbsp;from&nbsp;the&nbsp;RE2&nbsp;distribution.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">/*<br>
+<span class="lineno"></span>Package&nbsp;syntax&nbsp;parses&nbsp;regular&nbsp;expressions&nbsp;into&nbsp;parse&nbsp;trees&nbsp;and&nbsp;compiles<br>
+<span class="lineno"></span>parse&nbsp;trees&nbsp;into&nbsp;programs.&nbsp;Most&nbsp;clients&nbsp;of&nbsp;regular&nbsp;expressions&nbsp;will&nbsp;use&nbsp;the<br>
+<span class="lineno">10</span>facilities&nbsp;of&nbsp;package&nbsp;regexp&nbsp;(such&nbsp;as&nbsp;Compile&nbsp;and&nbsp;Match)&nbsp;instead&nbsp;of&nbsp;this&nbsp;package.<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>Syntax<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>The&nbsp;regular&nbsp;expression&nbsp;syntax&nbsp;understood&nbsp;by&nbsp;this&nbsp;package&nbsp;when&nbsp;parsing&nbsp;with&nbsp;the&nbsp;Perl&nbsp;flag&nbsp;is&nbsp;as&nbsp;follows.<br>
+<span class="lineno">15</span>Parts&nbsp;of&nbsp;the&nbsp;syntax&nbsp;can&nbsp;be&nbsp;disabled&nbsp;by&nbsp;passing&nbsp;alternate&nbsp;flags&nbsp;to&nbsp;Parse.<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>Single&nbsp;characters:<br>
+<span class="lineno"></span>&nbsp;&nbsp;.&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;any&nbsp;character,&nbsp;possibly&nbsp;including&nbsp;newline&nbsp;(flag&nbsp;s=true)<br>
+<span class="lineno">20</span>&nbsp;&nbsp;[xyz]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;character&nbsp;class<br>
+<span class="lineno"></span>&nbsp;&nbsp;[^xyz]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;negated&nbsp;character&nbsp;class<br>
+<span class="lineno"></span>&nbsp;&nbsp;\d&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Perl&nbsp;character&nbsp;class<br>
+<span class="lineno"></span>&nbsp;&nbsp;\D&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;negated&nbsp;Perl&nbsp;character&nbsp;class<br>
+<span class="lineno"></span>&nbsp;&nbsp;[[:alpha:]]&nbsp;&nbsp;&nbsp;&nbsp;ASCII&nbsp;character&nbsp;class<br>
+<span class="lineno">25</span>&nbsp;&nbsp;[[:^alpha:]]&nbsp;&nbsp;&nbsp;negated&nbsp;ASCII&nbsp;character&nbsp;class<br>
+<span class="lineno"></span>&nbsp;&nbsp;\pN&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Unicode&nbsp;character&nbsp;class&nbsp;(one-letter&nbsp;name)<br>
+<span class="lineno"></span>&nbsp;&nbsp;\p{Greek}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Unicode&nbsp;character&nbsp;class<br>
+<span class="lineno"></span>&nbsp;&nbsp;\PN&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;negated&nbsp;Unicode&nbsp;character&nbsp;class&nbsp;(one-letter&nbsp;name)<br>
+<span class="lineno"></span>&nbsp;&nbsp;\P{Greek}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;negated&nbsp;Unicode&nbsp;character&nbsp;class<br>
+<span class="lineno">30</span><br>
+<span class="lineno"></span>Composites:<br>
+<span class="lineno"></span>&nbsp;&nbsp;xy&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;x&nbsp;followed&nbsp;by&nbsp;y<br>
+<span class="lineno"></span>&nbsp;&nbsp;x|y&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;x&nbsp;or&nbsp;y&nbsp;(prefer&nbsp;x)<br>
+<span class="lineno"></span><br>
+<span class="lineno">35</span>Repetitions:<br>
+<span class="lineno"></span>&nbsp;&nbsp;x*&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;zero&nbsp;or&nbsp;more&nbsp;x,&nbsp;prefer&nbsp;more<br>
+<span class="lineno"></span>&nbsp;&nbsp;x+&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;one&nbsp;or&nbsp;more&nbsp;x,&nbsp;prefer&nbsp;more<br>
+<span class="lineno"></span>&nbsp;&nbsp;x?&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;zero&nbsp;or&nbsp;one&nbsp;x,&nbsp;prefer&nbsp;one<br>
+<span class="lineno"></span>&nbsp;&nbsp;x{n,m}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;n&nbsp;or&nbsp;n+1&nbsp;or&nbsp;...&nbsp;or&nbsp;m&nbsp;x,&nbsp;prefer&nbsp;more<br>
+<span class="lineno">40</span>&nbsp;&nbsp;x{n,}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;n&nbsp;or&nbsp;more&nbsp;x,&nbsp;prefer&nbsp;more<br>
+<span class="lineno"></span>&nbsp;&nbsp;x{n}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;exactly&nbsp;n&nbsp;x<br>
+<span class="lineno"></span>&nbsp;&nbsp;x*?&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;zero&nbsp;or&nbsp;more&nbsp;x,&nbsp;prefer&nbsp;fewer<br>
+<span class="lineno"></span>&nbsp;&nbsp;x+?&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;one&nbsp;or&nbsp;more&nbsp;x,&nbsp;prefer&nbsp;fewer<br>
+<span class="lineno"></span>&nbsp;&nbsp;x??&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;zero&nbsp;or&nbsp;one&nbsp;x,&nbsp;prefer&nbsp;zero<br>
+<span class="lineno">45</span>&nbsp;&nbsp;x{n,m}?&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;n&nbsp;or&nbsp;n+1&nbsp;or&nbsp;...&nbsp;or&nbsp;m&nbsp;x,&nbsp;prefer&nbsp;fewer<br>
+<span class="lineno"></span>&nbsp;&nbsp;x{n,}?&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;n&nbsp;or&nbsp;more&nbsp;x,&nbsp;prefer&nbsp;fewer<br>
+<span class="lineno"></span>&nbsp;&nbsp;x{n}?&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;exactly&nbsp;n&nbsp;x<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>Implementation&nbsp;restriction:&nbsp;The&nbsp;counting&nbsp;forms&nbsp;x{n,m},&nbsp;x{n,},&nbsp;and&nbsp;x{n}<br>
+<span class="lineno">50</span>reject&nbsp;forms&nbsp;that&nbsp;create&nbsp;a&nbsp;minimum&nbsp;or&nbsp;maximum&nbsp;repetition&nbsp;count&nbsp;above&nbsp;1000.<br>
+<span class="lineno"></span>Unlimited&nbsp;repetitions&nbsp;are&nbsp;not&nbsp;subject&nbsp;to&nbsp;this&nbsp;restriction.<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>Grouping:<br>
+<span class="lineno"></span>&nbsp;&nbsp;(re)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;numbered&nbsp;capturing&nbsp;group&nbsp;(submatch)<br>
+<span class="lineno">55</span>&nbsp;&nbsp;(?P&lt;name&gt;re)&nbsp;&nbsp;&nbsp;named&nbsp;&amp;&nbsp;numbered&nbsp;capturing&nbsp;group&nbsp;(submatch)<br>
+<span class="lineno"></span>&nbsp;&nbsp;(?:re)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;non-capturing&nbsp;group<br>
+<span class="lineno"></span>&nbsp;&nbsp;(?flags)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;set&nbsp;flags&nbsp;within&nbsp;current&nbsp;group;&nbsp;non-capturing<br>
+<span class="lineno"></span>&nbsp;&nbsp;(?flags:re)&nbsp;&nbsp;&nbsp;&nbsp;set&nbsp;flags&nbsp;during&nbsp;re;&nbsp;non-capturing<br>
+<span class="lineno"></span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;Flag&nbsp;syntax&nbsp;is&nbsp;xyz&nbsp;(set)&nbsp;or&nbsp;-xyz&nbsp;(clear)&nbsp;or&nbsp;xy-z&nbsp;(set&nbsp;xy,&nbsp;clear&nbsp;z).&nbsp;The&nbsp;flags&nbsp;are:<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;i&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;case-insensitive&nbsp;(default&nbsp;false)<br>
+<span class="lineno"></span>&nbsp;&nbsp;m&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;multi-line&nbsp;mode:&nbsp;^&nbsp;and&nbsp;$&nbsp;match&nbsp;begin/end&nbsp;line&nbsp;in&nbsp;addition&nbsp;to&nbsp;begin/end&nbsp;text&nbsp;(default&nbsp;false)<br>
+<span class="lineno"></span>&nbsp;&nbsp;s&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;let&nbsp;.&nbsp;match&nbsp;\n&nbsp;(default&nbsp;false)<br>
+<span class="lineno">65</span>&nbsp;&nbsp;U&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ungreedy:&nbsp;swap&nbsp;meaning&nbsp;of&nbsp;x*&nbsp;and&nbsp;x*?,&nbsp;x+&nbsp;and&nbsp;x+?,&nbsp;etc&nbsp;(default&nbsp;false)<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>Empty&nbsp;strings:<br>
+<span class="lineno"></span>&nbsp;&nbsp;^&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;at&nbsp;beginning&nbsp;of&nbsp;text&nbsp;or&nbsp;line&nbsp;(flag&nbsp;m=true)<br>
+<span class="lineno"></span>&nbsp;&nbsp;$&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;at&nbsp;end&nbsp;of&nbsp;text&nbsp;(like&nbsp;\z&nbsp;not&nbsp;\Z)&nbsp;or&nbsp;line&nbsp;(flag&nbsp;m=true)<br>
+<span class="lineno">70</span>&nbsp;&nbsp;\A&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;at&nbsp;beginning&nbsp;of&nbsp;text<br>
+<span class="lineno"></span>&nbsp;&nbsp;\b&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;at&nbsp;ASCII&nbsp;word&nbsp;boundary&nbsp;(\w&nbsp;on&nbsp;one&nbsp;side&nbsp;and&nbsp;\W,&nbsp;\A,&nbsp;or&nbsp;\z&nbsp;on&nbsp;the&nbsp;other)<br>
+<span class="lineno"></span>&nbsp;&nbsp;\B&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;not&nbsp;at&nbsp;ASCII&nbsp;word&nbsp;boundary<br>
+<span class="lineno"></span>&nbsp;&nbsp;\z&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;at&nbsp;end&nbsp;of&nbsp;text<br>
+<span class="lineno"></span><br>
+<span class="lineno">75</span>Escape&nbsp;sequences:<br>
+<span class="lineno"></span>&nbsp;&nbsp;\a&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;bell&nbsp;(==&nbsp;\007)<br>
+<span class="lineno"></span>&nbsp;&nbsp;\f&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;form&nbsp;feed&nbsp;(==&nbsp;\014)<br>
+<span class="lineno"></span>&nbsp;&nbsp;\t&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;horizontal&nbsp;tab&nbsp;(==&nbsp;\011)<br>
+<span class="lineno"></span>&nbsp;&nbsp;\n&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;newline&nbsp;(==&nbsp;\012)<br>
+<span class="lineno">80</span>&nbsp;&nbsp;\r&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;carriage&nbsp;return&nbsp;(==&nbsp;\015)<br>
+<span class="lineno"></span>&nbsp;&nbsp;\v&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;vertical&nbsp;tab&nbsp;character&nbsp;(==&nbsp;\013)<br>
+<span class="lineno"></span>&nbsp;&nbsp;\*&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;literal&nbsp;*,&nbsp;for&nbsp;any&nbsp;punctuation&nbsp;character&nbsp;*<br>
+<span class="lineno"></span>&nbsp;&nbsp;\123&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;octal&nbsp;character&nbsp;code&nbsp;(up&nbsp;to&nbsp;three&nbsp;digits)<br>
+<span class="lineno"></span>&nbsp;&nbsp;\x7F&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;hex&nbsp;character&nbsp;code&nbsp;(exactly&nbsp;two&nbsp;digits)<br>
+<span class="lineno">85</span>&nbsp;&nbsp;\x{10FFFF}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;hex&nbsp;character&nbsp;code<br>
+<span class="lineno"></span>&nbsp;&nbsp;\Q...\E&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;literal&nbsp;text&nbsp;...&nbsp;even&nbsp;if&nbsp;...&nbsp;has&nbsp;punctuation<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>Character&nbsp;class&nbsp;elements:<br>
+<span class="lineno"></span>&nbsp;&nbsp;x&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;single&nbsp;character<br>
+<span class="lineno">90</span>&nbsp;&nbsp;A-Z&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;character&nbsp;range&nbsp;(inclusive)<br>
+<span class="lineno"></span>&nbsp;&nbsp;\d&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Perl&nbsp;character&nbsp;class<br>
+<span class="lineno"></span>&nbsp;&nbsp;[:foo:]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ASCII&nbsp;character&nbsp;class&nbsp;foo<br>
+<span class="lineno"></span>&nbsp;&nbsp;\p{Foo}&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Unicode&nbsp;character&nbsp;class&nbsp;Foo<br>
+<span class="lineno"></span>&nbsp;&nbsp;\pF&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Unicode&nbsp;character&nbsp;class&nbsp;F&nbsp;(one-letter&nbsp;name)<br>
+<span class="lineno">95</span><br>
+<span class="lineno"></span>Named&nbsp;character&nbsp;classes&nbsp;as&nbsp;character&nbsp;class&nbsp;elements:<br>
+<span class="lineno"></span>&nbsp;&nbsp;[\d]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;digits&nbsp;(==&nbsp;\d)<br>
+<span class="lineno"></span>&nbsp;&nbsp;[^\d]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;not&nbsp;digits&nbsp;(==&nbsp;\D)<br>
+<span class="lineno"></span>&nbsp;&nbsp;[\D]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;not&nbsp;digits&nbsp;(==&nbsp;\D)<br>
+<span class="lineno">100</span>&nbsp;&nbsp;[^\D]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;not&nbsp;not&nbsp;digits&nbsp;(==&nbsp;\d)<br>
+<span class="lineno"></span>&nbsp;&nbsp;[[:name:]]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;named&nbsp;ASCII&nbsp;class&nbsp;inside&nbsp;character&nbsp;class&nbsp;(==&nbsp;[:name:])<br>
+<span class="lineno"></span>&nbsp;&nbsp;[^[:name:]]&nbsp;&nbsp;&nbsp;&nbsp;named&nbsp;ASCII&nbsp;class&nbsp;inside&nbsp;negated&nbsp;character&nbsp;class&nbsp;(==&nbsp;[:^name:])<br>
+<span class="lineno"></span>&nbsp;&nbsp;[\p{Name}]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;named&nbsp;Unicode&nbsp;property&nbsp;inside&nbsp;character&nbsp;class&nbsp;(==&nbsp;\p{Name})<br>
+<span class="lineno"></span>&nbsp;&nbsp;[^\p{Name}]&nbsp;&nbsp;&nbsp;&nbsp;named&nbsp;Unicode&nbsp;property&nbsp;inside&nbsp;negated&nbsp;character&nbsp;class&nbsp;(==&nbsp;\P{Name})<br>
+<span class="lineno">105</span><br>
+<span class="lineno"></span>Perl&nbsp;character&nbsp;classes&nbsp;(all&nbsp;ASCII-only):<br>
+<span class="lineno"></span>&nbsp;&nbsp;\d&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;digits&nbsp;(==&nbsp;[0-9])<br>
+<span class="lineno"></span>&nbsp;&nbsp;\D&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;not&nbsp;digits&nbsp;(==&nbsp;[^0-9])<br>
+<span class="lineno"></span>&nbsp;&nbsp;\s&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;whitespace&nbsp;(==&nbsp;[\t\n\f\r&nbsp;])<br>
+<span class="lineno">110</span>&nbsp;&nbsp;\S&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;not&nbsp;whitespace&nbsp;(==&nbsp;[^\t\n\f\r&nbsp;])<br>
+<span class="lineno"></span>&nbsp;&nbsp;\w&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;word&nbsp;characters&nbsp;(==&nbsp;[0-9A-Za-z_])<br>
+<span class="lineno"></span>&nbsp;&nbsp;\W&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;not&nbsp;word&nbsp;characters&nbsp;(==&nbsp;[^0-9A-Za-z_])<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>ASCII&nbsp;character&nbsp;classes:<br>
+<span class="lineno">115</span>&nbsp;&nbsp;[[:alnum:]]&nbsp;&nbsp;&nbsp;&nbsp;alphanumeric&nbsp;(==&nbsp;[0-9A-Za-z])<br>
+<span class="lineno"></span>&nbsp;&nbsp;[[:alpha:]]&nbsp;&nbsp;&nbsp;&nbsp;alphabetic&nbsp;(==&nbsp;[A-Za-z])<br>
+<span class="lineno"></span>&nbsp;&nbsp;[[:ascii:]]&nbsp;&nbsp;&nbsp;&nbsp;ASCII&nbsp;(==&nbsp;[\x00-\x7F])<br>
+<span class="lineno"></span>&nbsp;&nbsp;[[:blank:]]&nbsp;&nbsp;&nbsp;&nbsp;blank&nbsp;(==&nbsp;[\t&nbsp;])<br>
+<span class="lineno"></span>&nbsp;&nbsp;[[:cntrl:]]&nbsp;&nbsp;&nbsp;&nbsp;control&nbsp;(==&nbsp;[\x00-\x1F\x7F])<br>
+<span class="lineno">120</span>&nbsp;&nbsp;[[:digit:]]&nbsp;&nbsp;&nbsp;&nbsp;digits&nbsp;(==&nbsp;[0-9])<br>
+<span class="lineno"></span>&nbsp;&nbsp;[[:graph:]]&nbsp;&nbsp;&nbsp;&nbsp;graphical&nbsp;(==&nbsp;[!-~]&nbsp;==&nbsp;[A-Za-z0-9!&#34;#$%&amp;&#39;()*+,\-./:;&lt;=&gt;?@[\\\]^_`{|}~])<br>
+<span class="lineno"></span>&nbsp;&nbsp;[[:lower:]]&nbsp;&nbsp;&nbsp;&nbsp;lower&nbsp;case&nbsp;(==&nbsp;[a-z])<br>
+<span class="lineno"></span>&nbsp;&nbsp;[[:print:]]&nbsp;&nbsp;&nbsp;&nbsp;printable&nbsp;(==&nbsp;[&nbsp;-~]&nbsp;==&nbsp;[&nbsp;[:graph:]])<br>
+<span class="lineno"></span>&nbsp;&nbsp;[[:punct:]]&nbsp;&nbsp;&nbsp;&nbsp;punctuation&nbsp;(==&nbsp;[!-/:-@[-`{-~])<br>
+<span class="lineno">125</span>&nbsp;&nbsp;[[:space:]]&nbsp;&nbsp;&nbsp;&nbsp;whitespace&nbsp;(==&nbsp;[\t\n\v\f\r&nbsp;])<br>
+<span class="lineno"></span>&nbsp;&nbsp;[[:upper:]]&nbsp;&nbsp;&nbsp;&nbsp;upper&nbsp;case&nbsp;(==&nbsp;[A-Z])<br>
+<span class="lineno"></span>&nbsp;&nbsp;[[:word:]]&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;word&nbsp;characters&nbsp;(==&nbsp;[0-9A-Za-z_])<br>
+<span class="lineno"></span>&nbsp;&nbsp;[[:xdigit:]]&nbsp;&nbsp;&nbsp;hex&nbsp;digit&nbsp;(==&nbsp;[0-9A-Fa-f])<br>
+<span class="lineno"></span><br>
+<span class="lineno">130</span>*/</span><br>
+<span class="lineno"></span><span class="keyword">package</span>&nbsp;<span class="ident">syntax</span>
+</div>
+</body>
+</html>

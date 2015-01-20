@@ -1,0 +1,149 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2010&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">jsonrpc</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;encoding/json&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;errors&#34;</span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;io&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;net/rpc&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;sync&#34;</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">15</span><span class="keyword">var</span>&nbsp;<span class="ident">errMissingParams</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">errors</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="string">&#34;jsonrpc:&nbsp;request&nbsp;body&nbsp;missing&nbsp;params&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">serverCodec</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dec</span>&nbsp;<span class="op">*</span><span class="ident">json</span><span class="op">.</span><span class="ident">Decoder</span>&nbsp;<span class="comment">//&nbsp;for&nbsp;reading&nbsp;JSON&nbsp;values</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">enc</span>&nbsp;<span class="op">*</span><span class="ident">json</span><span class="op">.</span><span class="ident">Encoder</span>&nbsp;<span class="comment">//&nbsp;for&nbsp;writing&nbsp;JSON&nbsp;values</span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span>&nbsp;&nbsp;&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">Closer</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;temporary&nbsp;work&nbsp;space</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">req</span>&nbsp;<span class="ident">serverRequest</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;JSON-RPC&nbsp;clients&nbsp;can&nbsp;use&nbsp;arbitrary&nbsp;json&nbsp;values&nbsp;as&nbsp;request&nbsp;IDs.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Package&nbsp;rpc&nbsp;expects&nbsp;uint64&nbsp;request&nbsp;IDs.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;We&nbsp;assign&nbsp;uint64&nbsp;sequence&nbsp;numbers&nbsp;to&nbsp;incoming&nbsp;requests</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;but&nbsp;save&nbsp;the&nbsp;original&nbsp;request&nbsp;ID&nbsp;in&nbsp;the&nbsp;pending&nbsp;map.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;When&nbsp;rpc&nbsp;responds,&nbsp;we&nbsp;use&nbsp;the&nbsp;sequence&nbsp;number&nbsp;in</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;the&nbsp;response&nbsp;to&nbsp;find&nbsp;the&nbsp;original&nbsp;request&nbsp;ID.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mutex</span>&nbsp;&nbsp;&nbsp;<span class="ident">sync</span><span class="op">.</span><span class="ident">Mutex</span>&nbsp;<span class="comment">//&nbsp;protects&nbsp;seq,&nbsp;pending</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">seq</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pending</span>&nbsp;<span class="keyword">map</span><span class="op">[</span><span class="ident">uint64</span><span class="op">]</span><span class="op">*</span><span class="ident">json</span><span class="op">.</span><span class="ident">RawMessage</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">35</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;NewServerCodec&nbsp;returns&nbsp;a&nbsp;new&nbsp;rpc.ServerCodec&nbsp;using&nbsp;JSON-RPC&nbsp;on&nbsp;conn.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">NewServerCodec</span><span class="op">(</span><span class="ident">conn</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">ReadWriteCloser</span><span class="op">)</span>&nbsp;<span class="ident">rpc</span><span class="op">.</span><span class="ident">ServerCodec</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="op">&amp;</span><span class="ident">serverCodec</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dec</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">json</span><span class="op">.</span><span class="ident">NewDecoder</span><span class="op">(</span><span class="ident">conn</span><span class="op">)</span><span class="op">,</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">enc</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">json</span><span class="op">.</span><span class="ident">NewEncoder</span><span class="op">(</span><span class="ident">conn</span><span class="op">)</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">conn</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pending</span><span class="op">:</span>&nbsp;<span class="builtinfunc">make</span><span class="op">(</span><span class="keyword">map</span><span class="op">[</span><span class="ident">uint64</span><span class="op">]</span><span class="op">*</span><span class="ident">json</span><span class="op">.</span><span class="ident">RawMessage</span><span class="op">)</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">45</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">serverRequest</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Method</span>&nbsp;<span class="builtintype">string</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">`json:&#34;method&#34;`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Params</span>&nbsp;<span class="op">*</span><span class="ident">json</span><span class="op">.</span><span class="ident">RawMessage</span>&nbsp;<span class="string">`json:&#34;params&#34;`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Id</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">*</span><span class="ident">json</span><span class="op">.</span><span class="ident">RawMessage</span>&nbsp;<span class="string">`json:&#34;id&#34;`</span><br>
+<span class="lineno">50</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">r</span>&nbsp;<span class="op">*</span><span class="ident">serverRequest</span><span class="op">)</span>&nbsp;<span class="ident">reset</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span><span class="op">.</span><span class="ident">Method</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">&#34;&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span><span class="op">.</span><span class="ident">Params</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span><span class="op">.</span><span class="ident">Id</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">serverResponse</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Id</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">*</span><span class="ident">json</span><span class="op">.</span><span class="ident">RawMessage</span>&nbsp;<span class="string">`json:&#34;id&#34;`</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Result</span>&nbsp;<span class="keyword">interface</span><span class="op">{</span><span class="op">}</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">`json:&#34;result&#34;`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Error</span>&nbsp;&nbsp;<span class="keyword">interface</span><span class="op">{</span><span class="op">}</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">`json:&#34;error&#34;`</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">serverCodec</span><span class="op">)</span>&nbsp;<span class="ident">ReadRequestHeader</span><span class="op">(</span><span class="ident">r</span>&nbsp;<span class="op">*</span><span class="ident">rpc</span><span class="op">.</span><span class="ident">Request</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">req</span><span class="op">.</span><span class="ident">reset</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">dec</span><span class="op">.</span><span class="ident">Decode</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">c</span><span class="op">.</span><span class="ident">req</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span><span class="op">.</span><span class="ident">ServiceMethod</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">req</span><span class="op">.</span><span class="ident">Method</span><br>
+<span class="lineno">70</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;JSON&nbsp;request&nbsp;id&nbsp;can&nbsp;be&nbsp;any&nbsp;JSON&nbsp;value;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;RPC&nbsp;package&nbsp;expects&nbsp;uint64.&nbsp;&nbsp;Translate&nbsp;to</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;internal&nbsp;uint64&nbsp;and&nbsp;save&nbsp;JSON&nbsp;on&nbsp;the&nbsp;side.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">mutex</span><span class="op">.</span><span class="ident">Lock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">seq</span><span class="op">++</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">pending</span><span class="op">[</span><span class="ident">c</span><span class="op">.</span><span class="ident">seq</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">req</span><span class="op">.</span><span class="ident">Id</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">req</span><span class="op">.</span><span class="ident">Id</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span><span class="op">.</span><span class="ident">Seq</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">seq</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">mutex</span><span class="op">.</span><span class="ident">Unlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">80</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">serverCodec</span><span class="op">)</span>&nbsp;<span class="ident">ReadRequestBody</span><span class="op">(</span><span class="ident">x</span>&nbsp;<span class="keyword">interface</span><span class="op">{</span><span class="op">}</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">req</span><span class="op">.</span><span class="ident">Params</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">errMissingParams</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;JSON&nbsp;params&nbsp;is&nbsp;array&nbsp;value.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;RPC&nbsp;params&nbsp;is&nbsp;struct.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Unmarshal&nbsp;into&nbsp;array&nbsp;containing&nbsp;struct&nbsp;for&nbsp;now.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Should&nbsp;think&nbsp;about&nbsp;making&nbsp;RPC&nbsp;more&nbsp;general.</span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">params</span>&nbsp;<span class="op">[</span><span class="num">1</span><span class="op">]</span><span class="keyword">interface</span><span class="op">{</span><span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">params</span><span class="op">[</span><span class="num">0</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">x</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">json</span><span class="op">.</span><span class="ident">Unmarshal</span><span class="op">(</span><span class="op">*</span><span class="ident">c</span><span class="op">.</span><span class="ident">req</span><span class="op">.</span><span class="ident">Params</span><span class="op">,</span>&nbsp;<span class="op">&amp;</span><span class="ident">params</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">100</span><span class="keyword">var</span>&nbsp;<span class="ident">null</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">json</span><span class="op">.</span><span class="ident">RawMessage</span><span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">(</span><span class="string">&#34;null&#34;</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">serverCodec</span><span class="op">)</span>&nbsp;<span class="ident">WriteResponse</span><span class="op">(</span><span class="ident">r</span>&nbsp;<span class="op">*</span><span class="ident">rpc</span><span class="op">.</span><span class="ident">Response</span><span class="op">,</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="keyword">interface</span><span class="op">{</span><span class="op">}</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">mutex</span><span class="op">.</span><span class="ident">Lock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span><span class="op">,</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">pending</span><span class="op">[</span><span class="ident">r</span><span class="op">.</span><span class="ident">Seq</span><span class="op">]</span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">ok</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">mutex</span><span class="op">.</span><span class="ident">Unlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">errors</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="string">&#34;invalid&nbsp;sequence&nbsp;number&nbsp;in&nbsp;response&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">delete</span><span class="op">(</span><span class="ident">c</span><span class="op">.</span><span class="ident">pending</span><span class="op">,</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">Seq</span><span class="op">)</span><br>
+<span class="lineno">110</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">mutex</span><span class="op">.</span><span class="ident">Unlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">b</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Invalid&nbsp;request&nbsp;so&nbsp;no&nbsp;id.&nbsp;&nbsp;Use&nbsp;JSON&nbsp;null.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">&amp;</span><span class="ident">null</span><br>
+<span class="lineno">115</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">resp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">serverResponse</span><span class="op">{</span><span class="ident">Id</span><span class="op">:</span>&nbsp;<span class="ident">b</span><span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">Error</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#34;&#34;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">resp</span><span class="op">.</span><span class="ident">Result</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">x</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">120</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">resp</span><span class="op">.</span><span class="ident">Error</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">Error</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">enc</span><span class="op">.</span><span class="ident">Encode</span><span class="op">(</span><span class="ident">resp</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">125</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">serverCodec</span><span class="op">)</span>&nbsp;<span class="ident">Close</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">c</span><span class="op">.</span><span class="ident">Close</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ServeConn&nbsp;runs&nbsp;the&nbsp;JSON-RPC&nbsp;server&nbsp;on&nbsp;a&nbsp;single&nbsp;connection.</span><br>
+<span class="lineno">130</span><span class="comment">//&nbsp;ServeConn&nbsp;blocks,&nbsp;serving&nbsp;the&nbsp;connection&nbsp;until&nbsp;the&nbsp;client&nbsp;hangs&nbsp;up.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;caller&nbsp;typically&nbsp;invokes&nbsp;ServeConn&nbsp;in&nbsp;a&nbsp;go&nbsp;statement.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">ServeConn</span><span class="op">(</span><span class="ident">conn</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">ReadWriteCloser</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">rpc</span><span class="op">.</span><span class="ident">ServeCodec</span><span class="op">(</span><span class="ident">NewServerCodec</span><span class="op">(</span><span class="ident">conn</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

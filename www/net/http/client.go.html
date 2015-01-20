@@ -1,0 +1,526 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2009&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="comment">//&nbsp;HTTP&nbsp;client.&nbsp;See&nbsp;RFC&nbsp;2616.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;This&nbsp;is&nbsp;the&nbsp;high-level&nbsp;Client&nbsp;interface.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;low-level&nbsp;implementation&nbsp;is&nbsp;in&nbsp;transport.go.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">10</span><span class="keyword">package</span>&nbsp;<span class="ident">http</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;encoding/base64&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;errors&#34;</span><br>
+<span class="lineno">15</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;fmt&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;io&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;io/ioutil&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;log&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;net/url&#34;</span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;strings&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;sync&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;time&#34;</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">25</span><span class="comment">//&nbsp;A&nbsp;Client&nbsp;is&nbsp;an&nbsp;HTTP&nbsp;client.&nbsp;Its&nbsp;zero&nbsp;value&nbsp;(DefaultClient)&nbsp;is&nbsp;a</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;usable&nbsp;client&nbsp;that&nbsp;uses&nbsp;DefaultTransport.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;Client&#39;s&nbsp;Transport&nbsp;typically&nbsp;has&nbsp;internal&nbsp;state&nbsp;(cached&nbsp;TCP</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;connections),&nbsp;so&nbsp;Clients&nbsp;should&nbsp;be&nbsp;reused&nbsp;instead&nbsp;of&nbsp;created&nbsp;as</span><br>
+<span class="lineno">30</span><span class="comment">//&nbsp;needed.&nbsp;Clients&nbsp;are&nbsp;safe&nbsp;for&nbsp;concurrent&nbsp;use&nbsp;by&nbsp;multiple&nbsp;goroutines.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;A&nbsp;Client&nbsp;is&nbsp;higher-level&nbsp;than&nbsp;a&nbsp;RoundTripper&nbsp;(such&nbsp;as&nbsp;Transport)</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;and&nbsp;additionally&nbsp;handles&nbsp;HTTP&nbsp;details&nbsp;such&nbsp;as&nbsp;cookies&nbsp;and</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;redirects.</span><br>
+<span class="lineno">35</span><span class="keyword">type</span>&nbsp;<span class="ident">Client</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Transport&nbsp;specifies&nbsp;the&nbsp;mechanism&nbsp;by&nbsp;which&nbsp;individual</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;HTTP&nbsp;requests&nbsp;are&nbsp;made.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;If&nbsp;nil,&nbsp;DefaultTransport&nbsp;is&nbsp;used.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Transport</span>&nbsp;<span class="ident">RoundTripper</span><br>
+<span class="lineno">40</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;CheckRedirect&nbsp;specifies&nbsp;the&nbsp;policy&nbsp;for&nbsp;handling&nbsp;redirects.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;If&nbsp;CheckRedirect&nbsp;is&nbsp;not&nbsp;nil,&nbsp;the&nbsp;client&nbsp;calls&nbsp;it&nbsp;before</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;following&nbsp;an&nbsp;HTTP&nbsp;redirect.&nbsp;The&nbsp;arguments&nbsp;req&nbsp;and&nbsp;via&nbsp;are</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;the&nbsp;upcoming&nbsp;request&nbsp;and&nbsp;the&nbsp;requests&nbsp;made&nbsp;already,&nbsp;oldest</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;first.&nbsp;If&nbsp;CheckRedirect&nbsp;returns&nbsp;an&nbsp;error,&nbsp;the&nbsp;Client&#39;s&nbsp;Get</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;method&nbsp;returns&nbsp;both&nbsp;the&nbsp;previous&nbsp;Response&nbsp;and</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;CheckRedirect&#39;s&nbsp;error&nbsp;(wrapped&nbsp;in&nbsp;a&nbsp;url.Error)&nbsp;instead&nbsp;of</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;issuing&nbsp;the&nbsp;Request&nbsp;req.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;If&nbsp;CheckRedirect&nbsp;is&nbsp;nil,&nbsp;the&nbsp;Client&nbsp;uses&nbsp;its&nbsp;default&nbsp;policy,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;which&nbsp;is&nbsp;to&nbsp;stop&nbsp;after&nbsp;10&nbsp;consecutive&nbsp;requests.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">CheckRedirect</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="ident">req</span>&nbsp;<span class="op">*</span><span class="ident">Request</span><span class="op">,</span>&nbsp;<span class="ident">via</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="op">*</span><span class="ident">Request</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Jar&nbsp;specifies&nbsp;the&nbsp;cookie&nbsp;jar.</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;If&nbsp;Jar&nbsp;is&nbsp;nil,&nbsp;cookies&nbsp;are&nbsp;not&nbsp;sent&nbsp;in&nbsp;requests&nbsp;and&nbsp;ignored</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;in&nbsp;responses.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Jar</span>&nbsp;<span class="ident">CookieJar</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Timeout&nbsp;specifies&nbsp;a&nbsp;time&nbsp;limit&nbsp;for&nbsp;requests&nbsp;made&nbsp;by&nbsp;this</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Client.&nbsp;The&nbsp;timeout&nbsp;includes&nbsp;connection&nbsp;time,&nbsp;any</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;redirects,&nbsp;and&nbsp;reading&nbsp;the&nbsp;response&nbsp;body.&nbsp;The&nbsp;timer&nbsp;remains</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;running&nbsp;after&nbsp;Get,&nbsp;Head,&nbsp;Post,&nbsp;or&nbsp;Do&nbsp;return&nbsp;and&nbsp;will</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;interrupt&nbsp;reading&nbsp;of&nbsp;the&nbsp;Response.Body.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;A&nbsp;Timeout&nbsp;of&nbsp;zero&nbsp;means&nbsp;no&nbsp;timeout.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;The&nbsp;Client&#39;s&nbsp;Transport&nbsp;must&nbsp;support&nbsp;the&nbsp;CancelRequest</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;method&nbsp;or&nbsp;Client&nbsp;will&nbsp;return&nbsp;errors&nbsp;when&nbsp;attempting&nbsp;to&nbsp;make</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;a&nbsp;request&nbsp;with&nbsp;Get,&nbsp;Head,&nbsp;Post,&nbsp;or&nbsp;Do.&nbsp;Client&#39;s&nbsp;default</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Transport&nbsp;(DefaultTransport)&nbsp;supports&nbsp;CancelRequest.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Timeout</span>&nbsp;<span class="ident">time</span><span class="op">.</span><span class="ident">Duration</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;DefaultClient&nbsp;is&nbsp;the&nbsp;default&nbsp;Client&nbsp;and&nbsp;is&nbsp;used&nbsp;by&nbsp;Get,&nbsp;Head,&nbsp;and&nbsp;Post.</span><br>
+<span class="lineno">75</span><span class="keyword">var</span>&nbsp;<span class="ident">DefaultClient</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">&amp;</span><span class="ident">Client</span><span class="op">{</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;RoundTripper&nbsp;is&nbsp;an&nbsp;interface&nbsp;representing&nbsp;the&nbsp;ability&nbsp;to&nbsp;execute&nbsp;a</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;single&nbsp;HTTP&nbsp;transaction,&nbsp;obtaining&nbsp;the&nbsp;Response&nbsp;for&nbsp;a&nbsp;given&nbsp;Request.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">80</span><span class="comment">//&nbsp;A&nbsp;RoundTripper&nbsp;must&nbsp;be&nbsp;safe&nbsp;for&nbsp;concurrent&nbsp;use&nbsp;by&nbsp;multiple</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;goroutines.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">RoundTripper</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;RoundTrip&nbsp;executes&nbsp;a&nbsp;single&nbsp;HTTP&nbsp;transaction,&nbsp;returning</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;the&nbsp;Response&nbsp;for&nbsp;the&nbsp;request&nbsp;req.&nbsp;&nbsp;RoundTrip&nbsp;should&nbsp;not</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;attempt&nbsp;to&nbsp;interpret&nbsp;the&nbsp;response.&nbsp;&nbsp;In&nbsp;particular,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;RoundTrip&nbsp;must&nbsp;return&nbsp;err&nbsp;==&nbsp;nil&nbsp;if&nbsp;it&nbsp;obtained&nbsp;a&nbsp;response,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;regardless&nbsp;of&nbsp;the&nbsp;response&#39;s&nbsp;HTTP&nbsp;status&nbsp;code.&nbsp;&nbsp;A&nbsp;non-nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;err&nbsp;should&nbsp;be&nbsp;reserved&nbsp;for&nbsp;failure&nbsp;to&nbsp;obtain&nbsp;a&nbsp;response.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Similarly,&nbsp;RoundTrip&nbsp;should&nbsp;not&nbsp;attempt&nbsp;to&nbsp;handle</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;higher-level&nbsp;protocol&nbsp;details&nbsp;such&nbsp;as&nbsp;redirects,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;authentication,&nbsp;or&nbsp;cookies.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;RoundTrip&nbsp;should&nbsp;not&nbsp;modify&nbsp;the&nbsp;request,&nbsp;except&nbsp;for</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;consuming&nbsp;and&nbsp;closing&nbsp;the&nbsp;Body,&nbsp;including&nbsp;on&nbsp;errors.&nbsp;The</span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;request&#39;s&nbsp;URL&nbsp;and&nbsp;Header&nbsp;fields&nbsp;are&nbsp;guaranteed&nbsp;to&nbsp;be</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;initialized.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">RoundTrip</span><span class="op">(</span><span class="op">*</span><span class="ident">Request</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="op">*</span><span class="ident">Response</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">100</span><span class="comment">//&nbsp;Given&nbsp;a&nbsp;string&nbsp;of&nbsp;the&nbsp;form&nbsp;&#34;host&#34;,&nbsp;&#34;host:port&#34;,&nbsp;or&nbsp;&#34;[ipv6::address]:port&#34;,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;return&nbsp;true&nbsp;if&nbsp;the&nbsp;string&nbsp;includes&nbsp;a&nbsp;port.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">hasPort</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="ident">strings</span><span class="op">.</span><span class="ident">LastIndex</span><span class="op">(</span><span class="ident">s</span><span class="op">,</span>&nbsp;<span class="string">&#34;:&#34;</span><span class="op">)</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="ident">strings</span><span class="op">.</span><span class="ident">LastIndex</span><span class="op">(</span><span class="ident">s</span><span class="op">,</span>&nbsp;<span class="string">&#34;]&#34;</span><span class="op">)</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;refererForURL&nbsp;returns&nbsp;a&nbsp;referer&nbsp;without&nbsp;any&nbsp;authentication&nbsp;info&nbsp;or</span><br>
+<span class="lineno">105</span><span class="comment">//&nbsp;an&nbsp;empty&nbsp;string&nbsp;if&nbsp;lastReq&nbsp;scheme&nbsp;is&nbsp;https&nbsp;and&nbsp;newReq&nbsp;scheme&nbsp;is&nbsp;http.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">refererForURL</span><span class="op">(</span><span class="ident">lastReq</span><span class="op">,</span>&nbsp;<span class="ident">newReq</span>&nbsp;<span class="op">*</span><span class="ident">url</span><span class="op">.</span><span class="ident">URL</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;https://tools.ietf.org/html/rfc7231#section-5.5.2</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;&nbsp;&nbsp;&#34;Clients&nbsp;SHOULD&nbsp;NOT&nbsp;include&nbsp;a&nbsp;Referer&nbsp;header&nbsp;field&nbsp;in&nbsp;a</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;(non-secure)&nbsp;HTTP&nbsp;request&nbsp;if&nbsp;the&nbsp;referring&nbsp;page&nbsp;was</span><br>
+<span class="lineno">110</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;transferred&nbsp;with&nbsp;a&nbsp;secure&nbsp;protocol.&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">lastReq</span><span class="op">.</span><span class="ident">Scheme</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#34;https&#34;</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">newReq</span><span class="op">.</span><span class="ident">Scheme</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#34;http&#34;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="string">&#34;&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">referer</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">lastReq</span><span class="op">.</span><span class="ident">String</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">115</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">lastReq</span><span class="op">.</span><span class="ident">User</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;This&nbsp;is&nbsp;not&nbsp;very&nbsp;efficient,&nbsp;but&nbsp;is&nbsp;the&nbsp;best&nbsp;we&nbsp;can</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;do&nbsp;without:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;-&nbsp;introducing&nbsp;a&nbsp;new&nbsp;method&nbsp;on&nbsp;URL</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;-&nbsp;creating&nbsp;a&nbsp;race&nbsp;condition</span><br>
+<span class="lineno">120</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;-&nbsp;copying&nbsp;the&nbsp;URL&nbsp;struct&nbsp;manually,&nbsp;which&nbsp;would&nbsp;cause</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;&nbsp;&nbsp;maintenance&nbsp;problems&nbsp;down&nbsp;the&nbsp;line</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">auth</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">lastReq</span><span class="op">.</span><span class="ident">User</span><span class="op">.</span><span class="ident">String</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">+</span>&nbsp;<span class="string">&#34;@&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">referer</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">strings</span><span class="op">.</span><span class="ident">Replace</span><span class="op">(</span><span class="ident">referer</span><span class="op">,</span>&nbsp;<span class="ident">auth</span><span class="op">,</span>&nbsp;<span class="string">&#34;&#34;</span><span class="op">,</span>&nbsp;<span class="num">1</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">125</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">referer</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Used&nbsp;in&nbsp;Send&nbsp;to&nbsp;implement&nbsp;io.ReadCloser&nbsp;by&nbsp;bundling&nbsp;together&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;bufio.Reader&nbsp;through&nbsp;which&nbsp;we&nbsp;read&nbsp;the&nbsp;response,&nbsp;and&nbsp;the&nbsp;underlying</span><br>
+<span class="lineno">130</span><span class="comment">//&nbsp;network&nbsp;connection.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">readClose</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">io</span><span class="op">.</span><span class="ident">Reader</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">io</span><span class="op">.</span><span class="ident">Closer</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">135</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">Client</span><span class="op">)</span>&nbsp;<span class="ident">send</span><span class="op">(</span><span class="ident">req</span>&nbsp;<span class="op">*</span><span class="ident">Request</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="op">*</span><span class="ident">Response</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">Jar</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">cookie</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">Jar</span><span class="op">.</span><span class="ident">Cookies</span><span class="op">(</span><span class="ident">req</span><span class="op">.</span><span class="ident">URL</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">req</span><span class="op">.</span><span class="ident">AddCookie</span><span class="op">(</span><span class="ident">cookie</span><span class="op">)</span><br>
+<span class="lineno">140</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">resp</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">send</span><span class="op">(</span><span class="ident">req</span><span class="op">,</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">transport</span><span class="op">(</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno">145</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">Jar</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">rc</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">resp</span><span class="op">.</span><span class="ident">Cookies</span><span class="op">(</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">rc</span><span class="op">)</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">Jar</span><span class="op">.</span><span class="ident">SetCookies</span><span class="op">(</span><span class="ident">req</span><span class="op">.</span><span class="ident">URL</span><span class="op">,</span>&nbsp;<span class="ident">rc</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">150</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">resp</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Do&nbsp;sends&nbsp;an&nbsp;HTTP&nbsp;request&nbsp;and&nbsp;returns&nbsp;an&nbsp;HTTP&nbsp;response,&nbsp;following</span><br>
+<span class="lineno">155</span><span class="comment">//&nbsp;policy&nbsp;(e.g.&nbsp;redirects,&nbsp;cookies,&nbsp;auth)&nbsp;as&nbsp;configured&nbsp;on&nbsp;the&nbsp;client.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;An&nbsp;error&nbsp;is&nbsp;returned&nbsp;if&nbsp;caused&nbsp;by&nbsp;client&nbsp;policy&nbsp;(such&nbsp;as</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;CheckRedirect),&nbsp;or&nbsp;if&nbsp;there&nbsp;was&nbsp;an&nbsp;HTTP&nbsp;protocol&nbsp;error.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;A&nbsp;non-2xx&nbsp;response&nbsp;doesn&#39;t&nbsp;cause&nbsp;an&nbsp;error.</span><br>
+<span class="lineno">160</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;When&nbsp;err&nbsp;is&nbsp;nil,&nbsp;resp&nbsp;always&nbsp;contains&nbsp;a&nbsp;non-nil&nbsp;resp.Body.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Callers&nbsp;should&nbsp;close&nbsp;resp.Body&nbsp;when&nbsp;done&nbsp;reading&nbsp;from&nbsp;it.&nbsp;If</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;resp.Body&nbsp;is&nbsp;not&nbsp;closed,&nbsp;the&nbsp;Client&#39;s&nbsp;underlying&nbsp;RoundTripper</span><br>
+<span class="lineno">165</span><span class="comment">//&nbsp;(typically&nbsp;Transport)&nbsp;may&nbsp;not&nbsp;be&nbsp;able&nbsp;to&nbsp;re-use&nbsp;a&nbsp;persistent&nbsp;TCP</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;connection&nbsp;to&nbsp;the&nbsp;server&nbsp;for&nbsp;a&nbsp;subsequent&nbsp;&#34;keep-alive&#34;&nbsp;request.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;request&nbsp;Body,&nbsp;if&nbsp;non-nil,&nbsp;will&nbsp;be&nbsp;closed&nbsp;by&nbsp;the&nbsp;underlying</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Transport,&nbsp;even&nbsp;on&nbsp;errors.</span><br>
+<span class="lineno">170</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Generally&nbsp;Get,&nbsp;Post,&nbsp;or&nbsp;PostForm&nbsp;will&nbsp;be&nbsp;used&nbsp;instead&nbsp;of&nbsp;Do.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">Client</span><span class="op">)</span>&nbsp;<span class="ident">Do</span><span class="op">(</span><span class="ident">req</span>&nbsp;<span class="op">*</span><span class="ident">Request</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">resp</span>&nbsp;<span class="op">*</span><span class="ident">Response</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">req</span><span class="op">.</span><span class="ident">Method</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#34;GET&#34;</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">req</span><span class="op">.</span><span class="ident">Method</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#34;HEAD&#34;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">doFollowingRedirects</span><span class="op">(</span><span class="ident">req</span><span class="op">,</span>&nbsp;<span class="ident">shouldRedirectGet</span><span class="op">)</span><br>
+<span class="lineno">175</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">req</span><span class="op">.</span><span class="ident">Method</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#34;POST&#34;</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">req</span><span class="op">.</span><span class="ident">Method</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#34;PUT&#34;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">doFollowingRedirects</span><span class="op">(</span><span class="ident">req</span><span class="op">,</span>&nbsp;<span class="ident">shouldRedirectPost</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">send</span><span class="op">(</span><span class="ident">req</span><span class="op">)</span><br>
+<span class="lineno">180</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">Client</span><span class="op">)</span>&nbsp;<span class="ident">transport</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="ident">RoundTripper</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">Transport</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">Transport</span><br>
+<span class="lineno">185</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">DefaultTransport</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;send&nbsp;issues&nbsp;an&nbsp;HTTP&nbsp;request.</span><br>
+<span class="lineno">190</span><span class="comment">//&nbsp;Caller&nbsp;should&nbsp;close&nbsp;resp.Body&nbsp;when&nbsp;done&nbsp;reading&nbsp;from&nbsp;it.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">send</span><span class="op">(</span><span class="ident">req</span>&nbsp;<span class="op">*</span><span class="ident">Request</span><span class="op">,</span>&nbsp;<span class="ident">t</span>&nbsp;<span class="ident">RoundTripper</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">resp</span>&nbsp;<span class="op">*</span><span class="ident">Response</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">t</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">req</span><span class="op">.</span><span class="ident">closeBody</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">errors</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="string">&#34;http:&nbsp;no&nbsp;Client.Transport&nbsp;or&nbsp;DefaultTransport&#34;</span><span class="op">)</span><br>
+<span class="lineno">195</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">req</span><span class="op">.</span><span class="ident">URL</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">req</span><span class="op">.</span><span class="ident">closeBody</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">errors</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="string">&#34;http:&nbsp;nil&nbsp;Request.URL&#34;</span><span class="op">)</span><br>
+<span class="lineno">200</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">req</span><span class="op">.</span><span class="ident">RequestURI</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="string">&#34;&#34;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">req</span><span class="op">.</span><span class="ident">closeBody</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">errors</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="string">&#34;http:&nbsp;Request.RequestURI&nbsp;can&#39;t&nbsp;be&nbsp;set&nbsp;in&nbsp;client&nbsp;requests.&#34;</span><span class="op">)</span><br>
+<span class="lineno">205</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Most&nbsp;the&nbsp;callers&nbsp;of&nbsp;send&nbsp;(Get,&nbsp;Post,&nbsp;et&nbsp;al)&nbsp;don&#39;t&nbsp;need</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Headers,&nbsp;leaving&nbsp;it&nbsp;uninitialized.&nbsp;&nbsp;We&nbsp;guarantee&nbsp;to&nbsp;the</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Transport&nbsp;that&nbsp;this&nbsp;has&nbsp;been&nbsp;initialized,&nbsp;though.</span><br>
+<span class="lineno">210</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">req</span><span class="op">.</span><span class="ident">Header</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">req</span><span class="op">.</span><span class="ident">Header</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">make</span><span class="op">(</span><span class="ident">Header</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">u</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">req</span><span class="op">.</span><span class="ident">URL</span><span class="op">.</span><span class="ident">User</span><span class="op">;</span>&nbsp;<span class="ident">u</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">215</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">username</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">u</span><span class="op">.</span><span class="ident">Username</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">password</span><span class="op">,</span>&nbsp;<span class="ident">_</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">u</span><span class="op">.</span><span class="ident">Password</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">req</span><span class="op">.</span><span class="ident">Header</span><span class="op">.</span><span class="ident">Set</span><span class="op">(</span><span class="string">&#34;Authorization&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;Basic&nbsp;&#34;</span><span class="op">+</span><span class="ident">basicAuth</span><span class="op">(</span><span class="ident">username</span><span class="op">,</span>&nbsp;<span class="ident">password</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">resp</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">t</span><span class="op">.</span><span class="ident">RoundTrip</span><span class="op">(</span><span class="ident">req</span><span class="op">)</span><br>
+<span class="lineno">220</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">resp</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">log</span><span class="op">.</span><span class="ident">Printf</span><span class="op">(</span><span class="string">&#34;RoundTripper&nbsp;returned&nbsp;a&nbsp;response&nbsp;&amp;&nbsp;error;&nbsp;ignoring&nbsp;response&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno">225</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">resp</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;See&nbsp;2&nbsp;(end&nbsp;of&nbsp;page&nbsp;4)&nbsp;http://www.ietf.org/rfc/rfc2617.txt</span><br>
+<span class="lineno">230</span><span class="comment">//&nbsp;&#34;To&nbsp;receive&nbsp;authorization,&nbsp;the&nbsp;client&nbsp;sends&nbsp;the&nbsp;userid&nbsp;and&nbsp;password,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;separated&nbsp;by&nbsp;a&nbsp;single&nbsp;colon&nbsp;(&#34;:&#34;)&nbsp;character,&nbsp;within&nbsp;a&nbsp;base64</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;encoded&nbsp;string&nbsp;in&nbsp;the&nbsp;credentials.&#34;</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;It&nbsp;is&nbsp;not&nbsp;meant&nbsp;to&nbsp;be&nbsp;urlencoded.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">basicAuth</span><span class="op">(</span><span class="ident">username</span><span class="op">,</span>&nbsp;<span class="ident">password</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">235</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">auth</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">username</span>&nbsp;<span class="op">+</span>&nbsp;<span class="string">&#34;:&#34;</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">password</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">base64</span><span class="op">.</span><span class="ident">StdEncoding</span><span class="op">.</span><span class="ident">EncodeToString</span><span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">(</span><span class="ident">auth</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;True&nbsp;if&nbsp;the&nbsp;specified&nbsp;HTTP&nbsp;status&nbsp;code&nbsp;is&nbsp;one&nbsp;for&nbsp;which&nbsp;the&nbsp;Get&nbsp;utility&nbsp;should</span><br>
+<span class="lineno">240</span><span class="comment">//&nbsp;automatically&nbsp;redirect.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">shouldRedirectGet</span><span class="op">(</span><span class="ident">statusCode</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="ident">statusCode</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">StatusMovedPermanently</span><span class="op">,</span>&nbsp;<span class="ident">StatusFound</span><span class="op">,</span>&nbsp;<span class="ident">StatusSeeOther</span><span class="op">,</span>&nbsp;<span class="ident">StatusTemporaryRedirect</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno">245</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;True&nbsp;if&nbsp;the&nbsp;specified&nbsp;HTTP&nbsp;status&nbsp;code&nbsp;is&nbsp;one&nbsp;for&nbsp;which&nbsp;the&nbsp;Post&nbsp;utility&nbsp;should</span><br>
+<span class="lineno">250</span><span class="comment">//&nbsp;automatically&nbsp;redirect.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">shouldRedirectPost</span><span class="op">(</span><span class="ident">statusCode</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="ident">statusCode</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">StatusFound</span><span class="op">,</span>&nbsp;<span class="ident">StatusSeeOther</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno">255</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Get&nbsp;issues&nbsp;a&nbsp;GET&nbsp;to&nbsp;the&nbsp;specified&nbsp;URL.&nbsp;&nbsp;If&nbsp;the&nbsp;response&nbsp;is&nbsp;one&nbsp;of&nbsp;the&nbsp;following</span><br>
+<span class="lineno">260</span><span class="comment">//&nbsp;redirect&nbsp;codes,&nbsp;Get&nbsp;follows&nbsp;the&nbsp;redirect,&nbsp;up&nbsp;to&nbsp;a&nbsp;maximum&nbsp;of&nbsp;10&nbsp;redirects:</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;301&nbsp;(Moved&nbsp;Permanently)</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;302&nbsp;(Found)</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;303&nbsp;(See&nbsp;Other)</span><br>
+<span class="lineno">265</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;307&nbsp;(Temporary&nbsp;Redirect)</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;An&nbsp;error&nbsp;is&nbsp;returned&nbsp;if&nbsp;there&nbsp;were&nbsp;too&nbsp;many&nbsp;redirects&nbsp;or&nbsp;if&nbsp;there</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;was&nbsp;an&nbsp;HTTP&nbsp;protocol&nbsp;error.&nbsp;A&nbsp;non-2xx&nbsp;response&nbsp;doesn&#39;t&nbsp;cause&nbsp;an</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;error.</span><br>
+<span class="lineno">270</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;When&nbsp;err&nbsp;is&nbsp;nil,&nbsp;resp&nbsp;always&nbsp;contains&nbsp;a&nbsp;non-nil&nbsp;resp.Body.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Caller&nbsp;should&nbsp;close&nbsp;resp.Body&nbsp;when&nbsp;done&nbsp;reading&nbsp;from&nbsp;it.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Get&nbsp;is&nbsp;a&nbsp;wrapper&nbsp;around&nbsp;DefaultClient.Get.</span><br>
+<span class="lineno">275</span><span class="keyword">func</span>&nbsp;<span class="ident">Get</span><span class="op">(</span><span class="ident">url</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">resp</span>&nbsp;<span class="op">*</span><span class="ident">Response</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">DefaultClient</span><span class="op">.</span><span class="ident">Get</span><span class="op">(</span><span class="ident">url</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Get&nbsp;issues&nbsp;a&nbsp;GET&nbsp;to&nbsp;the&nbsp;specified&nbsp;URL.&nbsp;&nbsp;If&nbsp;the&nbsp;response&nbsp;is&nbsp;one&nbsp;of&nbsp;the</span><br>
+<span class="lineno">280</span><span class="comment">//&nbsp;following&nbsp;redirect&nbsp;codes,&nbsp;Get&nbsp;follows&nbsp;the&nbsp;redirect&nbsp;after&nbsp;calling&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Client&#39;s&nbsp;CheckRedirect&nbsp;function.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;301&nbsp;(Moved&nbsp;Permanently)</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;302&nbsp;(Found)</span><br>
+<span class="lineno">285</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;303&nbsp;(See&nbsp;Other)</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;307&nbsp;(Temporary&nbsp;Redirect)</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;An&nbsp;error&nbsp;is&nbsp;returned&nbsp;if&nbsp;the&nbsp;Client&#39;s&nbsp;CheckRedirect&nbsp;function&nbsp;fails</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;or&nbsp;if&nbsp;there&nbsp;was&nbsp;an&nbsp;HTTP&nbsp;protocol&nbsp;error.&nbsp;A&nbsp;non-2xx&nbsp;response&nbsp;doesn&#39;t</span><br>
+<span class="lineno">290</span><span class="comment">//&nbsp;cause&nbsp;an&nbsp;error.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;When&nbsp;err&nbsp;is&nbsp;nil,&nbsp;resp&nbsp;always&nbsp;contains&nbsp;a&nbsp;non-nil&nbsp;resp.Body.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Caller&nbsp;should&nbsp;close&nbsp;resp.Body&nbsp;when&nbsp;done&nbsp;reading&nbsp;from&nbsp;it.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">Client</span><span class="op">)</span>&nbsp;<span class="ident">Get</span><span class="op">(</span><span class="ident">url</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">resp</span>&nbsp;<span class="op">*</span><span class="ident">Response</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">295</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">req</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">NewRequest</span><span class="op">(</span><span class="string">&#34;GET&#34;</span><span class="op">,</span>&nbsp;<span class="ident">url</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">doFollowingRedirects</span><span class="op">(</span><span class="ident">req</span><span class="op">,</span>&nbsp;<span class="ident">shouldRedirectGet</span><span class="op">)</span><br>
+<span class="lineno">300</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">Client</span><span class="op">)</span>&nbsp;<span class="ident">doFollowingRedirects</span><span class="op">(</span><span class="ident">ireq</span>&nbsp;<span class="op">*</span><span class="ident">Request</span><span class="op">,</span>&nbsp;<span class="ident">shouldRedirect</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">resp</span>&nbsp;<span class="op">*</span><span class="ident">Response</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">base</span>&nbsp;<span class="op">*</span><span class="ident">url</span><span class="op">.</span><span class="ident">URL</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">redirectChecker</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">CheckRedirect</span><br>
+<span class="lineno">305</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">redirectChecker</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">redirectChecker</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">defaultCheckRedirect</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">via</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="op">*</span><span class="ident">Request</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">310</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">ireq</span><span class="op">.</span><span class="ident">URL</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ireq</span><span class="op">.</span><span class="ident">closeBody</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">errors</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="string">&#34;http:&nbsp;nil&nbsp;Request.URL&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">315</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">reqmu</span>&nbsp;<span class="ident">sync</span><span class="op">.</span><span class="ident">Mutex</span>&nbsp;<span class="comment">//&nbsp;guards&nbsp;req</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">req</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">ireq</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">timer</span>&nbsp;<span class="op">*</span><span class="ident">time</span><span class="op">.</span><span class="ident">Timer</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">Timeout</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">320</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">type</span>&nbsp;<span class="ident">canceler</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">CancelRequest</span><span class="op">(</span><span class="op">*</span><span class="ident">Request</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tr</span><span class="op">,</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">transport</span><span class="op">(</span><span class="op">)</span><span class="op">.</span><span class="op">(</span><span class="ident">canceler</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">ok</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">325</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">fmt</span><span class="op">.</span><span class="ident">Errorf</span><span class="op">(</span><span class="string">&#34;net/http:&nbsp;Client&nbsp;Transport&nbsp;of&nbsp;type&nbsp;%T&nbsp;doesn&#39;t&nbsp;support&nbsp;CancelRequest;&nbsp;Timeout&nbsp;not&nbsp;supported&#34;</span><span class="op">,</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">transport</span><span class="op">(</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">timer</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">time</span><span class="op">.</span><span class="ident">AfterFunc</span><span class="op">(</span><span class="ident">c</span><span class="op">.</span><span class="ident">Timeout</span><span class="op">,</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">reqmu</span><span class="op">.</span><span class="ident">Lock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">defer</span>&nbsp;<span class="ident">reqmu</span><span class="op">.</span><span class="ident">Unlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">330</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tr</span><span class="op">.</span><span class="ident">CancelRequest</span><span class="op">(</span><span class="ident">req</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">urlStr</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="string">&#34;&#34;</span>&nbsp;<span class="comment">//&nbsp;next&nbsp;relative&nbsp;or&nbsp;absolute&nbsp;URL&nbsp;to&nbsp;fetch&nbsp;(after&nbsp;first&nbsp;request)</span><br>
+<span class="lineno">335</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">redirectFailed</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">redirect</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="num">0</span><span class="op">;</span>&nbsp;<span class="op">;</span>&nbsp;<span class="ident">redirect</span><span class="op">++</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">redirect</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nreq</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">new</span><span class="op">(</span><span class="ident">Request</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nreq</span><span class="op">.</span><span class="ident">Method</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">ireq</span><span class="op">.</span><span class="ident">Method</span><br>
+<span class="lineno">340</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">ireq</span><span class="op">.</span><span class="ident">Method</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#34;POST&#34;</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">ireq</span><span class="op">.</span><span class="ident">Method</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#34;PUT&#34;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nreq</span><span class="op">.</span><span class="ident">Method</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">&#34;GET&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nreq</span><span class="op">.</span><span class="ident">Header</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">make</span><span class="op">(</span><span class="ident">Header</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nreq</span><span class="op">.</span><span class="ident">URL</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">base</span><span class="op">.</span><span class="ident">Parse</span><span class="op">(</span><span class="ident">urlStr</span><span class="op">)</span><br>
+<span class="lineno">345</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">break</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">via</span><span class="op">)</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Add&nbsp;the&nbsp;Referer&nbsp;header.</span><br>
+<span class="lineno">350</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">lastReq</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">via</span><span class="op">[</span><span class="builtinfunc">len</span><span class="op">(</span><span class="ident">via</span><span class="op">)</span><span class="op">-</span><span class="num">1</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">ref</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">refererForURL</span><span class="op">(</span><span class="ident">lastReq</span><span class="op">.</span><span class="ident">URL</span><span class="op">,</span>&nbsp;<span class="ident">nreq</span><span class="op">.</span><span class="ident">URL</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">ref</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="string">&#34;&#34;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nreq</span><span class="op">.</span><span class="ident">Header</span><span class="op">.</span><span class="ident">Set</span><span class="op">(</span><span class="string">&#34;Referer&#34;</span><span class="op">,</span>&nbsp;<span class="ident">ref</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">355</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">redirectChecker</span><span class="op">(</span><span class="ident">nreq</span><span class="op">,</span>&nbsp;<span class="ident">via</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">redirectFailed</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">break</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">360</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">reqmu</span><span class="op">.</span><span class="ident">Lock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">req</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">nreq</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">reqmu</span><span class="op">.</span><span class="ident">Unlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">365</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">urlStr</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">req</span><span class="op">.</span><span class="ident">URL</span><span class="op">.</span><span class="ident">String</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">resp</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">send</span><span class="op">(</span><span class="ident">req</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">break</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">370</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">shouldRedirect</span><span class="op">(</span><span class="ident">resp</span><span class="op">.</span><span class="ident">StatusCode</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Read&nbsp;the&nbsp;body&nbsp;if&nbsp;small&nbsp;so&nbsp;underlying&nbsp;TCP&nbsp;connection&nbsp;will&nbsp;be&nbsp;re-used.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;No&nbsp;need&nbsp;to&nbsp;check&nbsp;for&nbsp;errors:&nbsp;if&nbsp;it&nbsp;fails,&nbsp;Transport&nbsp;won&#39;t&nbsp;reuse&nbsp;it&nbsp;anyway.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">const</span>&nbsp;<span class="ident">maxBodySlurpSize</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">2</span>&nbsp;<span class="op">&lt;&lt;</span>&nbsp;<span class="num">10</span><br>
+<span class="lineno">375</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">resp</span><span class="op">.</span><span class="ident">ContentLength</span>&nbsp;<span class="op">==</span>&nbsp;<span class="op">-</span><span class="num">1</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">resp</span><span class="op">.</span><span class="ident">ContentLength</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">maxBodySlurpSize</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">io</span><span class="op">.</span><span class="ident">CopyN</span><span class="op">(</span><span class="ident">ioutil</span><span class="op">.</span><span class="ident">Discard</span><span class="op">,</span>&nbsp;<span class="ident">resp</span><span class="op">.</span><span class="ident">Body</span><span class="op">,</span>&nbsp;<span class="ident">maxBodySlurpSize</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">resp</span><span class="op">.</span><span class="ident">Body</span><span class="op">.</span><span class="ident">Close</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">urlStr</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">resp</span><span class="op">.</span><span class="ident">Header</span><span class="op">.</span><span class="ident">Get</span><span class="op">(</span><span class="string">&#34;Location&#34;</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">urlStr</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#34;&#34;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">380</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">errors</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="ident">fmt</span><span class="op">.</span><span class="ident">Sprintf</span><span class="op">(</span><span class="string">&#34;%d&nbsp;response&nbsp;missing&nbsp;Location&nbsp;header&#34;</span><span class="op">,</span>&nbsp;<span class="ident">resp</span><span class="op">.</span><span class="ident">StatusCode</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">break</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">base</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">req</span><span class="op">.</span><span class="ident">URL</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">via</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">append</span><span class="op">(</span><span class="ident">via</span><span class="op">,</span>&nbsp;<span class="ident">req</span><span class="op">)</span><br>
+<span class="lineno">385</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">continue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">timer</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">resp</span><span class="op">.</span><span class="ident">Body</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">&amp;</span><span class="ident">cancelTimerBody</span><span class="op">{</span><span class="ident">timer</span><span class="op">,</span>&nbsp;<span class="ident">resp</span><span class="op">.</span><span class="ident">Body</span><span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">390</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">resp</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">method</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">ireq</span><span class="op">.</span><span class="ident">Method</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">urlErr</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">&amp;</span><span class="ident">url</span><span class="op">.</span><span class="ident">Error</span><span class="op">{</span><br>
+<span class="lineno">395</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Op</span><span class="op">:</span>&nbsp;&nbsp;<span class="ident">method</span><span class="op">[</span><span class="num">0</span><span class="op">:</span><span class="num">1</span><span class="op">]</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">strings</span><span class="op">.</span><span class="ident">ToLower</span><span class="op">(</span><span class="ident">method</span><span class="op">[</span><span class="num">1</span><span class="op">:</span><span class="op">]</span><span class="op">)</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">URL</span><span class="op">:</span>&nbsp;<span class="ident">urlStr</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Err</span><span class="op">:</span>&nbsp;<span class="ident">err</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">400</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">redirectFailed</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Special&nbsp;case&nbsp;for&nbsp;Go&nbsp;1&nbsp;compatibility:&nbsp;return&nbsp;both&nbsp;the&nbsp;response</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;and&nbsp;an&nbsp;error&nbsp;if&nbsp;the&nbsp;CheckRedirect&nbsp;function&nbsp;failed.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;See&nbsp;http://golang.org/issue/3795</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">resp</span><span class="op">,</span>&nbsp;<span class="ident">urlErr</span><br>
+<span class="lineno">405</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">resp</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">resp</span><span class="op">.</span><span class="ident">Body</span><span class="op">.</span><span class="ident">Close</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">410</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">urlErr</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">defaultCheckRedirect</span><span class="op">(</span><span class="ident">req</span>&nbsp;<span class="op">*</span><span class="ident">Request</span><span class="op">,</span>&nbsp;<span class="ident">via</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="op">*</span><span class="ident">Request</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">via</span><span class="op">)</span>&nbsp;<span class="op">&gt;=</span>&nbsp;<span class="num">10</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">415</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">errors</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="string">&#34;stopped&nbsp;after&nbsp;10&nbsp;redirects&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">420</span><span class="comment">//&nbsp;Post&nbsp;issues&nbsp;a&nbsp;POST&nbsp;to&nbsp;the&nbsp;specified&nbsp;URL.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Caller&nbsp;should&nbsp;close&nbsp;resp.Body&nbsp;when&nbsp;done&nbsp;reading&nbsp;from&nbsp;it.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Post&nbsp;is&nbsp;a&nbsp;wrapper&nbsp;around&nbsp;DefaultClient.Post</span><br>
+<span class="lineno">425</span><span class="keyword">func</span>&nbsp;<span class="ident">Post</span><span class="op">(</span><span class="ident">url</span>&nbsp;<span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">bodyType</span>&nbsp;<span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">body</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">Reader</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">resp</span>&nbsp;<span class="op">*</span><span class="ident">Response</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">DefaultClient</span><span class="op">.</span><span class="ident">Post</span><span class="op">(</span><span class="ident">url</span><span class="op">,</span>&nbsp;<span class="ident">bodyType</span><span class="op">,</span>&nbsp;<span class="ident">body</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Post&nbsp;issues&nbsp;a&nbsp;POST&nbsp;to&nbsp;the&nbsp;specified&nbsp;URL.</span><br>
+<span class="lineno">430</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Caller&nbsp;should&nbsp;close&nbsp;resp.Body&nbsp;when&nbsp;done&nbsp;reading&nbsp;from&nbsp;it.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;If&nbsp;the&nbsp;provided&nbsp;body&nbsp;is&nbsp;also&nbsp;an&nbsp;io.Closer,&nbsp;it&nbsp;is&nbsp;closed&nbsp;after&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;request.</span><br>
+<span class="lineno">435</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">Client</span><span class="op">)</span>&nbsp;<span class="ident">Post</span><span class="op">(</span><span class="ident">url</span>&nbsp;<span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">bodyType</span>&nbsp;<span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">body</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">Reader</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">resp</span>&nbsp;<span class="op">*</span><span class="ident">Response</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">req</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">NewRequest</span><span class="op">(</span><span class="string">&#34;POST&#34;</span><span class="op">,</span>&nbsp;<span class="ident">url</span><span class="op">,</span>&nbsp;<span class="ident">body</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">440</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">req</span><span class="op">.</span><span class="ident">Header</span><span class="op">.</span><span class="ident">Set</span><span class="op">(</span><span class="string">&#34;Content-Type&#34;</span><span class="op">,</span>&nbsp;<span class="ident">bodyType</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">doFollowingRedirects</span><span class="op">(</span><span class="ident">req</span><span class="op">,</span>&nbsp;<span class="ident">shouldRedirectPost</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;PostForm&nbsp;issues&nbsp;a&nbsp;POST&nbsp;to&nbsp;the&nbsp;specified&nbsp;URL,&nbsp;with&nbsp;data&#39;s&nbsp;keys&nbsp;and</span><br>
+<span class="lineno">445</span><span class="comment">//&nbsp;values&nbsp;URL-encoded&nbsp;as&nbsp;the&nbsp;request&nbsp;body.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;When&nbsp;err&nbsp;is&nbsp;nil,&nbsp;resp&nbsp;always&nbsp;contains&nbsp;a&nbsp;non-nil&nbsp;resp.Body.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Caller&nbsp;should&nbsp;close&nbsp;resp.Body&nbsp;when&nbsp;done&nbsp;reading&nbsp;from&nbsp;it.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">450</span><span class="comment">//&nbsp;PostForm&nbsp;is&nbsp;a&nbsp;wrapper&nbsp;around&nbsp;DefaultClient.PostForm</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">PostForm</span><span class="op">(</span><span class="ident">url</span>&nbsp;<span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">data</span>&nbsp;<span class="ident">url</span><span class="op">.</span><span class="ident">Values</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">resp</span>&nbsp;<span class="op">*</span><span class="ident">Response</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">DefaultClient</span><span class="op">.</span><span class="ident">PostForm</span><span class="op">(</span><span class="ident">url</span><span class="op">,</span>&nbsp;<span class="ident">data</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">455</span><span class="comment">//&nbsp;PostForm&nbsp;issues&nbsp;a&nbsp;POST&nbsp;to&nbsp;the&nbsp;specified&nbsp;URL,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;with&nbsp;data&#39;s&nbsp;keys&nbsp;and&nbsp;values&nbsp;urlencoded&nbsp;as&nbsp;the&nbsp;request&nbsp;body.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;When&nbsp;err&nbsp;is&nbsp;nil,&nbsp;resp&nbsp;always&nbsp;contains&nbsp;a&nbsp;non-nil&nbsp;resp.Body.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Caller&nbsp;should&nbsp;close&nbsp;resp.Body&nbsp;when&nbsp;done&nbsp;reading&nbsp;from&nbsp;it.</span><br>
+<span class="lineno">460</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">Client</span><span class="op">)</span>&nbsp;<span class="ident">PostForm</span><span class="op">(</span><span class="ident">url</span>&nbsp;<span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">data</span>&nbsp;<span class="ident">url</span><span class="op">.</span><span class="ident">Values</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">resp</span>&nbsp;<span class="op">*</span><span class="ident">Response</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">Post</span><span class="op">(</span><span class="ident">url</span><span class="op">,</span>&nbsp;<span class="string">&#34;application/x-www-form-urlencoded&#34;</span><span class="op">,</span>&nbsp;<span class="ident">strings</span><span class="op">.</span><span class="ident">NewReader</span><span class="op">(</span><span class="ident">data</span><span class="op">.</span><span class="ident">Encode</span><span class="op">(</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Head&nbsp;issues&nbsp;a&nbsp;HEAD&nbsp;to&nbsp;the&nbsp;specified&nbsp;URL.&nbsp;&nbsp;If&nbsp;the&nbsp;response&nbsp;is&nbsp;one&nbsp;of&nbsp;the</span><br>
+<span class="lineno">465</span><span class="comment">//&nbsp;following&nbsp;redirect&nbsp;codes,&nbsp;Head&nbsp;follows&nbsp;the&nbsp;redirect&nbsp;after&nbsp;calling&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Client&#39;s&nbsp;CheckRedirect&nbsp;function.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;301&nbsp;(Moved&nbsp;Permanently)</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;302&nbsp;(Found)</span><br>
+<span class="lineno">470</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;303&nbsp;(See&nbsp;Other)</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;307&nbsp;(Temporary&nbsp;Redirect)</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Head&nbsp;is&nbsp;a&nbsp;wrapper&nbsp;around&nbsp;DefaultClient.Head</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">Head</span><span class="op">(</span><span class="ident">url</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">resp</span>&nbsp;<span class="op">*</span><span class="ident">Response</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">475</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">DefaultClient</span><span class="op">.</span><span class="ident">Head</span><span class="op">(</span><span class="ident">url</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Head&nbsp;issues&nbsp;a&nbsp;HEAD&nbsp;to&nbsp;the&nbsp;specified&nbsp;URL.&nbsp;&nbsp;If&nbsp;the&nbsp;response&nbsp;is&nbsp;one&nbsp;of&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;following&nbsp;redirect&nbsp;codes,&nbsp;Head&nbsp;follows&nbsp;the&nbsp;redirect&nbsp;after&nbsp;calling&nbsp;the</span><br>
+<span class="lineno">480</span><span class="comment">//&nbsp;Client&#39;s&nbsp;CheckRedirect&nbsp;function.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;301&nbsp;(Moved&nbsp;Permanently)</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;302&nbsp;(Found)</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;303&nbsp;(See&nbsp;Other)</span><br>
+<span class="lineno">485</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;307&nbsp;(Temporary&nbsp;Redirect)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">Client</span><span class="op">)</span>&nbsp;<span class="ident">Head</span><span class="op">(</span><span class="ident">url</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">resp</span>&nbsp;<span class="op">*</span><span class="ident">Response</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">req</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">NewRequest</span><span class="op">(</span><span class="string">&#34;HEAD&#34;</span><span class="op">,</span>&nbsp;<span class="ident">url</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno">490</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">doFollowingRedirects</span><span class="op">(</span><span class="ident">req</span><span class="op">,</span>&nbsp;<span class="ident">shouldRedirectGet</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">cancelTimerBody</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">495</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span>&nbsp;&nbsp;<span class="op">*</span><span class="ident">time</span><span class="op">.</span><span class="ident">Timer</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">rc</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">ReadCloser</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">b</span>&nbsp;<span class="op">*</span><span class="ident">cancelTimerBody</span><span class="op">)</span>&nbsp;<span class="ident">Read</span><span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">n</span>&nbsp;<span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">500</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">b</span><span class="op">.</span><span class="ident">rc</span><span class="op">.</span><span class="ident">Read</span><span class="op">(</span><span class="ident">p</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">EOF</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span><span class="op">.</span><span class="ident">t</span><span class="op">.</span><span class="ident">Stop</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno">505</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">b</span>&nbsp;<span class="op">*</span><span class="ident">cancelTimerBody</span><span class="op">)</span>&nbsp;<span class="ident">Close</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">b</span><span class="op">.</span><span class="ident">rc</span><span class="op">.</span><span class="ident">Close</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span><span class="op">.</span><span class="ident">t</span><span class="op">.</span><span class="ident">Stop</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">510</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

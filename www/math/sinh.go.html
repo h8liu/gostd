@@ -1,0 +1,92 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2009&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">math</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">/*<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspFloating-point&nbsp;hyperbolic&nbsp;sine&nbsp;and&nbsp;cosine.<br>
+<span class="lineno"></span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbspThe&nbsp;exponential&nbsp;func&nbsp;is&nbsp;called&nbsp;for&nbsp;arguments<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspgreater&nbsp;in&nbsp;magnitude&nbsp;than&nbsp;0.5.<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspA&nbsp;series&nbsp;is&nbsp;used&nbsp;for&nbsp;arguments&nbsp;smaller&nbsp;in&nbsp;magnitude&nbsp;than&nbsp;0.5.<br>
+<span class="lineno"></span><br>
+<span class="lineno">15</span>&nbsp;&nbsp;&nbsp;&nbspCosh(x)&nbsp;is&nbsp;computed&nbsp;from&nbsp;the&nbsp;exponential&nbsp;func&nbsp;for<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspall&nbsp;arguments.<br>
+<span class="lineno"></span>*/</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Sinh&nbsp;returns&nbsp;the&nbsp;hyperbolic&nbsp;sine&nbsp;of&nbsp;x.</span><br>
+<span class="lineno">20</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Special&nbsp;cases&nbsp;are:</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspSinh(±0)&nbsp;=&nbsp;±0</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspSinh(±Inf)&nbsp;=&nbsp;±Inf</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspSinh(NaN)&nbsp;=&nbsp;NaN</span><br>
+<span class="lineno">25</span><span class="keyword">func</span>&nbsp;<span class="ident">Sinh</span><span class="op">(</span><span class="ident">x</span>&nbsp;<span class="builtintype">float64</span><span class="op">)</span>&nbsp;<span class="builtintype">float64</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;The&nbsp;coefficients&nbsp;are&nbsp;#2029&nbsp;from&nbsp;Hart&nbsp;&amp;&nbsp;Cheney.&nbsp;(20.36D)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">P0</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">-</span><span class="num">0.6307673640497716991184787251e+6</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">P1</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">-</span><span class="num">0.8991272022039509355398013511e+5</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">P2</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">-</span><span class="num">0.2894211355989563807284660366e+4</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">P3</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">-</span><span class="num">0.2630563213397497062819489e+2</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Q0</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">-</span><span class="num">0.6307673640497716991212077277e+6</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Q1</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0.1521517378790019070696485176e+5</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Q2</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">-</span><span class="num">0.173678953558233699533450911e+3</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sign</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">x</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">-</span><span class="ident">x</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sign</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">temp</span>&nbsp;<span class="builtintype">float64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="ident">true</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">21</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">temp</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">Exp</span><span class="op">(</span><span class="ident">x</span><span class="op">)</span>&nbsp;<span class="op">/</span>&nbsp;<span class="num">2</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0.5</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">temp</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">(</span><span class="ident">Exp</span><span class="op">(</span><span class="ident">x</span><span class="op">)</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">Exp</span><span class="op">(</span><span class="op">-</span><span class="ident">x</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">/</span>&nbsp;<span class="num">2</span><br>
+<span class="lineno">50</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">default</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sq</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">*</span>&nbsp;<span class="ident">x</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">temp</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">(</span><span class="op">(</span><span class="op">(</span><span class="ident">P3</span><span class="op">*</span><span class="ident">sq</span><span class="op">+</span><span class="ident">P2</span><span class="op">)</span><span class="op">*</span><span class="ident">sq</span><span class="op">+</span><span class="ident">P1</span><span class="op">)</span><span class="op">*</span><span class="ident">sq</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">P0</span><span class="op">)</span>&nbsp;<span class="op">*</span>&nbsp;<span class="ident">x</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">temp</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">temp</span>&nbsp;<span class="op">/</span>&nbsp;<span class="op">(</span><span class="op">(</span><span class="op">(</span><span class="ident">sq</span><span class="op">+</span><span class="ident">Q2</span><span class="op">)</span><span class="op">*</span><span class="ident">sq</span><span class="op">+</span><span class="ident">Q1</span><span class="op">)</span><span class="op">*</span><span class="ident">sq</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">Q0</span><span class="op">)</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">sign</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">temp</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">-</span><span class="ident">temp</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">temp</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Cosh&nbsp;returns&nbsp;the&nbsp;hyperbolic&nbsp;cosine&nbsp;of&nbsp;x.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">65</span><span class="comment">//&nbsp;Special&nbsp;cases&nbsp;are:</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspCosh(±0)&nbsp;=&nbsp;1</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspCosh(±Inf)&nbsp;=&nbsp;+Inf</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspCosh(NaN)&nbsp;=&nbsp;NaN</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">Cosh</span><span class="op">(</span><span class="ident">x</span>&nbsp;<span class="builtintype">float64</span><span class="op">)</span>&nbsp;<span class="builtintype">float64</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">x</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">-</span><span class="ident">x</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">21</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">Exp</span><span class="op">(</span><span class="ident">x</span><span class="op">)</span>&nbsp;<span class="op">/</span>&nbsp;<span class="num">2</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="op">(</span><span class="ident">Exp</span><span class="op">(</span><span class="ident">x</span><span class="op">)</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">Exp</span><span class="op">(</span><span class="op">-</span><span class="ident">x</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">/</span>&nbsp;<span class="num">2</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

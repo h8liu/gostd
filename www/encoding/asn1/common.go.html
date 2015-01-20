@@ -1,0 +1,178 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2009&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">asn1</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;reflect&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;strconv&#34;</span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;strings&#34;</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ASN.1&nbsp;objects&nbsp;have&nbsp;metadata&nbsp;preceding&nbsp;them:</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;the&nbsp;tag:&nbsp;the&nbsp;type&nbsp;of&nbsp;the&nbsp;object</span><br>
+<span class="lineno">15</span><span class="comment">//&nbsp;&nbsp;&nbsp;a&nbsp;flag&nbsp;denoting&nbsp;if&nbsp;this&nbsp;object&nbsp;is&nbsp;compound&nbsp;or&nbsp;not</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;the&nbsp;class&nbsp;type:&nbsp;the&nbsp;namespace&nbsp;of&nbsp;the&nbsp;tag</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;the&nbsp;length&nbsp;of&nbsp;the&nbsp;object,&nbsp;in&nbsp;bytes</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Here&nbsp;are&nbsp;some&nbsp;standard&nbsp;tags&nbsp;and&nbsp;classes</span><br>
+<span class="lineno">20</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tagBoolean</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tagInteger</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">2</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tagBitString</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">3</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tagOctetString</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">4</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tagOID</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">6</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tagEnum</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">10</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tagUTF8String</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">12</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tagSequence</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">16</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tagSet</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">17</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tagPrintableString</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">19</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tagT61String</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">20</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tagIA5String</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">22</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tagUTCTime</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">23</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tagGeneralizedTime</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">24</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tagGeneralString</span>&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">27</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">classUniversal</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">classApplication</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">classContextSpecific</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">2</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">classPrivate</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">3</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno">45</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">tagAndLength</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">class</span><span class="op">,</span>&nbsp;<span class="ident">tag</span><span class="op">,</span>&nbsp;<span class="ident">length</span>&nbsp;<span class="builtintype">int</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">isCompound</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">bool</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">50</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ASN.1&nbsp;has&nbsp;IMPLICIT&nbsp;and&nbsp;EXPLICIT&nbsp;tags,&nbsp;which&nbsp;can&nbsp;be&nbsp;translated&nbsp;as&nbsp;&#34;instead</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;of&#34;&nbsp;and&nbsp;&#34;in&nbsp;addition&nbsp;to&#34;.&nbsp;When&nbsp;not&nbsp;specified,&nbsp;every&nbsp;primitive&nbsp;type&nbsp;has&nbsp;a</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;default&nbsp;tag&nbsp;in&nbsp;the&nbsp;UNIVERSAL&nbsp;class.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">55</span><span class="comment">//&nbsp;For&nbsp;example:&nbsp;a&nbsp;BIT&nbsp;STRING&nbsp;is&nbsp;tagged&nbsp;[UNIVERSAL&nbsp;3]&nbsp;by&nbsp;default&nbsp;(although&nbsp;ASN.1</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;doesn&#39;t&nbsp;actually&nbsp;have&nbsp;a&nbsp;UNIVERSAL&nbsp;keyword).&nbsp;However,&nbsp;by&nbsp;saying&nbsp;[IMPLICIT</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;CONTEXT-SPECIFIC&nbsp;42],&nbsp;that&nbsp;means&nbsp;that&nbsp;the&nbsp;tag&nbsp;is&nbsp;replaced&nbsp;by&nbsp;another.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;On&nbsp;the&nbsp;other&nbsp;hand,&nbsp;if&nbsp;it&nbsp;said&nbsp;[EXPLICIT&nbsp;CONTEXT-SPECIFIC&nbsp;10],&nbsp;then&nbsp;an</span><br>
+<span class="lineno">60</span><span class="comment">//&nbsp;/additional/&nbsp;tag&nbsp;would&nbsp;wrap&nbsp;the&nbsp;default&nbsp;tag.&nbsp;This&nbsp;explicit&nbsp;tag&nbsp;will&nbsp;have&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;compound&nbsp;flag&nbsp;set.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;(This&nbsp;is&nbsp;used&nbsp;in&nbsp;order&nbsp;to&nbsp;remove&nbsp;ambiguity&nbsp;with&nbsp;optional&nbsp;elements.)</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">65</span><span class="comment">//&nbsp;You&nbsp;can&nbsp;layer&nbsp;EXPLICIT&nbsp;and&nbsp;IMPLICIT&nbsp;tags&nbsp;to&nbsp;an&nbsp;arbitrary&nbsp;depth,&nbsp;however&nbsp;we</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;don&#39;t&nbsp;support&nbsp;that&nbsp;here.&nbsp;We&nbsp;support&nbsp;a&nbsp;single&nbsp;layer&nbsp;of&nbsp;EXPLICIT&nbsp;or&nbsp;IMPLICIT</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;tagging&nbsp;with&nbsp;tag&nbsp;strings&nbsp;on&nbsp;the&nbsp;fields&nbsp;of&nbsp;a&nbsp;structure.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;fieldParameters&nbsp;is&nbsp;the&nbsp;parsed&nbsp;representation&nbsp;of&nbsp;tag&nbsp;string&nbsp;from&nbsp;a&nbsp;structure&nbsp;field.</span><br>
+<span class="lineno">70</span><span class="keyword">type</span>&nbsp;<span class="ident">fieldParameters</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">optional</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">bool</span>&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;true&nbsp;iff&nbsp;the&nbsp;field&nbsp;is&nbsp;OPTIONAL</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">explicit</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">bool</span>&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;true&nbsp;iff&nbsp;an&nbsp;EXPLICIT&nbsp;tag&nbsp;is&nbsp;in&nbsp;use.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">application</span>&nbsp;&nbsp;<span class="builtintype">bool</span>&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;true&nbsp;iff&nbsp;an&nbsp;APPLICATION&nbsp;tag&nbsp;is&nbsp;in&nbsp;use.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">defaultValue</span>&nbsp;<span class="op">*</span><span class="ident">int64</span>&nbsp;<span class="comment">//&nbsp;a&nbsp;default&nbsp;value&nbsp;for&nbsp;INTEGER&nbsp;typed&nbsp;fields&nbsp;(maybe&nbsp;nil).</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tag</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">*</span><span class="builtintype">int</span>&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;the&nbsp;EXPLICIT&nbsp;or&nbsp;IMPLICIT&nbsp;tag&nbsp;(maybe&nbsp;nil).</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stringType</span>&nbsp;&nbsp;&nbsp;<span class="builtintype">int</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;the&nbsp;string&nbsp;tag&nbsp;to&nbsp;use&nbsp;when&nbsp;marshaling.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">set</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">bool</span>&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;true&nbsp;iff&nbsp;this&nbsp;should&nbsp;be&nbsp;encoded&nbsp;as&nbsp;a&nbsp;SET</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">omitEmpty</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">bool</span>&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;true&nbsp;iff&nbsp;this&nbsp;should&nbsp;be&nbsp;omitted&nbsp;if&nbsp;empty&nbsp;when&nbsp;marshaling.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Invariants:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;&nbsp;&nbsp;if&nbsp;explicit&nbsp;is&nbsp;set,&nbsp;tag&nbsp;is&nbsp;non-nil.</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Given&nbsp;a&nbsp;tag&nbsp;string&nbsp;with&nbsp;the&nbsp;format&nbsp;specified&nbsp;in&nbsp;the&nbsp;package&nbsp;comment,</span><br>
+<span class="lineno">85</span><span class="comment">//&nbsp;parseFieldParameters&nbsp;will&nbsp;parse&nbsp;it&nbsp;into&nbsp;a&nbsp;fieldParameters&nbsp;structure,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ignoring&nbsp;unknown&nbsp;parts&nbsp;of&nbsp;the&nbsp;string.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">parseFieldParameters</span><span class="op">(</span><span class="ident">str</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">ret</span>&nbsp;<span class="ident">fieldParameters</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">part</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">strings</span><span class="op">.</span><span class="ident">Split</span><span class="op">(</span><span class="ident">str</span><span class="op">,</span>&nbsp;<span class="string">&#34;,&#34;</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">part</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#34;optional&#34;</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span><span class="op">.</span><span class="ident">optional</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">part</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#34;explicit&#34;</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span><span class="op">.</span><span class="ident">explicit</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">ret</span><span class="op">.</span><span class="ident">tag</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span><span class="op">.</span><span class="ident">tag</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">new</span><span class="op">(</span><span class="builtintype">int</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">part</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#34;ia5&#34;</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span><span class="op">.</span><span class="ident">stringType</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">tagIA5String</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">part</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#34;printable&#34;</span><span class="op">:</span><br>
+<span class="lineno">100</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span><span class="op">.</span><span class="ident">stringType</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">tagPrintableString</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">part</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#34;utf8&#34;</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span><span class="op">.</span><span class="ident">stringType</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">tagUTF8String</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">strings</span><span class="op">.</span><span class="ident">HasPrefix</span><span class="op">(</span><span class="ident">part</span><span class="op">,</span>&nbsp;<span class="string">&#34;default:&#34;</span><span class="op">)</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">i</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">strconv</span><span class="op">.</span><span class="ident">ParseInt</span><span class="op">(</span><span class="ident">part</span><span class="op">[</span><span class="num">8</span><span class="op">:</span><span class="op">]</span><span class="op">,</span>&nbsp;<span class="num">10</span><span class="op">,</span>&nbsp;<span class="num">64</span><span class="op">)</span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span><span class="op">.</span><span class="ident">defaultValue</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">new</span><span class="op">(</span><span class="ident">int64</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">ret</span><span class="op">.</span><span class="ident">defaultValue</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">i</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">strings</span><span class="op">.</span><span class="ident">HasPrefix</span><span class="op">(</span><span class="ident">part</span><span class="op">,</span>&nbsp;<span class="string">&#34;tag:&#34;</span><span class="op">)</span><span class="op">:</span><br>
+<span class="lineno">110</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">i</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">strconv</span><span class="op">.</span><span class="ident">Atoi</span><span class="op">(</span><span class="ident">part</span><span class="op">[</span><span class="num">4</span><span class="op">:</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span><span class="op">.</span><span class="ident">tag</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">new</span><span class="op">(</span><span class="builtintype">int</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">ret</span><span class="op">.</span><span class="ident">tag</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">i</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">115</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">part</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#34;set&#34;</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span><span class="op">.</span><span class="ident">set</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">part</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#34;application&#34;</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span><span class="op">.</span><span class="ident">application</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">ret</span><span class="op">.</span><span class="ident">tag</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">120</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span><span class="op">.</span><span class="ident">tag</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">new</span><span class="op">(</span><span class="builtintype">int</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">part</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#34;omitempty&#34;</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span><span class="op">.</span><span class="ident">omitEmpty</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">125</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Given&nbsp;a&nbsp;reflected&nbsp;Go&nbsp;type,&nbsp;getUniversalType&nbsp;returns&nbsp;the&nbsp;default&nbsp;tag&nbsp;number</span><br>
+<span class="lineno">130</span><span class="comment">//&nbsp;and&nbsp;expected&nbsp;compound&nbsp;flag.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">getUniversalType</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="ident">reflect</span><span class="op">.</span><span class="ident">Type</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">tagNumber</span>&nbsp;<span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">isCompound</span><span class="op">,</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="builtintype">bool</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="ident">t</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">objectIdentifierType</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">tagOID</span><span class="op">,</span>&nbsp;<span class="ident">false</span><span class="op">,</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno">135</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">bitStringType</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">tagBitString</span><span class="op">,</span>&nbsp;<span class="ident">false</span><span class="op">,</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">timeType</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">tagUTCTime</span><span class="op">,</span>&nbsp;<span class="ident">false</span><span class="op">,</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">enumeratedType</span><span class="op">:</span><br>
+<span class="lineno">140</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">tagEnum</span><span class="op">,</span>&nbsp;<span class="ident">false</span><span class="op">,</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">bigIntType</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">tagInteger</span><span class="op">,</span>&nbsp;<span class="ident">false</span><span class="op">,</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="ident">t</span><span class="op">.</span><span class="ident">Kind</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">145</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">reflect</span><span class="op">.</span><span class="ident">Bool</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">tagBoolean</span><span class="op">,</span>&nbsp;<span class="ident">false</span><span class="op">,</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">reflect</span><span class="op">.</span><span class="ident">Int</span><span class="op">,</span>&nbsp;<span class="ident">reflect</span><span class="op">.</span><span class="ident">Int8</span><span class="op">,</span>&nbsp;<span class="ident">reflect</span><span class="op">.</span><span class="ident">Int16</span><span class="op">,</span>&nbsp;<span class="ident">reflect</span><span class="op">.</span><span class="ident">Int32</span><span class="op">,</span>&nbsp;<span class="ident">reflect</span><span class="op">.</span><span class="ident">Int64</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">tagInteger</span><span class="op">,</span>&nbsp;<span class="ident">false</span><span class="op">,</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">reflect</span><span class="op">.</span><span class="ident">Struct</span><span class="op">:</span><br>
+<span class="lineno">150</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">tagSequence</span><span class="op">,</span>&nbsp;<span class="ident">true</span><span class="op">,</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">reflect</span><span class="op">.</span><span class="ident">Slice</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">t</span><span class="op">.</span><span class="ident">Elem</span><span class="op">(</span><span class="op">)</span><span class="op">.</span><span class="ident">Kind</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">reflect</span><span class="op">.</span><span class="ident">Uint8</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">tagOctetString</span><span class="op">,</span>&nbsp;<span class="ident">false</span><span class="op">,</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">155</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">strings</span><span class="op">.</span><span class="ident">HasSuffix</span><span class="op">(</span><span class="ident">t</span><span class="op">.</span><span class="ident">Name</span><span class="op">(</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="string">&#34;SET&#34;</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">tagSet</span><span class="op">,</span>&nbsp;<span class="ident">true</span><span class="op">,</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">tagSequence</span><span class="op">,</span>&nbsp;<span class="ident">true</span><span class="op">,</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">reflect</span><span class="op">.</span><span class="ident">String</span><span class="op">:</span><br>
+<span class="lineno">160</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">tagPrintableString</span><span class="op">,</span>&nbsp;<span class="ident">false</span><span class="op">,</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">false</span><span class="op">,</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

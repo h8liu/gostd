@@ -1,0 +1,196 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2009&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="comment">//&nbsp;Buffered&nbsp;reading&nbsp;and&nbsp;decoding&nbsp;of&nbsp;DWARF&nbsp;data&nbsp;streams.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">package</span>&nbsp;<span class="ident">dwarf</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;encoding/binary&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;strconv&#34;</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Data&nbsp;buffer&nbsp;being&nbsp;decoded.</span><br>
+<span class="lineno">15</span><span class="keyword">type</span>&nbsp;<span class="ident">buf</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dwarf</span>&nbsp;&nbsp;<span class="op">*</span><span class="ident">Data</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">order</span>&nbsp;&nbsp;<span class="ident">binary</span><span class="op">.</span><span class="ident">ByteOrder</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">format</span>&nbsp;<span class="ident">dataFormat</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">name</span>&nbsp;&nbsp;&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">off</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">Offset</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">data</span>&nbsp;&nbsp;&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">error</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">25</span><span class="comment">//&nbsp;Data&nbsp;format,&nbsp;other&nbsp;than&nbsp;byte&nbsp;order.&nbsp;&nbsp;This&nbsp;affects&nbsp;the&nbsp;handling&nbsp;of</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;certain&nbsp;field&nbsp;formats.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">dataFormat</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;DWARF&nbsp;version&nbsp;number.&nbsp;&nbsp;Zero&nbsp;means&nbsp;unknown.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">version</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span><br>
+<span class="lineno">30</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;64-bit&nbsp;DWARF&nbsp;format?</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dwarf64</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">dwarf64</span>&nbsp;<span class="builtintype">bool</span><span class="op">,</span>&nbsp;<span class="ident">isKnown</span>&nbsp;<span class="builtintype">bool</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Size&nbsp;of&nbsp;an&nbsp;address,&nbsp;in&nbsp;bytes.&nbsp;&nbsp;Zero&nbsp;means&nbsp;unknown.</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">addrsize</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Some&nbsp;parts&nbsp;of&nbsp;DWARF&nbsp;have&nbsp;no&nbsp;data&nbsp;format,&nbsp;e.g.,&nbsp;abbrevs.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">unknownFormat</span>&nbsp;<span class="keyword">struct</span><span class="op">{</span><span class="op">}</span><br>
+<span class="lineno">40</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">u</span>&nbsp;<span class="ident">unknownFormat</span><span class="op">)</span>&nbsp;<span class="ident">version</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">45</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">u</span>&nbsp;<span class="ident">unknownFormat</span><span class="op">)</span>&nbsp;<span class="ident">dwarf64</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="builtintype">bool</span><span class="op">,</span>&nbsp;<span class="builtintype">bool</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">false</span><span class="op">,</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">u</span>&nbsp;<span class="ident">unknownFormat</span><span class="op">)</span>&nbsp;<span class="ident">addrsize</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">makeBuf</span><span class="op">(</span><span class="ident">d</span>&nbsp;<span class="op">*</span><span class="ident">Data</span><span class="op">,</span>&nbsp;<span class="ident">format</span>&nbsp;<span class="ident">dataFormat</span><span class="op">,</span>&nbsp;<span class="ident">name</span>&nbsp;<span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">off</span>&nbsp;<span class="ident">Offset</span><span class="op">,</span>&nbsp;<span class="ident">data</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="ident">buf</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">buf</span><span class="op">{</span><span class="ident">d</span><span class="op">,</span>&nbsp;<span class="ident">d</span><span class="op">.</span><span class="ident">order</span><span class="op">,</span>&nbsp;<span class="ident">format</span><span class="op">,</span>&nbsp;<span class="ident">name</span><span class="op">,</span>&nbsp;<span class="ident">off</span><span class="op">,</span>&nbsp;<span class="ident">data</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><span class="op">}</span><br>
+<span class="lineno">55</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">b</span>&nbsp;<span class="op">*</span><span class="ident">buf</span><span class="op">)</span>&nbsp;<span class="builtintype">uint8</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">uint8</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">b</span><span class="op">.</span><span class="ident">data</span><span class="op">)</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">1</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span><span class="op">.</span><span class="builtintype">error</span><span class="op">(</span><span class="string">&#34;underflow&#34;</span><span class="op">)</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">val</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">b</span><span class="op">.</span><span class="ident">data</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span><span class="op">.</span><span class="ident">data</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">b</span><span class="op">.</span><span class="ident">data</span><span class="op">[</span><span class="num">1</span><span class="op">:</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span><span class="op">.</span><span class="ident">off</span><span class="op">++</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">val</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">b</span>&nbsp;<span class="op">*</span><span class="ident">buf</span><span class="op">)</span>&nbsp;<span class="ident">bytes</span><span class="op">(</span><span class="ident">n</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">b</span><span class="op">.</span><span class="ident">data</span><span class="op">)</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span><span class="op">.</span><span class="builtintype">error</span><span class="op">(</span><span class="string">&#34;underflow&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">data</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">b</span><span class="op">.</span><span class="ident">data</span><span class="op">[</span><span class="num">0</span><span class="op">:</span><span class="ident">n</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span><span class="op">.</span><span class="ident">data</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">b</span><span class="op">.</span><span class="ident">data</span><span class="op">[</span><span class="ident">n</span><span class="op">:</span><span class="op">]</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span><span class="op">.</span><span class="ident">off</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="ident">Offset</span><span class="op">(</span><span class="ident">n</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">data</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">b</span>&nbsp;<span class="op">*</span><span class="ident">buf</span><span class="op">)</span>&nbsp;<span class="ident">skip</span><span class="op">(</span><span class="ident">n</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="op">{</span>&nbsp;<span class="ident">b</span><span class="op">.</span><span class="ident">bytes</span><span class="op">(</span><span class="ident">n</span><span class="op">)</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno">80</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">b</span>&nbsp;<span class="op">*</span><span class="ident">buf</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="num">0</span><span class="op">;</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">b</span><span class="op">.</span><span class="ident">data</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">i</span><span class="op">++</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">b</span><span class="op">.</span><span class="ident">data</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtintype">string</span><span class="op">(</span><span class="ident">b</span><span class="op">.</span><span class="ident">data</span><span class="op">[</span><span class="num">0</span><span class="op">:</span><span class="ident">i</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span><span class="op">.</span><span class="ident">data</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">b</span><span class="op">.</span><span class="ident">data</span><span class="op">[</span><span class="ident">i</span><span class="op">+</span><span class="num">1</span><span class="op">:</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span><span class="op">.</span><span class="ident">off</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="ident">Offset</span><span class="op">(</span><span class="ident">i</span>&nbsp;<span class="op">+</span>&nbsp;<span class="num">1</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">s</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span><span class="op">.</span><span class="builtintype">error</span><span class="op">(</span><span class="string">&#34;underflow&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="string">&#34;&#34;</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">b</span>&nbsp;<span class="op">*</span><span class="ident">buf</span><span class="op">)</span>&nbsp;<span class="builtintype">uint16</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">uint16</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">a</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">b</span><span class="op">.</span><span class="ident">bytes</span><span class="op">(</span><span class="num">2</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">a</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">b</span><span class="op">.</span><span class="ident">order</span><span class="op">.</span><span class="ident">Uint16</span><span class="op">(</span><span class="ident">a</span><span class="op">)</span><br>
+<span class="lineno">100</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">b</span>&nbsp;<span class="op">*</span><span class="ident">buf</span><span class="op">)</span>&nbsp;<span class="builtintype">uint32</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">uint32</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">a</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">b</span><span class="op">.</span><span class="ident">bytes</span><span class="op">(</span><span class="num">4</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">a</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">b</span><span class="op">.</span><span class="ident">order</span><span class="op">.</span><span class="ident">Uint32</span><span class="op">(</span><span class="ident">a</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">110</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">b</span>&nbsp;<span class="op">*</span><span class="ident">buf</span><span class="op">)</span>&nbsp;<span class="ident">uint64</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="ident">uint64</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">a</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">b</span><span class="op">.</span><span class="ident">bytes</span><span class="op">(</span><span class="num">8</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">a</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">115</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">b</span><span class="op">.</span><span class="ident">order</span><span class="op">.</span><span class="ident">Uint64</span><span class="op">(</span><span class="ident">a</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Read&nbsp;a&nbsp;varint,&nbsp;which&nbsp;is&nbsp;7&nbsp;bits&nbsp;per&nbsp;byte,&nbsp;little&nbsp;endian.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;the&nbsp;0x80&nbsp;bit&nbsp;means&nbsp;read&nbsp;another&nbsp;byte.</span><br>
+<span class="lineno">120</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">b</span>&nbsp;<span class="op">*</span><span class="ident">buf</span><span class="op">)</span>&nbsp;<span class="ident">varint</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="ident">uint64</span><span class="op">,</span>&nbsp;<span class="ident">bits</span>&nbsp;<span class="builtintype">uint</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="num">0</span><span class="op">;</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">b</span><span class="op">.</span><span class="ident">data</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">i</span><span class="op">++</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">byte</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">b</span><span class="op">.</span><span class="ident">data</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span>&nbsp;<span class="op">|=</span>&nbsp;<span class="ident">uint64</span><span class="op">(</span><span class="builtintype">byte</span><span class="op">&amp;</span><span class="num">0x7F</span><span class="op">)</span>&nbsp;<span class="op">&lt;&lt;</span>&nbsp;<span class="ident">bits</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">bits</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="num">7</span><br>
+<span class="lineno">125</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtintype">byte</span><span class="op">&amp;</span><span class="num">0x80</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span><span class="op">.</span><span class="ident">off</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="ident">Offset</span><span class="op">(</span><span class="ident">i</span>&nbsp;<span class="op">+</span>&nbsp;<span class="num">1</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span><span class="op">.</span><span class="ident">data</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">b</span><span class="op">.</span><span class="ident">data</span><span class="op">[</span><span class="ident">i</span><span class="op">+</span><span class="num">1</span><span class="op">:</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">c</span><span class="op">,</span>&nbsp;<span class="ident">bits</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">130</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Unsigned&nbsp;int&nbsp;is&nbsp;just&nbsp;a&nbsp;varint.</span><br>
+<span class="lineno">135</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">b</span>&nbsp;<span class="op">*</span><span class="ident">buf</span><span class="op">)</span>&nbsp;<span class="builtintype">uint</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="ident">uint64</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">x</span><span class="op">,</span>&nbsp;<span class="ident">_</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">b</span><span class="op">.</span><span class="ident">varint</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">x</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">140</span><span class="comment">//&nbsp;Signed&nbsp;int&nbsp;is&nbsp;a&nbsp;sign-extended&nbsp;varint.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">b</span>&nbsp;<span class="op">*</span><span class="ident">buf</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="ident">int64</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ux</span><span class="op">,</span>&nbsp;<span class="ident">bits</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">b</span><span class="op">.</span><span class="ident">varint</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">x</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">int64</span><span class="op">(</span><span class="ident">ux</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">x</span><span class="op">&amp;</span><span class="op">(</span><span class="num">1</span><span class="op">&lt;&lt;</span><span class="op">(</span><span class="ident">bits</span><span class="op">-</span><span class="num">1</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">145</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">x</span>&nbsp;<span class="op">|=</span>&nbsp;<span class="op">-</span><span class="num">1</span>&nbsp;<span class="op">&lt;&lt;</span>&nbsp;<span class="ident">bits</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">x</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">150</span><span class="comment">//&nbsp;Address-sized&nbsp;uint.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">b</span>&nbsp;<span class="op">*</span><span class="ident">buf</span><span class="op">)</span>&nbsp;<span class="ident">addr</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="ident">uint64</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="ident">b</span><span class="op">.</span><span class="ident">format</span><span class="op">.</span><span class="ident">addrsize</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="num">1</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">uint64</span><span class="op">(</span><span class="ident">b</span><span class="op">.</span><span class="builtintype">uint8</span><span class="op">(</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno">155</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="num">2</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">uint64</span><span class="op">(</span><span class="ident">b</span><span class="op">.</span><span class="builtintype">uint16</span><span class="op">(</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="num">4</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">uint64</span><span class="op">(</span><span class="ident">b</span><span class="op">.</span><span class="builtintype">uint32</span><span class="op">(</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="num">8</span><span class="op">:</span><br>
+<span class="lineno">160</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">uint64</span><span class="op">(</span><span class="ident">b</span><span class="op">.</span><span class="ident">uint64</span><span class="op">(</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span><span class="op">.</span><span class="builtintype">error</span><span class="op">(</span><span class="string">&#34;unknown&nbsp;address&nbsp;size&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">165</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">b</span>&nbsp;<span class="op">*</span><span class="ident">buf</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">b</span><span class="op">.</span><span class="ident">err</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span><span class="op">.</span><span class="ident">data</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span><span class="op">.</span><span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">DecodeError</span><span class="op">{</span><span class="ident">b</span><span class="op">.</span><span class="ident">name</span><span class="op">,</span>&nbsp;<span class="ident">b</span><span class="op">.</span><span class="ident">off</span><span class="op">,</span>&nbsp;<span class="ident">s</span><span class="op">}</span><br>
+<span class="lineno">170</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">DecodeError</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Name</span>&nbsp;&nbsp;&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno">175</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Offset</span>&nbsp;<span class="ident">Offset</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Err</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">e</span>&nbsp;<span class="ident">DecodeError</span><span class="op">)</span>&nbsp;<span class="ident">Error</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">180</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="string">&#34;decoding&nbsp;dwarf&nbsp;section&nbsp;&#34;</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">e</span><span class="op">.</span><span class="ident">Name</span>&nbsp;<span class="op">+</span>&nbsp;<span class="string">&#34;&nbsp;at&nbsp;offset&nbsp;0x&#34;</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">strconv</span><span class="op">.</span><span class="ident">FormatInt</span><span class="op">(</span><span class="ident">int64</span><span class="op">(</span><span class="ident">e</span><span class="op">.</span><span class="ident">Offset</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="num">16</span><span class="op">)</span>&nbsp;<span class="op">+</span>&nbsp;<span class="string">&#34;:&nbsp;&#34;</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">e</span><span class="op">.</span><span class="ident">Err</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

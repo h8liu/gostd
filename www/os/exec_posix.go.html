@@ -1,0 +1,149 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2009&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="comment">//&nbsp;+build&nbsp;darwin&nbsp;dragonfly&nbsp;freebsd&nbsp;linux&nbsp;nacl&nbsp;netbsd&nbsp;openbsd&nbsp;solaris&nbsp;windows</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">package</span>&nbsp;<span class="ident">os</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;syscall&#34;</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;only&nbsp;signal&nbsp;values&nbsp;guaranteed&nbsp;to&nbsp;be&nbsp;present&nbsp;on&nbsp;all&nbsp;systems</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;are&nbsp;Interrupt&nbsp;(send&nbsp;the&nbsp;process&nbsp;an&nbsp;interrupt)&nbsp;and&nbsp;Kill&nbsp;(force</span><br>
+<span class="lineno">15</span><span class="comment">//&nbsp;the&nbsp;process&nbsp;to&nbsp;exit).</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Interrupt</span>&nbsp;<span class="ident">Signal</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">syscall</span><span class="op">.</span><span class="ident">SIGINT</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Kill</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">Signal</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">syscall</span><span class="op">.</span><span class="ident">SIGKILL</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno">20</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">startProcess</span><span class="op">(</span><span class="ident">name</span>&nbsp;<span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">argv</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">attr</span>&nbsp;<span class="op">*</span><span class="ident">ProcAttr</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">*</span><span class="ident">Process</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;If&nbsp;there&nbsp;is&nbsp;no&nbsp;SysProcAttr&nbsp;(ie.&nbsp;no&nbsp;Chroot&nbsp;or&nbsp;changed</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;UID/GID),&nbsp;double-check&nbsp;existence&nbsp;of&nbsp;the&nbsp;directory&nbsp;we&nbsp;want</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;to&nbsp;chdir&nbsp;into.&nbsp;&nbsp;We&nbsp;can&nbsp;make&nbsp;the&nbsp;error&nbsp;clearer&nbsp;this&nbsp;way.</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">attr</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">attr</span><span class="op">.</span><span class="ident">Sys</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">attr</span><span class="op">.</span><span class="ident">Dir</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="string">&#34;&#34;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">Stat</span><span class="op">(</span><span class="ident">attr</span><span class="op">.</span><span class="ident">Dir</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pe</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">err</span><span class="op">.</span><span class="op">(</span><span class="op">*</span><span class="ident">PathError</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pe</span><span class="op">.</span><span class="ident">Op</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">&#34;chdir&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">pe</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sysattr</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">&amp;</span><span class="ident">syscall</span><span class="op">.</span><span class="ident">ProcAttr</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Dir</span><span class="op">:</span>&nbsp;<span class="ident">attr</span><span class="op">.</span><span class="ident">Dir</span><span class="op">,</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Env</span><span class="op">:</span>&nbsp;<span class="ident">attr</span><span class="op">.</span><span class="ident">Env</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Sys</span><span class="op">:</span>&nbsp;<span class="ident">attr</span><span class="op">.</span><span class="ident">Sys</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">sysattr</span><span class="op">.</span><span class="ident">Env</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sysattr</span><span class="op">.</span><span class="ident">Env</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">Environ</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">f</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">attr</span><span class="op">.</span><span class="ident">Files</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sysattr</span><span class="op">.</span><span class="ident">Files</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">append</span><span class="op">(</span><span class="ident">sysattr</span><span class="op">.</span><span class="ident">Files</span><span class="op">,</span>&nbsp;<span class="ident">f</span><span class="op">.</span><span class="ident">Fd</span><span class="op">(</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pid</span><span class="op">,</span>&nbsp;<span class="ident">h</span><span class="op">,</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">syscall</span><span class="op">.</span><span class="ident">StartProcess</span><span class="op">(</span><span class="ident">name</span><span class="op">,</span>&nbsp;<span class="ident">argv</span><span class="op">,</span>&nbsp;<span class="ident">sysattr</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="op">&amp;</span><span class="ident">PathError</span><span class="op">{</span><span class="string">&#34;fork/exec&#34;</span><span class="op">,</span>&nbsp;<span class="ident">name</span><span class="op">,</span>&nbsp;<span class="ident">e</span><span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">newProcess</span><span class="op">(</span><span class="ident">pid</span><span class="op">,</span>&nbsp;<span class="ident">h</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno">50</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">*</span><span class="ident">Process</span><span class="op">)</span>&nbsp;<span class="ident">kill</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">p</span><span class="op">.</span><span class="ident">Signal</span><span class="op">(</span><span class="ident">Kill</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">55</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ProcessState&nbsp;stores&nbsp;information&nbsp;about&nbsp;a&nbsp;process,&nbsp;as&nbsp;reported&nbsp;by&nbsp;Wait.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">ProcessState</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pid</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">int</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;The&nbsp;process&#39;s&nbsp;id.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">status</span>&nbsp;<span class="ident">syscall</span><span class="op">.</span><span class="ident">WaitStatus</span>&nbsp;<span class="comment">//&nbsp;System-dependent&nbsp;status&nbsp;info.</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">rusage</span>&nbsp;<span class="op">*</span><span class="ident">syscall</span><span class="op">.</span><span class="ident">Rusage</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Pid&nbsp;returns&nbsp;the&nbsp;process&nbsp;id&nbsp;of&nbsp;the&nbsp;exited&nbsp;process.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">*</span><span class="ident">ProcessState</span><span class="op">)</span>&nbsp;<span class="ident">Pid</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">p</span><span class="op">.</span><span class="ident">pid</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">*</span><span class="ident">ProcessState</span><span class="op">)</span>&nbsp;<span class="ident">exited</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">p</span><span class="op">.</span><span class="ident">status</span><span class="op">.</span><span class="ident">Exited</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">70</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">*</span><span class="ident">ProcessState</span><span class="op">)</span>&nbsp;<span class="ident">success</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">p</span><span class="op">.</span><span class="ident">status</span><span class="op">.</span><span class="ident">ExitStatus</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">75</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">*</span><span class="ident">ProcessState</span><span class="op">)</span>&nbsp;<span class="ident">sys</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="keyword">interface</span><span class="op">{</span><span class="op">}</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">p</span><span class="op">.</span><span class="ident">status</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">80</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">*</span><span class="ident">ProcessState</span><span class="op">)</span>&nbsp;<span class="ident">sysUsage</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="keyword">interface</span><span class="op">{</span><span class="op">}</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">p</span><span class="op">.</span><span class="ident">rusage</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Convert&nbsp;i&nbsp;to&nbsp;decimal&nbsp;string.</span><br>
+<span class="lineno">85</span><span class="keyword">func</span>&nbsp;<span class="ident">itod</span><span class="op">(</span><span class="ident">i</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="string">&#34;0&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">u</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">uint64</span><span class="op">(</span><span class="ident">i</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">u</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">-</span><span class="ident">u</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Assemble&nbsp;decimal&nbsp;in&nbsp;reverse&nbsp;order.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">b</span>&nbsp;<span class="op">[</span><span class="num">32</span><span class="op">]</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">bp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">b</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="op">;</span>&nbsp;<span class="ident">u</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span><span class="op">;</span>&nbsp;<span class="ident">u</span>&nbsp;<span class="op">/=</span>&nbsp;<span class="num">10</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">bp</span><span class="op">--</span><br>
+<span class="lineno">100</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span><span class="op">[</span><span class="ident">bp</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtintype">byte</span><span class="op">(</span><span class="ident">u</span><span class="op">%</span><span class="num">10</span><span class="op">)</span>&nbsp;<span class="op">+</span>&nbsp;<span class="string">&#39;0&#39;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">bp</span><span class="op">--</span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span><span class="op">[</span><span class="ident">bp</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">&#39;-&#39;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="builtintype">string</span><span class="op">(</span><span class="ident">b</span><span class="op">[</span><span class="ident">bp</span><span class="op">:</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">110</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">*</span><span class="ident">ProcessState</span><span class="op">)</span>&nbsp;<span class="ident">String</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">p</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="string">&#34;&lt;nil&gt;&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">115</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">status</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">p</span><span class="op">.</span><span class="ident">Sys</span><span class="op">(</span><span class="op">)</span><span class="op">.</span><span class="op">(</span><span class="ident">syscall</span><span class="op">.</span><span class="ident">WaitStatus</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">res</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="string">&#34;&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">status</span><span class="op">.</span><span class="ident">Exited</span><span class="op">(</span><span class="op">)</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">res</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">&#34;exit&nbsp;status&nbsp;&#34;</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">itod</span><span class="op">(</span><span class="ident">status</span><span class="op">.</span><span class="ident">ExitStatus</span><span class="op">(</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno">120</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">status</span><span class="op">.</span><span class="ident">Signaled</span><span class="op">(</span><span class="op">)</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">res</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">&#34;signal:&nbsp;&#34;</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">status</span><span class="op">.</span><span class="ident">Signal</span><span class="op">(</span><span class="op">)</span><span class="op">.</span><span class="ident">String</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">status</span><span class="op">.</span><span class="ident">Stopped</span><span class="op">(</span><span class="op">)</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">res</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">&#34;stop&nbsp;signal:&nbsp;&#34;</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">status</span><span class="op">.</span><span class="ident">StopSignal</span><span class="op">(</span><span class="op">)</span><span class="op">.</span><span class="ident">String</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">status</span><span class="op">.</span><span class="ident">StopSignal</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">syscall</span><span class="op">.</span><span class="ident">SIGTRAP</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">status</span><span class="op">.</span><span class="ident">TrapCause</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">125</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">res</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="string">&#34;&nbsp;(trap&nbsp;&#34;</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">itod</span><span class="op">(</span><span class="ident">status</span><span class="op">.</span><span class="ident">TrapCause</span><span class="op">(</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">+</span>&nbsp;<span class="string">&#34;)&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">status</span><span class="op">.</span><span class="ident">Continued</span><span class="op">(</span><span class="op">)</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">res</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">&#34;continued&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">130</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">status</span><span class="op">.</span><span class="ident">CoreDump</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">res</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="string">&#34;&nbsp;(core&nbsp;dumped)&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">res</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

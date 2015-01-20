@@ -1,0 +1,122 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2010&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">smtp</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;crypto/hmac&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;crypto/md5&#34;</span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;errors&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;fmt&#34;</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Auth&nbsp;is&nbsp;implemented&nbsp;by&nbsp;an&nbsp;SMTP&nbsp;authentication&nbsp;mechanism.</span><br>
+<span class="lineno">15</span><span class="keyword">type</span>&nbsp;<span class="ident">Auth</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Start&nbsp;begins&nbsp;an&nbsp;authentication&nbsp;with&nbsp;a&nbsp;server.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;It&nbsp;returns&nbsp;the&nbsp;name&nbsp;of&nbsp;the&nbsp;authentication&nbsp;protocol</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;and&nbsp;optionally&nbsp;data&nbsp;to&nbsp;include&nbsp;in&nbsp;the&nbsp;initial&nbsp;AUTH&nbsp;message</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;sent&nbsp;to&nbsp;the&nbsp;server.&nbsp;It&nbsp;can&nbsp;return&nbsp;proto&nbsp;==&nbsp;&#34;&#34;&nbsp;to&nbsp;indicate</span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;that&nbsp;the&nbsp;authentication&nbsp;should&nbsp;be&nbsp;skipped.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;If&nbsp;it&nbsp;returns&nbsp;a&nbsp;non-nil&nbsp;error,&nbsp;the&nbsp;SMTP&nbsp;client&nbsp;aborts</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;the&nbsp;authentication&nbsp;attempt&nbsp;and&nbsp;closes&nbsp;the&nbsp;connection.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Start</span><span class="op">(</span><span class="ident">server</span>&nbsp;<span class="op">*</span><span class="ident">ServerInfo</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">proto</span>&nbsp;<span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">toServer</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Next&nbsp;continues&nbsp;the&nbsp;authentication.&nbsp;The&nbsp;server&nbsp;has&nbsp;just&nbsp;sent</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;the&nbsp;fromServer&nbsp;data.&nbsp;If&nbsp;more&nbsp;is&nbsp;true,&nbsp;the&nbsp;server&nbsp;expects&nbsp;a</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;response,&nbsp;which&nbsp;Next&nbsp;should&nbsp;return&nbsp;as&nbsp;toServer;&nbsp;otherwise</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Next&nbsp;should&nbsp;return&nbsp;toServer&nbsp;==&nbsp;nil.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;If&nbsp;Next&nbsp;returns&nbsp;a&nbsp;non-nil&nbsp;error,&nbsp;the&nbsp;SMTP&nbsp;client&nbsp;aborts</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;the&nbsp;authentication&nbsp;attempt&nbsp;and&nbsp;closes&nbsp;the&nbsp;connection.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Next</span><span class="op">(</span><span class="ident">fromServer</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="ident">more</span>&nbsp;<span class="builtintype">bool</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">toServer</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ServerInfo&nbsp;records&nbsp;information&nbsp;about&nbsp;an&nbsp;SMTP&nbsp;server.</span><br>
+<span class="lineno">35</span><span class="keyword">type</span>&nbsp;<span class="ident">ServerInfo</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Name</span>&nbsp;<span class="builtintype">string</span>&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;SMTP&nbsp;server&nbsp;name</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">TLS</span>&nbsp;&nbsp;<span class="builtintype">bool</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;using&nbsp;TLS,&nbsp;with&nbsp;valid&nbsp;certificate&nbsp;for&nbsp;Name</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Auth</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">string</span>&nbsp;<span class="comment">//&nbsp;advertised&nbsp;authentication&nbsp;mechanisms</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">40</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">plainAuth</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">identity</span><span class="op">,</span>&nbsp;<span class="ident">username</span><span class="op">,</span>&nbsp;<span class="ident">password</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">host</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">45</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;PlainAuth&nbsp;returns&nbsp;an&nbsp;Auth&nbsp;that&nbsp;implements&nbsp;the&nbsp;PLAIN&nbsp;authentication</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;mechanism&nbsp;as&nbsp;defined&nbsp;in&nbsp;RFC&nbsp;4616.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;returned&nbsp;Auth&nbsp;uses&nbsp;the&nbsp;given&nbsp;username&nbsp;and&nbsp;password&nbsp;to&nbsp;authenticate</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;on&nbsp;TLS&nbsp;connections&nbsp;to&nbsp;host&nbsp;and&nbsp;act&nbsp;as&nbsp;identity.&nbsp;Usually&nbsp;identity&nbsp;will&nbsp;be</span><br>
+<span class="lineno">50</span><span class="comment">//&nbsp;left&nbsp;blank&nbsp;to&nbsp;act&nbsp;as&nbsp;username.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">PlainAuth</span><span class="op">(</span><span class="ident">identity</span><span class="op">,</span>&nbsp;<span class="ident">username</span><span class="op">,</span>&nbsp;<span class="ident">password</span><span class="op">,</span>&nbsp;<span class="ident">host</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="ident">Auth</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="op">&amp;</span><span class="ident">plainAuth</span><span class="op">{</span><span class="ident">identity</span><span class="op">,</span>&nbsp;<span class="ident">username</span><span class="op">,</span>&nbsp;<span class="ident">password</span><span class="op">,</span>&nbsp;<span class="ident">host</span><span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">55</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">a</span>&nbsp;<span class="op">*</span><span class="ident">plainAuth</span><span class="op">)</span>&nbsp;<span class="ident">Start</span><span class="op">(</span><span class="ident">server</span>&nbsp;<span class="op">*</span><span class="ident">ServerInfo</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">server</span><span class="op">.</span><span class="ident">TLS</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">advertised</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">mechanism</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">server</span><span class="op">.</span><span class="ident">Auth</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">mechanism</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#34;PLAIN&#34;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">advertised</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">break</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">advertised</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="string">&#34;&#34;</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">errors</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="string">&#34;unencrypted&nbsp;connection&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">server</span><span class="op">.</span><span class="ident">Name</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">a</span><span class="op">.</span><span class="ident">host</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="string">&#34;&#34;</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">errors</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="string">&#34;wrong&nbsp;host&nbsp;name&#34;</span><span class="op">)</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">resp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">(</span><span class="ident">a</span><span class="op">.</span><span class="ident">identity</span>&nbsp;<span class="op">+</span>&nbsp;<span class="string">&#34;\x00&#34;</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">a</span><span class="op">.</span><span class="ident">username</span>&nbsp;<span class="op">+</span>&nbsp;<span class="string">&#34;\x00&#34;</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">a</span><span class="op">.</span><span class="ident">password</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="string">&#34;PLAIN&#34;</span><span class="op">,</span>&nbsp;<span class="ident">resp</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">75</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">a</span>&nbsp;<span class="op">*</span><span class="ident">plainAuth</span><span class="op">)</span>&nbsp;<span class="ident">Next</span><span class="op">(</span><span class="ident">fromServer</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="ident">more</span>&nbsp;<span class="builtintype">bool</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">more</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;We&#39;ve&nbsp;already&nbsp;sent&nbsp;everything.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">errors</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="string">&#34;unexpected&nbsp;server&nbsp;challenge&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">cramMD5Auth</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">username</span><span class="op">,</span>&nbsp;<span class="ident">secret</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno">85</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;CRAMMD5Auth&nbsp;returns&nbsp;an&nbsp;Auth&nbsp;that&nbsp;implements&nbsp;the&nbsp;CRAM-MD5&nbsp;authentication</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;mechanism&nbsp;as&nbsp;defined&nbsp;in&nbsp;RFC&nbsp;2195.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;returned&nbsp;Auth&nbsp;uses&nbsp;the&nbsp;given&nbsp;username&nbsp;and&nbsp;secret&nbsp;to&nbsp;authenticate</span><br>
+<span class="lineno">90</span><span class="comment">//&nbsp;to&nbsp;the&nbsp;server&nbsp;using&nbsp;the&nbsp;challenge-response&nbsp;mechanism.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">CRAMMD5Auth</span><span class="op">(</span><span class="ident">username</span><span class="op">,</span>&nbsp;<span class="ident">secret</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="ident">Auth</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="op">&amp;</span><span class="ident">cramMD5Auth</span><span class="op">{</span><span class="ident">username</span><span class="op">,</span>&nbsp;<span class="ident">secret</span><span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">95</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">a</span>&nbsp;<span class="op">*</span><span class="ident">cramMD5Auth</span><span class="op">)</span>&nbsp;<span class="ident">Start</span><span class="op">(</span><span class="ident">server</span>&nbsp;<span class="op">*</span><span class="ident">ServerInfo</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="string">&#34;CRAM-MD5&#34;</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">a</span>&nbsp;<span class="op">*</span><span class="ident">cramMD5Auth</span><span class="op">)</span>&nbsp;<span class="ident">Next</span><span class="op">(</span><span class="ident">fromServer</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="ident">more</span>&nbsp;<span class="builtintype">bool</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">100</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">more</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">hmac</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="ident">md5</span><span class="op">.</span><span class="ident">New</span><span class="op">,</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">(</span><span class="ident">a</span><span class="op">.</span><span class="ident">secret</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span><span class="op">.</span><span class="ident">Write</span><span class="op">(</span><span class="ident">fromServer</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">make</span><span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">d</span><span class="op">.</span><span class="ident">Size</span><span class="op">(</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">(</span><span class="ident">fmt</span><span class="op">.</span><span class="ident">Sprintf</span><span class="op">(</span><span class="string">&#34;%s&nbsp;%x&#34;</span><span class="op">,</span>&nbsp;<span class="ident">a</span><span class="op">.</span><span class="ident">username</span><span class="op">,</span>&nbsp;<span class="ident">d</span><span class="op">.</span><span class="ident">Sum</span><span class="op">(</span><span class="ident">s</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

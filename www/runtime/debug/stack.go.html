@@ -1,0 +1,113 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2011&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="comment">//&nbsp;Package&nbsp;debug&nbsp;contains&nbsp;facilities&nbsp;for&nbsp;programs&nbsp;to&nbsp;debug&nbsp;themselves&nbsp;while</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;they&nbsp;are&nbsp;running.</span><br>
+<span class="lineno"></span><span class="keyword">package</span>&nbsp;<span class="ident">debug</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;bytes&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;fmt&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;io/ioutil&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;os&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;runtime&#34;</span><br>
+<span class="lineno">15</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dunno</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">(</span><span class="string">&#34;???&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">centerDot</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">(</span><span class="string">&#34;·&#34;</span><span class="op">)</span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dot</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">(</span><span class="string">&#34;.&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">slash</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">(</span><span class="string">&#34;/&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;PrintStack&nbsp;prints&nbsp;to&nbsp;standard&nbsp;error&nbsp;the&nbsp;stack&nbsp;trace&nbsp;returned&nbsp;by&nbsp;Stack.</span><br>
+<span class="lineno">25</span><span class="keyword">func</span>&nbsp;<span class="ident">PrintStack</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">os</span><span class="op">.</span><span class="ident">Stderr</span><span class="op">.</span><span class="ident">Write</span><span class="op">(</span><span class="ident">stack</span><span class="op">(</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Stack&nbsp;returns&nbsp;a&nbsp;formatted&nbsp;stack&nbsp;trace&nbsp;of&nbsp;the&nbsp;goroutine&nbsp;that&nbsp;calls&nbsp;it.</span><br>
+<span class="lineno">30</span><span class="comment">//&nbsp;For&nbsp;each&nbsp;routine,&nbsp;it&nbsp;includes&nbsp;the&nbsp;source&nbsp;line&nbsp;information&nbsp;and&nbsp;PC&nbsp;value,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;then&nbsp;attempts&nbsp;to&nbsp;discover,&nbsp;for&nbsp;Go&nbsp;functions,&nbsp;the&nbsp;calling&nbsp;function&nbsp;or</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;method&nbsp;and&nbsp;the&nbsp;text&nbsp;of&nbsp;the&nbsp;line&nbsp;containing&nbsp;the&nbsp;invocation.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;This&nbsp;function&nbsp;is&nbsp;deprecated.&nbsp;Use&nbsp;package&nbsp;runtime&#39;s&nbsp;Stack&nbsp;instead.</span><br>
+<span class="lineno">35</span><span class="keyword">func</span>&nbsp;<span class="ident">Stack</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">stack</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;stack&nbsp;implements&nbsp;Stack,&nbsp;skipping&nbsp;2&nbsp;frames</span><br>
+<span class="lineno">40</span><span class="keyword">func</span>&nbsp;<span class="ident">stack</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">buf</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">new</span><span class="op">(</span><span class="ident">bytes</span><span class="op">.</span><span class="ident">Buffer</span><span class="op">)</span>&nbsp;<span class="comment">//&nbsp;the&nbsp;returned&nbsp;data</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;As&nbsp;we&nbsp;loop,&nbsp;we&nbsp;open&nbsp;files&nbsp;and&nbsp;read&nbsp;them.&nbsp;These&nbsp;variables&nbsp;record&nbsp;the&nbsp;currently</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;loaded&nbsp;file.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">lines</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">lastFile</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="num">2</span><span class="op">;</span>&nbsp;<span class="op">;</span>&nbsp;<span class="ident">i</span><span class="op">++</span>&nbsp;<span class="op">{</span>&nbsp;<span class="comment">//&nbsp;Caller&nbsp;we&nbsp;care&nbsp;about&nbsp;is&nbsp;the&nbsp;user,&nbsp;2&nbsp;frames&nbsp;up</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pc</span><span class="op">,</span>&nbsp;<span class="ident">file</span><span class="op">,</span>&nbsp;<span class="ident">line</span><span class="op">,</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">runtime</span><span class="op">.</span><span class="ident">Caller</span><span class="op">(</span><span class="ident">i</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">ok</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">break</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Print&nbsp;this&nbsp;much&nbsp;at&nbsp;least.&nbsp;&nbsp;If&nbsp;we&nbsp;can&#39;t&nbsp;find&nbsp;the&nbsp;source,&nbsp;it&nbsp;won&#39;t&nbsp;show.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fmt</span><span class="op">.</span><span class="ident">Fprintf</span><span class="op">(</span><span class="ident">buf</span><span class="op">,</span>&nbsp;<span class="string">&#34;%s:%d&nbsp;(0x%x)\n&#34;</span><span class="op">,</span>&nbsp;<span class="ident">file</span><span class="op">,</span>&nbsp;<span class="ident">line</span><span class="op">,</span>&nbsp;<span class="ident">pc</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">file</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">lastFile</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">data</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">ioutil</span><span class="op">.</span><span class="ident">ReadFile</span><span class="op">(</span><span class="ident">file</span><span class="op">)</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">continue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">lines</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">bytes</span><span class="op">.</span><span class="ident">Split</span><span class="op">(</span><span class="ident">data</span><span class="op">,</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">{</span><span class="string">&#39;\n&#39;</span><span class="op">}</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">lastFile</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">file</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">line</span><span class="op">--</span>&nbsp;<span class="comment">//&nbsp;in&nbsp;stack&nbsp;trace,&nbsp;lines&nbsp;are&nbsp;1-indexed&nbsp;but&nbsp;our&nbsp;array&nbsp;is&nbsp;0-indexed</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fmt</span><span class="op">.</span><span class="ident">Fprintf</span><span class="op">(</span><span class="ident">buf</span><span class="op">,</span>&nbsp;<span class="string">&#34;\t%s:&nbsp;%s\n&#34;</span><span class="op">,</span>&nbsp;<span class="ident">function</span><span class="op">(</span><span class="ident">pc</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">source</span><span class="op">(</span><span class="ident">lines</span><span class="op">,</span>&nbsp;<span class="ident">line</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">buf</span><span class="op">.</span><span class="ident">Bytes</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">65</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;source&nbsp;returns&nbsp;a&nbsp;space-trimmed&nbsp;slice&nbsp;of&nbsp;the&nbsp;n&#39;th&nbsp;line.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">source</span><span class="op">(</span><span class="ident">lines</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="op">&gt;=</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">lines</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">dunno</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">bytes</span><span class="op">.</span><span class="ident">Trim</span><span class="op">(</span><span class="ident">lines</span><span class="op">[</span><span class="ident">n</span><span class="op">]</span><span class="op">,</span>&nbsp;<span class="string">&#34;&nbsp;\t&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">75</span><span class="comment">//&nbsp;function&nbsp;returns,&nbsp;if&nbsp;possible,&nbsp;the&nbsp;name&nbsp;of&nbsp;the&nbsp;function&nbsp;containing&nbsp;the&nbsp;PC.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">function</span><span class="op">(</span><span class="ident">pc</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">)</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fn</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">runtime</span><span class="op">.</span><span class="ident">FuncForPC</span><span class="op">(</span><span class="ident">pc</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">fn</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">dunno</span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">name</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">(</span><span class="ident">fn</span><span class="op">.</span><span class="ident">Name</span><span class="op">(</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;The&nbsp;name&nbsp;includes&nbsp;the&nbsp;path&nbsp;name&nbsp;to&nbsp;the&nbsp;package,&nbsp;which&nbsp;is&nbsp;unnecessary</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;since&nbsp;the&nbsp;file&nbsp;name&nbsp;is&nbsp;already&nbsp;included.&nbsp;&nbsp;Plus,&nbsp;it&nbsp;has&nbsp;center&nbsp;dots.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;That&nbsp;is,&nbsp;we&nbsp;see</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;&nbsp;&nbsp;&nbspruntime/debug.*T·ptrmethod</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;and&nbsp;want</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp*T.ptrmethod</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Since&nbsp;the&nbsp;package&nbsp;path&nbsp;might&nbsp;contains&nbsp;dots&nbsp;(e.g.&nbsp;code.google.com/...),</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;we&nbsp;first&nbsp;remove&nbsp;the&nbsp;path&nbsp;prefix&nbsp;if&nbsp;there&nbsp;is&nbsp;one.</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">lastslash</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">bytes</span><span class="op">.</span><span class="ident">LastIndex</span><span class="op">(</span><span class="ident">name</span><span class="op">,</span>&nbsp;<span class="ident">slash</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">lastslash</span>&nbsp;<span class="op">&gt;=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">name</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">name</span><span class="op">[</span><span class="ident">lastslash</span><span class="op">+</span><span class="num">1</span><span class="op">:</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">period</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">bytes</span><span class="op">.</span><span class="ident">Index</span><span class="op">(</span><span class="ident">name</span><span class="op">,</span>&nbsp;<span class="ident">dot</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">period</span>&nbsp;<span class="op">&gt;=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">name</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">name</span><span class="op">[</span><span class="ident">period</span><span class="op">+</span><span class="num">1</span><span class="op">:</span><span class="op">]</span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">name</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">bytes</span><span class="op">.</span><span class="ident">Replace</span><span class="op">(</span><span class="ident">name</span><span class="op">,</span>&nbsp;<span class="ident">centerDot</span><span class="op">,</span>&nbsp;<span class="ident">dot</span><span class="op">,</span>&nbsp;<span class="op">-</span><span class="num">1</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">name</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

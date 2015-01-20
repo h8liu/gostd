@@ -1,0 +1,652 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2010&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">textproto</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;bufio&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;bytes&#34;</span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;io&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;io/ioutil&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;strconv&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;strings&#34;</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno">15</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;BUG(rsc):&nbsp;To&nbsp;let&nbsp;callers&nbsp;manage&nbsp;exposure&nbsp;to&nbsp;denial&nbsp;of&nbsp;service</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;attacks,&nbsp;Reader&nbsp;should&nbsp;allow&nbsp;them&nbsp;to&nbsp;set&nbsp;and&nbsp;reset&nbsp;a&nbsp;limit&nbsp;on</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;the&nbsp;number&nbsp;of&nbsp;bytes&nbsp;read&nbsp;from&nbsp;the&nbsp;connection.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">20</span><span class="comment">//&nbsp;A&nbsp;Reader&nbsp;implements&nbsp;convenience&nbsp;methods&nbsp;for&nbsp;reading&nbsp;requests</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;or&nbsp;responses&nbsp;from&nbsp;a&nbsp;text&nbsp;protocol&nbsp;network&nbsp;connection.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">Reader</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">R</span>&nbsp;&nbsp;&nbsp;<span class="op">*</span><span class="ident">bufio</span><span class="op">.</span><span class="ident">Reader</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dot</span>&nbsp;<span class="op">*</span><span class="ident">dotReader</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">buf</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span>&nbsp;<span class="comment">//&nbsp;a&nbsp;re-usable&nbsp;buffer&nbsp;for&nbsp;readContinuedLineSlice</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;NewReader&nbsp;returns&nbsp;a&nbsp;new&nbsp;Reader&nbsp;reading&nbsp;from&nbsp;r.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">NewReader</span><span class="op">(</span><span class="ident">r</span>&nbsp;<span class="op">*</span><span class="ident">bufio</span><span class="op">.</span><span class="ident">Reader</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">Reader</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="op">&amp;</span><span class="ident">Reader</span><span class="op">{</span><span class="ident">R</span><span class="op">:</span>&nbsp;<span class="ident">r</span><span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ReadLine&nbsp;reads&nbsp;a&nbsp;single&nbsp;line&nbsp;from&nbsp;r,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;eliding&nbsp;the&nbsp;final&nbsp;\n&nbsp;or&nbsp;\r\n&nbsp;from&nbsp;the&nbsp;returned&nbsp;string.</span><br>
+<span class="lineno">35</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">r</span>&nbsp;<span class="op">*</span><span class="ident">Reader</span><span class="op">)</span>&nbsp;<span class="ident">ReadLine</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">line</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">readLineSlice</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="builtintype">string</span><span class="op">(</span><span class="ident">line</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">40</span><span class="comment">//&nbsp;ReadLineBytes&nbsp;is&nbsp;like&nbsp;ReadLine&nbsp;but&nbsp;returns&nbsp;a&nbsp;[]byte&nbsp;instead&nbsp;of&nbsp;a&nbsp;string.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">r</span>&nbsp;<span class="op">*</span><span class="ident">Reader</span><span class="op">)</span>&nbsp;<span class="ident">ReadLineBytes</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">line</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">readLineSlice</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">line</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">buf</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">make</span><span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">line</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">copy</span><span class="op">(</span><span class="ident">buf</span><span class="op">,</span>&nbsp;<span class="ident">line</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">line</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">buf</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">line</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">50</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">r</span>&nbsp;<span class="op">*</span><span class="ident">Reader</span><span class="op">)</span>&nbsp;<span class="ident">readLineSlice</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span><span class="op">.</span><span class="ident">closeDot</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">line</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">l</span><span class="op">,</span>&nbsp;<span class="ident">more</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">R</span><span class="op">.</span><span class="ident">ReadLine</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Avoid&nbsp;the&nbsp;copy&nbsp;if&nbsp;the&nbsp;first&nbsp;call&nbsp;produced&nbsp;a&nbsp;full&nbsp;line.</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">line</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="op">!</span><span class="ident">more</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">l</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">line</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">append</span><span class="op">(</span><span class="ident">line</span><span class="op">,</span>&nbsp;<span class="ident">l</span><span class="op">...</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">more</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">break</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">line</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">70</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ReadContinuedLine&nbsp;reads&nbsp;a&nbsp;possibly&nbsp;continued&nbsp;line&nbsp;from&nbsp;r,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;eliding&nbsp;the&nbsp;final&nbsp;trailing&nbsp;ASCII&nbsp;white&nbsp;space.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Lines&nbsp;after&nbsp;the&nbsp;first&nbsp;are&nbsp;considered&nbsp;continuations&nbsp;if&nbsp;they</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;begin&nbsp;with&nbsp;a&nbsp;space&nbsp;or&nbsp;tab&nbsp;character.&nbsp;&nbsp;In&nbsp;the&nbsp;returned&nbsp;data,</span><br>
+<span class="lineno">75</span><span class="comment">//&nbsp;continuation&nbsp;lines&nbsp;are&nbsp;separated&nbsp;from&nbsp;the&nbsp;previous&nbsp;line</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;only&nbsp;by&nbsp;a&nbsp;single&nbsp;space:&nbsp;the&nbsp;newline&nbsp;and&nbsp;leading&nbsp;white&nbsp;space</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;are&nbsp;removed.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;For&nbsp;example,&nbsp;consider&nbsp;this&nbsp;input:</span><br>
+<span class="lineno">80</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspLine&nbsp;1</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;continued...</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspLine&nbsp;2</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">85</span><span class="comment">//&nbsp;The&nbsp;first&nbsp;call&nbsp;to&nbsp;ReadContinuedLine&nbsp;will&nbsp;return&nbsp;&#34;Line&nbsp;1&nbsp;continued...&#34;</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;and&nbsp;the&nbsp;second&nbsp;will&nbsp;return&nbsp;&#34;Line&nbsp;2&#34;.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;A&nbsp;line&nbsp;consisting&nbsp;of&nbsp;only&nbsp;white&nbsp;space&nbsp;is&nbsp;never&nbsp;continued.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">90</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">r</span>&nbsp;<span class="op">*</span><span class="ident">Reader</span><span class="op">)</span>&nbsp;<span class="ident">ReadContinuedLine</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">line</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">readContinuedLineSlice</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="builtintype">string</span><span class="op">(</span><span class="ident">line</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">95</span><span class="comment">//&nbsp;trim&nbsp;returns&nbsp;s&nbsp;with&nbsp;leading&nbsp;and&nbsp;trailing&nbsp;spaces&nbsp;and&nbsp;tabs&nbsp;removed.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;It&nbsp;does&nbsp;not&nbsp;assume&nbsp;Unicode&nbsp;or&nbsp;UTF-8.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">trim</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">i</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">s</span><span class="op">)</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="op">(</span><span class="ident">s</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;&nbsp;&#39;</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">s</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;\t&#39;</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">100</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">i</span><span class="op">++</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">s</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="op">(</span><span class="ident">s</span><span class="op">[</span><span class="ident">n</span><span class="op">-</span><span class="num">1</span><span class="op">]</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;&nbsp;&#39;</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">s</span><span class="op">[</span><span class="ident">n</span><span class="op">-</span><span class="num">1</span><span class="op">]</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;\t&#39;</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span><span class="op">--</span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">s</span><span class="op">[</span><span class="ident">i</span><span class="op">:</span><span class="ident">n</span><span class="op">]</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ReadContinuedLineBytes&nbsp;is&nbsp;like&nbsp;ReadContinuedLine&nbsp;but</span><br>
+<span class="lineno">110</span><span class="comment">//&nbsp;returns&nbsp;a&nbsp;[]byte&nbsp;instead&nbsp;of&nbsp;a&nbsp;string.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">r</span>&nbsp;<span class="op">*</span><span class="ident">Reader</span><span class="op">)</span>&nbsp;<span class="ident">ReadContinuedLineBytes</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">line</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">readContinuedLineSlice</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">line</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">buf</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">make</span><span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">line</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno">115</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">copy</span><span class="op">(</span><span class="ident">buf</span><span class="op">,</span>&nbsp;<span class="ident">line</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">line</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">buf</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">line</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">120</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">r</span>&nbsp;<span class="op">*</span><span class="ident">Reader</span><span class="op">)</span>&nbsp;<span class="ident">readContinuedLineSlice</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Read&nbsp;the&nbsp;first&nbsp;line.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">line</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">readLineSlice</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">125</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">line</span><span class="op">)</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span>&nbsp;<span class="comment">//&nbsp;blank&nbsp;line&nbsp;-&nbsp;no&nbsp;continuation</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">line</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">130</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Optimistically&nbsp;assume&nbsp;that&nbsp;we&nbsp;have&nbsp;started&nbsp;to&nbsp;buffer&nbsp;the&nbsp;next&nbsp;line</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;and&nbsp;it&nbsp;starts&nbsp;with&nbsp;an&nbsp;ASCII&nbsp;letter&nbsp;(the&nbsp;next&nbsp;header&nbsp;key),&nbsp;so&nbsp;we&nbsp;can</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;avoid&nbsp;copying&nbsp;that&nbsp;buffered&nbsp;data&nbsp;around&nbsp;in&nbsp;memory&nbsp;and&nbsp;skipping&nbsp;over</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;non-existent&nbsp;whitespace.</span><br>
+<span class="lineno">135</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">R</span><span class="op">.</span><span class="ident">Buffered</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">1</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">peek</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">R</span><span class="op">.</span><span class="ident">Peek</span><span class="op">(</span><span class="num">1</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">isASCIILetter</span><span class="op">(</span><span class="ident">peek</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">trim</span><span class="op">(</span><span class="ident">line</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">140</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;ReadByte&nbsp;or&nbsp;the&nbsp;next&nbsp;readLineSlice&nbsp;will&nbsp;flush&nbsp;the&nbsp;read&nbsp;buffer;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;copy&nbsp;the&nbsp;slice&nbsp;into&nbsp;buf.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span><span class="op">.</span><span class="ident">buf</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">append</span><span class="op">(</span><span class="ident">r</span><span class="op">.</span><span class="ident">buf</span><span class="op">[</span><span class="op">:</span><span class="num">0</span><span class="op">]</span><span class="op">,</span>&nbsp;<span class="ident">trim</span><span class="op">(</span><span class="ident">line</span><span class="op">)</span><span class="op">...</span><span class="op">)</span><br>
+<span class="lineno">145</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Read&nbsp;continuation&nbsp;lines.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">skipSpace</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">line</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">readLineSlice</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">150</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">break</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span><span class="op">.</span><span class="ident">buf</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">append</span><span class="op">(</span><span class="ident">r</span><span class="op">.</span><span class="ident">buf</span><span class="op">,</span>&nbsp;<span class="string">&#39;&nbsp;&#39;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span><span class="op">.</span><span class="ident">buf</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">append</span><span class="op">(</span><span class="ident">r</span><span class="op">.</span><span class="ident">buf</span><span class="op">,</span>&nbsp;<span class="ident">line</span><span class="op">...</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">155</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">buf</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;skipSpace&nbsp;skips&nbsp;R&nbsp;over&nbsp;all&nbsp;spaces&nbsp;and&nbsp;returns&nbsp;the&nbsp;number&nbsp;of&nbsp;bytes&nbsp;skipped.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">r</span>&nbsp;<span class="op">*</span><span class="ident">Reader</span><span class="op">)</span>&nbsp;<span class="ident">skipSpace</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">160</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">R</span><span class="op">.</span><span class="ident">ReadByte</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Bufio&nbsp;will&nbsp;keep&nbsp;err&nbsp;until&nbsp;next&nbsp;read.</span><br>
+<span class="lineno">165</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">break</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="string">&#39;&nbsp;&#39;</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="string">&#39;\t&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span><span class="op">.</span><span class="ident">R</span><span class="op">.</span><span class="ident">UnreadByte</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">break</span><br>
+<span class="lineno">170</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span><span class="op">++</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">n</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">175</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">r</span>&nbsp;<span class="op">*</span><span class="ident">Reader</span><span class="op">)</span>&nbsp;<span class="ident">readCodeLine</span><span class="op">(</span><span class="ident">expectCode</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">code</span>&nbsp;<span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">continued</span>&nbsp;<span class="builtintype">bool</span><span class="op">,</span>&nbsp;<span class="ident">message</span>&nbsp;<span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">line</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">ReadLine</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno">180</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">parseCodeLine</span><span class="op">(</span><span class="ident">line</span><span class="op">,</span>&nbsp;<span class="ident">expectCode</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">parseCodeLine</span><span class="op">(</span><span class="ident">line</span>&nbsp;<span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">expectCode</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">code</span>&nbsp;<span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">continued</span>&nbsp;<span class="builtintype">bool</span><span class="op">,</span>&nbsp;<span class="ident">message</span>&nbsp;<span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">185</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">line</span><span class="op">)</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">4</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">line</span><span class="op">[</span><span class="num">3</span><span class="op">]</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="string">&#39;&nbsp;&#39;</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">line</span><span class="op">[</span><span class="num">3</span><span class="op">]</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="string">&#39;-&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">ProtocolError</span><span class="op">(</span><span class="string">&#34;short&nbsp;response:&nbsp;&#34;</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">line</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">continued</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">line</span><span class="op">[</span><span class="num">3</span><span class="op">]</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;-&#39;</span><br>
+<span class="lineno">190</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">code</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">strconv</span><span class="op">.</span><span class="ident">Atoi</span><span class="op">(</span><span class="ident">line</span><span class="op">[</span><span class="num">0</span><span class="op">:</span><span class="num">3</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">code</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">100</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">ProtocolError</span><span class="op">(</span><span class="string">&#34;invalid&nbsp;response&nbsp;code:&nbsp;&#34;</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">line</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">195</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">message</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">line</span><span class="op">[</span><span class="num">4</span><span class="op">:</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="num">1</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">expectCode</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">expectCode</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">10</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">code</span><span class="op">/</span><span class="num">100</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">expectCode</span>&nbsp;<span class="op">||</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="num">10</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">expectCode</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">expectCode</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">100</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">code</span><span class="op">/</span><span class="num">10</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">expectCode</span>&nbsp;<span class="op">||</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="num">100</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">expectCode</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">expectCode</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">1000</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">code</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">expectCode</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">&amp;</span><span class="ident">Error</span><span class="op">{</span><span class="ident">code</span><span class="op">,</span>&nbsp;<span class="ident">message</span><span class="op">}</span><br>
+<span class="lineno">200</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ReadCodeLine&nbsp;reads&nbsp;a&nbsp;response&nbsp;code&nbsp;line&nbsp;of&nbsp;the&nbsp;form</span><br>
+<span class="lineno">205</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspcode&nbsp;message</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;where&nbsp;code&nbsp;is&nbsp;a&nbsp;three-digit&nbsp;status&nbsp;code&nbsp;and&nbsp;the&nbsp;message</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;extends&nbsp;to&nbsp;the&nbsp;rest&nbsp;of&nbsp;the&nbsp;line.&nbsp;&nbsp;An&nbsp;example&nbsp;of&nbsp;such&nbsp;a&nbsp;line&nbsp;is:</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp220&nbsp;plan9.bell-labs.com&nbsp;ESMTP</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">210</span><span class="comment">//&nbsp;If&nbsp;the&nbsp;prefix&nbsp;of&nbsp;the&nbsp;status&nbsp;does&nbsp;not&nbsp;match&nbsp;the&nbsp;digits&nbsp;in&nbsp;expectCode,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ReadCodeLine&nbsp;returns&nbsp;with&nbsp;err&nbsp;set&nbsp;to&nbsp;&amp;Error{code,&nbsp;message}.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;For&nbsp;example,&nbsp;if&nbsp;expectCode&nbsp;is&nbsp;31,&nbsp;an&nbsp;error&nbsp;will&nbsp;be&nbsp;returned&nbsp;if</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;the&nbsp;status&nbsp;is&nbsp;not&nbsp;in&nbsp;the&nbsp;range&nbsp;[310,319].</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">215</span><span class="comment">//&nbsp;If&nbsp;the&nbsp;response&nbsp;is&nbsp;multi-line,&nbsp;ReadCodeLine&nbsp;returns&nbsp;an&nbsp;error.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;An&nbsp;expectCode&nbsp;&lt;=&nbsp;0&nbsp;disables&nbsp;the&nbsp;check&nbsp;of&nbsp;the&nbsp;status&nbsp;code.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">r</span>&nbsp;<span class="op">*</span><span class="ident">Reader</span><span class="op">)</span>&nbsp;<span class="ident">ReadCodeLine</span><span class="op">(</span><span class="ident">expectCode</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">code</span>&nbsp;<span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">message</span>&nbsp;<span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">220</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">code</span><span class="op">,</span>&nbsp;<span class="ident">continued</span><span class="op">,</span>&nbsp;<span class="ident">message</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">readCodeLine</span><span class="op">(</span><span class="ident">expectCode</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">continued</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">ProtocolError</span><span class="op">(</span><span class="string">&#34;unexpected&nbsp;multi-line&nbsp;response:&nbsp;&#34;</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">message</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno">225</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ReadResponse&nbsp;reads&nbsp;a&nbsp;multi-line&nbsp;response&nbsp;of&nbsp;the&nbsp;form:</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspcode-message&nbsp;line&nbsp;1</span><br>
+<span class="lineno">230</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspcode-message&nbsp;line&nbsp;2</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp...</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspcode&nbsp;message&nbsp;line&nbsp;n</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;where&nbsp;code&nbsp;is&nbsp;a&nbsp;three-digit&nbsp;status&nbsp;code.&nbsp;The&nbsp;first&nbsp;line&nbsp;starts&nbsp;with&nbsp;the</span><br>
+<span class="lineno">235</span><span class="comment">//&nbsp;code&nbsp;and&nbsp;a&nbsp;hyphen.&nbsp;The&nbsp;response&nbsp;is&nbsp;terminated&nbsp;by&nbsp;a&nbsp;line&nbsp;that&nbsp;starts</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;with&nbsp;the&nbsp;same&nbsp;code&nbsp;followed&nbsp;by&nbsp;a&nbsp;space.&nbsp;Each&nbsp;line&nbsp;in&nbsp;message&nbsp;is</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;separated&nbsp;by&nbsp;a&nbsp;newline&nbsp;(\n).</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;See&nbsp;page&nbsp;36&nbsp;of&nbsp;RFC&nbsp;959&nbsp;(http://www.ietf.org/rfc/rfc959.txt)&nbsp;for</span><br>
+<span class="lineno">240</span><span class="comment">//&nbsp;details.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;If&nbsp;the&nbsp;prefix&nbsp;of&nbsp;the&nbsp;status&nbsp;does&nbsp;not&nbsp;match&nbsp;the&nbsp;digits&nbsp;in&nbsp;expectCode,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ReadResponse&nbsp;returns&nbsp;with&nbsp;err&nbsp;set&nbsp;to&nbsp;&amp;Error{code,&nbsp;message}.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;For&nbsp;example,&nbsp;if&nbsp;expectCode&nbsp;is&nbsp;31,&nbsp;an&nbsp;error&nbsp;will&nbsp;be&nbsp;returned&nbsp;if</span><br>
+<span class="lineno">245</span><span class="comment">//&nbsp;the&nbsp;status&nbsp;is&nbsp;not&nbsp;in&nbsp;the&nbsp;range&nbsp;[310,319].</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;An&nbsp;expectCode&nbsp;&lt;=&nbsp;0&nbsp;disables&nbsp;the&nbsp;check&nbsp;of&nbsp;the&nbsp;status&nbsp;code.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">r</span>&nbsp;<span class="op">*</span><span class="ident">Reader</span><span class="op">)</span>&nbsp;<span class="ident">ReadResponse</span><span class="op">(</span><span class="ident">expectCode</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">code</span>&nbsp;<span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">message</span>&nbsp;<span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">250</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">code</span><span class="op">,</span>&nbsp;<span class="ident">continued</span><span class="op">,</span>&nbsp;<span class="ident">message</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">readCodeLine</span><span class="op">(</span><span class="ident">expectCode</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">continued</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">line</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">ReadLine</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="string">&#34;&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno">255</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">code2</span>&nbsp;<span class="builtintype">int</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">moreMessage</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">code2</span><span class="op">,</span>&nbsp;<span class="ident">continued</span><span class="op">,</span>&nbsp;<span class="ident">moreMessage</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">parseCodeLine</span><span class="op">(</span><span class="ident">line</span><span class="op">,</span>&nbsp;<span class="ident">expectCode</span><span class="op">)</span><br>
+<span class="lineno">260</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">code2</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">code</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">message</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="string">&#34;\n&#34;</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">strings</span><span class="op">.</span><span class="ident">TrimRight</span><span class="op">(</span><span class="ident">line</span><span class="op">,</span>&nbsp;<span class="string">&#34;\r\n&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">continued</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">continue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">265</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">message</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="string">&#34;\n&#34;</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">moreMessage</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">270</span><span class="comment">//&nbsp;DotReader&nbsp;returns&nbsp;a&nbsp;new&nbsp;Reader&nbsp;that&nbsp;satisfies&nbsp;Reads&nbsp;using&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;decoded&nbsp;text&nbsp;of&nbsp;a&nbsp;dot-encoded&nbsp;block&nbsp;read&nbsp;from&nbsp;r.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;returned&nbsp;Reader&nbsp;is&nbsp;only&nbsp;valid&nbsp;until&nbsp;the&nbsp;next&nbsp;call</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;to&nbsp;a&nbsp;method&nbsp;on&nbsp;r.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">275</span><span class="comment">//&nbsp;Dot&nbsp;encoding&nbsp;is&nbsp;a&nbsp;common&nbsp;framing&nbsp;used&nbsp;for&nbsp;data&nbsp;blocks</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;in&nbsp;text&nbsp;protocols&nbsp;such&nbsp;as&nbsp;SMTP.&nbsp;&nbsp;The&nbsp;data&nbsp;consists&nbsp;of&nbsp;a&nbsp;sequence</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;of&nbsp;lines,&nbsp;each&nbsp;of&nbsp;which&nbsp;ends&nbsp;in&nbsp;&#34;\r\n&#34;.&nbsp;&nbsp;The&nbsp;sequence&nbsp;itself</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ends&nbsp;at&nbsp;a&nbsp;line&nbsp;containing&nbsp;just&nbsp;a&nbsp;dot:&nbsp;&#34;.\r\n&#34;.&nbsp;&nbsp;Lines&nbsp;beginning</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;with&nbsp;a&nbsp;dot&nbsp;are&nbsp;escaped&nbsp;with&nbsp;an&nbsp;additional&nbsp;dot&nbsp;to&nbsp;avoid</span><br>
+<span class="lineno">280</span><span class="comment">//&nbsp;looking&nbsp;like&nbsp;the&nbsp;end&nbsp;of&nbsp;the&nbsp;sequence.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;decoded&nbsp;form&nbsp;returned&nbsp;by&nbsp;the&nbsp;Reader&#39;s&nbsp;Read&nbsp;method</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;rewrites&nbsp;the&nbsp;&#34;\r\n&#34;&nbsp;line&nbsp;endings&nbsp;into&nbsp;the&nbsp;simpler&nbsp;&#34;\n&#34;,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;removes&nbsp;leading&nbsp;dot&nbsp;escapes&nbsp;if&nbsp;present,&nbsp;and&nbsp;stops&nbsp;with&nbsp;error&nbsp;io.EOF</span><br>
+<span class="lineno">285</span><span class="comment">//&nbsp;after&nbsp;consuming&nbsp;(and&nbsp;discarding)&nbsp;the&nbsp;end-of-sequence&nbsp;line.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">r</span>&nbsp;<span class="op">*</span><span class="ident">Reader</span><span class="op">)</span>&nbsp;<span class="ident">DotReader</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">Reader</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span><span class="op">.</span><span class="ident">closeDot</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span><span class="op">.</span><span class="ident">dot</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">&amp;</span><span class="ident">dotReader</span><span class="op">{</span><span class="ident">r</span><span class="op">:</span>&nbsp;<span class="ident">r</span><span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">dot</span><br>
+<span class="lineno">290</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">dotReader</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">*</span><span class="ident">Reader</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">state</span>&nbsp;<span class="builtintype">int</span><br>
+<span class="lineno">295</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Read&nbsp;satisfies&nbsp;reads&nbsp;by&nbsp;decoding&nbsp;dot-encoded&nbsp;data&nbsp;read&nbsp;from&nbsp;d.r.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">d</span>&nbsp;<span class="op">*</span><span class="ident">dotReader</span><span class="op">)</span>&nbsp;<span class="ident">Read</span><span class="op">(</span><span class="ident">b</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">n</span>&nbsp;<span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Run&nbsp;data&nbsp;through&nbsp;a&nbsp;simple&nbsp;state&nbsp;machine&nbsp;to</span><br>
+<span class="lineno">300</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;elide&nbsp;leading&nbsp;dots,&nbsp;rewrite&nbsp;trailing&nbsp;\r\n&nbsp;into&nbsp;\n,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;and&nbsp;detect&nbsp;ending&nbsp;.\r\n&nbsp;line.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateBeginLine</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">iota</span>&nbsp;<span class="comment">//&nbsp;beginning&nbsp;of&nbsp;line;&nbsp;initial&nbsp;state;&nbsp;must&nbsp;be&nbsp;zero</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateDot</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;read&nbsp;.&nbsp;at&nbsp;beginning&nbsp;of&nbsp;line</span><br>
+<span class="lineno">305</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateDotCR</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;read&nbsp;.\r&nbsp;at&nbsp;beginning&nbsp;of&nbsp;line</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateCR</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;read&nbsp;\r&nbsp;(possibly&nbsp;at&nbsp;end&nbsp;of&nbsp;line)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateData</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;reading&nbsp;data&nbsp;in&nbsp;middle&nbsp;of&nbsp;line</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateEOF</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;reached&nbsp;.\r\n&nbsp;end&nbsp;marker&nbsp;line</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">)</span><br>
+<span class="lineno">310</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">br</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">d</span><span class="op">.</span><span class="ident">r</span><span class="op">.</span><span class="ident">R</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">b</span><span class="op">)</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">d</span><span class="op">.</span><span class="ident">state</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">stateEOF</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="builtintype">byte</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">br</span><span class="op">.</span><span class="ident">ReadByte</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">315</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">EOF</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">ErrUnexpectedEOF</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">break</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">320</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="ident">d</span><span class="op">.</span><span class="ident">state</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">stateBeginLine</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;.&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span><span class="op">.</span><span class="ident">state</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateDot</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">continue</span><br>
+<span class="lineno">325</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;\r&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span><span class="op">.</span><span class="ident">state</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateCR</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">continue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">330</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span><span class="op">.</span><span class="ident">state</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateData</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">stateDot</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;\r&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span><span class="op">.</span><span class="ident">state</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateDotCR</span><br>
+<span class="lineno">335</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">continue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;\n&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span><span class="op">.</span><span class="ident">state</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateEOF</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">continue</span><br>
+<span class="lineno">340</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span><span class="op">.</span><span class="ident">state</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateData</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">stateDotCR</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;\n&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">345</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span><span class="op">.</span><span class="ident">state</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateEOF</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">continue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Not&nbsp;part&nbsp;of&nbsp;.\r\n.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Consume&nbsp;leading&nbsp;dot&nbsp;and&nbsp;emit&nbsp;saved&nbsp;\r.</span><br>
+<span class="lineno">350</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">br</span><span class="op">.</span><span class="ident">UnreadByte</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">&#39;\r&#39;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span><span class="op">.</span><span class="ident">state</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateData</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">stateCR</span><span class="op">:</span><br>
+<span class="lineno">355</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;\n&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span><span class="op">.</span><span class="ident">state</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateBeginLine</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">break</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Not&nbsp;part&nbsp;of&nbsp;\r\n.&nbsp;&nbsp;Emit&nbsp;saved&nbsp;\r</span><br>
+<span class="lineno">360</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">br</span><span class="op">.</span><span class="ident">UnreadByte</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">&#39;\r&#39;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span><span class="op">.</span><span class="ident">state</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateData</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">stateData</span><span class="op">:</span><br>
+<span class="lineno">365</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;\r&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span><span class="op">.</span><span class="ident">state</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateCR</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">continue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;\n&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">370</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span><span class="op">.</span><span class="ident">state</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateBeginLine</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span><span class="op">[</span><span class="ident">n</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">c</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span><span class="op">++</span><br>
+<span class="lineno">375</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">d</span><span class="op">.</span><span class="ident">state</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">stateEOF</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">EOF</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">d</span><span class="op">.</span><span class="ident">r</span><span class="op">.</span><span class="ident">dot</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">d</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">380</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span><span class="op">.</span><span class="ident">r</span><span class="op">.</span><span class="ident">dot</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">385</span><span class="comment">//&nbsp;closeDot&nbsp;drains&nbsp;the&nbsp;current&nbsp;DotReader&nbsp;if&nbsp;any,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;making&nbsp;sure&nbsp;that&nbsp;it&nbsp;reads&nbsp;until&nbsp;the&nbsp;ending&nbsp;dot&nbsp;line.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">r</span>&nbsp;<span class="op">*</span><span class="ident">Reader</span><span class="op">)</span>&nbsp;<span class="ident">closeDot</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">dot</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno">390</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">buf</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">make</span><span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="num">128</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">dot</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;When&nbsp;Read&nbsp;reaches&nbsp;EOF&nbsp;or&nbsp;an&nbsp;error,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;it&nbsp;will&nbsp;set&nbsp;r.dot&nbsp;==&nbsp;nil.</span><br>
+<span class="lineno">395</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span><span class="op">.</span><span class="ident">dot</span><span class="op">.</span><span class="ident">Read</span><span class="op">(</span><span class="ident">buf</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ReadDotBytes&nbsp;reads&nbsp;a&nbsp;dot-encoding&nbsp;and&nbsp;returns&nbsp;the&nbsp;decoded&nbsp;data.</span><br>
+<span class="lineno">400</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;See&nbsp;the&nbsp;documentation&nbsp;for&nbsp;the&nbsp;DotReader&nbsp;method&nbsp;for&nbsp;details&nbsp;about&nbsp;dot-encoding.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">r</span>&nbsp;<span class="op">*</span><span class="ident">Reader</span><span class="op">)</span>&nbsp;<span class="ident">ReadDotBytes</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">ioutil</span><span class="op">.</span><span class="ident">ReadAll</span><span class="op">(</span><span class="ident">r</span><span class="op">.</span><span class="ident">DotReader</span><span class="op">(</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">405</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ReadDotLines&nbsp;reads&nbsp;a&nbsp;dot-encoding&nbsp;and&nbsp;returns&nbsp;a&nbsp;slice</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;containing&nbsp;the&nbsp;decoded&nbsp;lines,&nbsp;with&nbsp;the&nbsp;final&nbsp;\r\n&nbsp;or&nbsp;\n&nbsp;elided&nbsp;from&nbsp;each.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;See&nbsp;the&nbsp;documentation&nbsp;for&nbsp;the&nbsp;DotReader&nbsp;method&nbsp;for&nbsp;details&nbsp;about&nbsp;dot-encoding.</span><br>
+<span class="lineno">410</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">r</span>&nbsp;<span class="op">*</span><span class="ident">Reader</span><span class="op">)</span>&nbsp;<span class="ident">ReadDotLines</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;We&nbsp;could&nbsp;use&nbsp;ReadDotBytes&nbsp;and&nbsp;then&nbsp;Split&nbsp;it,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;but&nbsp;reading&nbsp;a&nbsp;line&nbsp;at&nbsp;a&nbsp;time&nbsp;avoids&nbsp;needing&nbsp;a</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;large&nbsp;contiguous&nbsp;block&nbsp;of&nbsp;memory&nbsp;and&nbsp;is&nbsp;simpler.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">v</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">string</span><br>
+<span class="lineno">415</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">line</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">line</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">ReadLine</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">420</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">EOF</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">ErrUnexpectedEOF</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">break</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">425</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Dot&nbsp;by&nbsp;itself&nbsp;marks&nbsp;end;&nbsp;otherwise&nbsp;cut&nbsp;one&nbsp;dot.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">line</span><span class="op">)</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">line</span><span class="op">[</span><span class="num">0</span><span class="op">]</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;.&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">line</span><span class="op">)</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">1</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">break</span><br>
+<span class="lineno">430</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">line</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">line</span><span class="op">[</span><span class="num">1</span><span class="op">:</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">append</span><span class="op">(</span><span class="ident">v</span><span class="op">,</span>&nbsp;<span class="ident">line</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">435</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">v</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ReadMIMEHeader&nbsp;reads&nbsp;a&nbsp;MIME-style&nbsp;header&nbsp;from&nbsp;r.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;header&nbsp;is&nbsp;a&nbsp;sequence&nbsp;of&nbsp;possibly&nbsp;continued&nbsp;Key:&nbsp;Value&nbsp;lines</span><br>
+<span class="lineno">440</span><span class="comment">//&nbsp;ending&nbsp;in&nbsp;a&nbsp;blank&nbsp;line.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;returned&nbsp;map&nbsp;m&nbsp;maps&nbsp;CanonicalMIMEHeaderKey(key)&nbsp;to&nbsp;a</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;sequence&nbsp;of&nbsp;values&nbsp;in&nbsp;the&nbsp;same&nbsp;order&nbsp;encountered&nbsp;in&nbsp;the&nbsp;input.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;For&nbsp;example,&nbsp;consider&nbsp;this&nbsp;input:</span><br>
+<span class="lineno">445</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspMy-Key:&nbsp;Value&nbsp;1</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspLong-Key:&nbsp;Even</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Longer&nbsp;Value</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspMy-Key:&nbsp;Value&nbsp;2</span><br>
+<span class="lineno">450</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Given&nbsp;that&nbsp;input,&nbsp;ReadMIMEHeader&nbsp;returns&nbsp;the&nbsp;map:</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspmap[string][]string{</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&#34;My-Key&#34;:&nbsp;{&#34;Value&nbsp;1&#34;,&nbsp;&#34;Value&nbsp;2&#34;},</span><br>
+<span class="lineno">455</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&#34;Long-Key&#34;:&nbsp;{&#34;Even&nbsp;Longer&nbsp;Value&#34;},</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp}</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">r</span>&nbsp;<span class="op">*</span><span class="ident">Reader</span><span class="op">)</span>&nbsp;<span class="ident">ReadMIMEHeader</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">MIMEHeader</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Avoid&nbsp;lots&nbsp;of&nbsp;small&nbsp;slice&nbsp;allocations&nbsp;later&nbsp;by&nbsp;allocating&nbsp;one</span><br>
+<span class="lineno">460</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;large&nbsp;one&nbsp;ahead&nbsp;of&nbsp;time&nbsp;which&nbsp;we&#39;ll&nbsp;cut&nbsp;up&nbsp;into&nbsp;smaller</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;slices.&nbsp;If&nbsp;this&nbsp;isn&#39;t&nbsp;big&nbsp;enough&nbsp;later,&nbsp;we&nbsp;allocate&nbsp;small&nbsp;ones.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">strs</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">string</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">hint</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">upcomingHeaderNewlines</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">hint</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">465</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">strs</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">make</span><span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">hint</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">m</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">make</span><span class="op">(</span><span class="ident">MIMEHeader</span><span class="op">,</span>&nbsp;<span class="ident">hint</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">470</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">kv</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">readContinuedLineSlice</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">kv</span><span class="op">)</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">m</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">475</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Key&nbsp;ends&nbsp;at&nbsp;first&nbsp;colon;&nbsp;should&nbsp;not&nbsp;have&nbsp;spaces&nbsp;but</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;they&nbsp;appear&nbsp;in&nbsp;the&nbsp;wild,&nbsp;violating&nbsp;specs,&nbsp;so&nbsp;we</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;remove&nbsp;them&nbsp;if&nbsp;present.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">i</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">bytes</span><span class="op">.</span><span class="ident">IndexByte</span><span class="op">(</span><span class="ident">kv</span><span class="op">,</span>&nbsp;<span class="string">&#39;:&#39;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">480</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">m</span><span class="op">,</span>&nbsp;<span class="ident">ProtocolError</span><span class="op">(</span><span class="string">&#34;malformed&nbsp;MIME&nbsp;header&nbsp;line:&nbsp;&#34;</span>&nbsp;<span class="op">+</span>&nbsp;<span class="builtintype">string</span><span class="op">(</span><span class="ident">kv</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">endKey</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">i</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">endKey</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">kv</span><span class="op">[</span><span class="ident">endKey</span><span class="op">-</span><span class="num">1</span><span class="op">]</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;&nbsp;&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">endKey</span><span class="op">--</span><br>
+<span class="lineno">485</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">key</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">canonicalMIMEHeaderKey</span><span class="op">(</span><span class="ident">kv</span><span class="op">[</span><span class="op">:</span><span class="ident">endKey</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Skip&nbsp;initial&nbsp;spaces&nbsp;in&nbsp;value.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">i</span><span class="op">++</span>&nbsp;<span class="comment">//&nbsp;skip&nbsp;colon</span><br>
+<span class="lineno">490</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">kv</span><span class="op">)</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="op">(</span><span class="ident">kv</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;&nbsp;&#39;</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">kv</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;\t&#39;</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">i</span><span class="op">++</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">value</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtintype">string</span><span class="op">(</span><span class="ident">kv</span><span class="op">[</span><span class="ident">i</span><span class="op">:</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">495</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">vv</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">m</span><span class="op">[</span><span class="ident">key</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">vv</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">strs</span><span class="op">)</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;More&nbsp;than&nbsp;likely&nbsp;this&nbsp;will&nbsp;be&nbsp;a&nbsp;single-element&nbsp;key.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Most&nbsp;headers&nbsp;aren&#39;t&nbsp;multi-valued.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Set&nbsp;the&nbsp;capacity&nbsp;on&nbsp;strs[0]&nbsp;to&nbsp;1,&nbsp;so&nbsp;any&nbsp;future&nbsp;append</span><br>
+<span class="lineno">500</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;won&#39;t&nbsp;extend&nbsp;the&nbsp;slice&nbsp;into&nbsp;the&nbsp;other&nbsp;strings.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">vv</span><span class="op">,</span>&nbsp;<span class="ident">strs</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">strs</span><span class="op">[</span><span class="op">:</span><span class="num">1</span><span class="op">:</span><span class="num">1</span><span class="op">]</span><span class="op">,</span>&nbsp;<span class="ident">strs</span><span class="op">[</span><span class="num">1</span><span class="op">:</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">vv</span><span class="op">[</span><span class="num">0</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">value</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">m</span><span class="op">[</span><span class="ident">key</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">vv</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">505</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">m</span><span class="op">[</span><span class="ident">key</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">append</span><span class="op">(</span><span class="ident">vv</span><span class="op">,</span>&nbsp;<span class="ident">value</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">m</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno">510</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;upcomingHeaderNewlines&nbsp;returns&nbsp;an&nbsp;approximation&nbsp;of&nbsp;the&nbsp;number&nbsp;of&nbsp;newlines</span><br>
+<span class="lineno">515</span><span class="comment">//&nbsp;that&nbsp;will&nbsp;be&nbsp;in&nbsp;this&nbsp;header.&nbsp;If&nbsp;it&nbsp;gets&nbsp;confused,&nbsp;it&nbsp;returns&nbsp;0.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">r</span>&nbsp;<span class="op">*</span><span class="ident">Reader</span><span class="op">)</span>&nbsp;<span class="ident">upcomingHeaderNewlines</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">n</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Try&nbsp;to&nbsp;determine&nbsp;the&nbsp;&#39;hint&#39;&nbsp;size.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span><span class="op">.</span><span class="ident">R</span><span class="op">.</span><span class="ident">Peek</span><span class="op">(</span><span class="num">1</span><span class="op">)</span>&nbsp;<span class="comment">//&nbsp;force&nbsp;a&nbsp;buffer&nbsp;load&nbsp;if&nbsp;empty</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">R</span><span class="op">.</span><span class="ident">Buffered</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">520</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">s</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">peek</span><span class="op">,</span>&nbsp;<span class="ident">_</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">R</span><span class="op">.</span><span class="ident">Peek</span><span class="op">(</span><span class="ident">s</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">peek</span><span class="op">)</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">525</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">i</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">bytes</span><span class="op">.</span><span class="ident">IndexByte</span><span class="op">(</span><span class="ident">peek</span><span class="op">,</span>&nbsp;<span class="string">&#39;\n&#39;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">3</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Not&nbsp;present&nbsp;(-1)&nbsp;or&nbsp;found&nbsp;within&nbsp;the&nbsp;next&nbsp;few&nbsp;bytes,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;implying&nbsp;we&#39;re&nbsp;at&nbsp;the&nbsp;end&nbsp;(&#34;\r\n\r\n&#34;&nbsp;or&nbsp;&#34;\n\n&#34;)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno">530</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span><span class="op">++</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">peek</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">peek</span><span class="op">[</span><span class="ident">i</span><span class="op">+</span><span class="num">1</span><span class="op">:</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno">535</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;CanonicalMIMEHeaderKey&nbsp;returns&nbsp;the&nbsp;canonical&nbsp;format&nbsp;of&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;MIME&nbsp;header&nbsp;key&nbsp;s.&nbsp;&nbsp;The&nbsp;canonicalization&nbsp;converts&nbsp;the&nbsp;first</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;letter&nbsp;and&nbsp;any&nbsp;letter&nbsp;following&nbsp;a&nbsp;hyphen&nbsp;to&nbsp;upper&nbsp;case;</span><br>
+<span class="lineno">540</span><span class="comment">//&nbsp;the&nbsp;rest&nbsp;are&nbsp;converted&nbsp;to&nbsp;lowercase.&nbsp;&nbsp;For&nbsp;example,&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;canonical&nbsp;key&nbsp;for&nbsp;&#34;accept-encoding&#34;&nbsp;is&nbsp;&#34;Accept-Encoding&#34;.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;MIME&nbsp;header&nbsp;keys&nbsp;are&nbsp;assumed&nbsp;to&nbsp;be&nbsp;ASCII&nbsp;only.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">CanonicalMIMEHeaderKey</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Quick&nbsp;check&nbsp;for&nbsp;canonical&nbsp;encoding.</span><br>
+<span class="lineno">545</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">upper</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="num">0</span><span class="op">;</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">s</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">i</span><span class="op">++</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">s</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">upper</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="string">&#39;a&#39;</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="string">&#39;z&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">canonicalMIMEHeaderKey</span><span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">(</span><span class="ident">s</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno">550</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">upper</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="string">&#39;A&#39;</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="string">&#39;Z&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">canonicalMIMEHeaderKey</span><span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">(</span><span class="ident">s</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">upper</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;-&#39;</span><br>
+<span class="lineno">555</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">s</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">toLower</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">&#39;a&#39;</span>&nbsp;<span class="op">-</span>&nbsp;<span class="string">&#39;A&#39;</span><br>
+<span class="lineno">560</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;canonicalMIMEHeaderKey&nbsp;is&nbsp;like&nbsp;CanonicalMIMEHeaderKey&nbsp;but&nbsp;is</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;allowed&nbsp;to&nbsp;mutate&nbsp;the&nbsp;provided&nbsp;byte&nbsp;slice&nbsp;before&nbsp;returning&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;string.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">canonicalMIMEHeaderKey</span><span class="op">(</span><span class="ident">a</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">565</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">upper</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span><span class="op">,</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">a</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Canonicalize:&nbsp;first&nbsp;letter&nbsp;upper&nbsp;case</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;and&nbsp;upper&nbsp;case&nbsp;after&nbsp;each&nbsp;dash.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;(Host,&nbsp;User-Agent,&nbsp;If-Modified-Since).</span><br>
+<span class="lineno">570</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;MIME&nbsp;headers&nbsp;are&nbsp;ASCII&nbsp;only,&nbsp;so&nbsp;no&nbsp;Unicode&nbsp;issues.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;&nbsp;&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">&#39;-&#39;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="keyword">if</span>&nbsp;<span class="ident">upper</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="string">&#39;a&#39;</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="string">&#39;z&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span>&nbsp;<span class="op">-=</span>&nbsp;<span class="ident">toLower</span><br>
+<span class="lineno">575</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">upper</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="string">&#39;A&#39;</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="string">&#39;Z&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="ident">toLower</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">a</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">c</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">upper</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;-&#39;</span>&nbsp;<span class="comment">//&nbsp;for&nbsp;next&nbsp;time</span><br>
+<span class="lineno">580</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;The&nbsp;compiler&nbsp;recognizes&nbsp;m[string(byteSlice)]&nbsp;as&nbsp;a&nbsp;special</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;case,&nbsp;so&nbsp;a&nbsp;copy&nbsp;of&nbsp;a&#39;s&nbsp;bytes&nbsp;into&nbsp;a&nbsp;new&nbsp;string&nbsp;does&nbsp;not</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;happen&nbsp;in&nbsp;this&nbsp;map&nbsp;lookup:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">v</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">commonHeader</span><span class="op">[</span><span class="builtintype">string</span><span class="op">(</span><span class="ident">a</span><span class="op">)</span><span class="op">]</span><span class="op">;</span>&nbsp;<span class="ident">v</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="string">&#34;&#34;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">585</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">v</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="builtintype">string</span><span class="op">(</span><span class="ident">a</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">590</span><span class="comment">//&nbsp;commonHeader&nbsp;interns&nbsp;common&nbsp;header&nbsp;strings.</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">commonHeader</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">make</span><span class="op">(</span><span class="keyword">map</span><span class="op">[</span><span class="builtintype">string</span><span class="op">]</span><span class="builtintype">string</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">init</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">v</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">string</span><span class="op">{</span><br>
+<span class="lineno">595</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;Accept&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;Accept-Charset&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;Accept-Encoding&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;Accept-Language&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;Accept-Ranges&#34;</span><span class="op">,</span><br>
+<span class="lineno">600</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;Cache-Control&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;Cc&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;Connection&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;Content-Id&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;Content-Language&#34;</span><span class="op">,</span><br>
+<span class="lineno">605</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;Content-Length&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;Content-Transfer-Encoding&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;Content-Type&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;Cookie&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;Date&#34;</span><span class="op">,</span><br>
+<span class="lineno">610</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;Dkim-Signature&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;Etag&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;Expires&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;From&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;Host&#34;</span><span class="op">,</span><br>
+<span class="lineno">615</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;If-Modified-Since&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;If-None-Match&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;In-Reply-To&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;Last-Modified&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;Location&#34;</span><span class="op">,</span><br>
+<span class="lineno">620</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;Message-Id&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;Mime-Version&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;Pragma&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;Received&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;Return-Path&#34;</span><span class="op">,</span><br>
+<span class="lineno">625</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;Server&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;Set-Cookie&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;Subject&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;To&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;User-Agent&#34;</span><span class="op">,</span><br>
+<span class="lineno">630</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;Via&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;X-Forwarded-For&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;X-Imforwards&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;X-Powered-By&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">635</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">commonHeader</span><span class="op">[</span><span class="ident">v</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">v</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

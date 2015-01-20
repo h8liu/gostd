@@ -1,0 +1,500 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2010&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">token</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;fmt&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;sort&#34;</span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;sync&#34;</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;-----------------------------------------------------------------------------</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Positions</span><br>
+<span class="lineno">15</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Position&nbsp;describes&nbsp;an&nbsp;arbitrary&nbsp;source&nbsp;position</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;including&nbsp;the&nbsp;file,&nbsp;line,&nbsp;and&nbsp;column&nbsp;location.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;A&nbsp;Position&nbsp;is&nbsp;valid&nbsp;if&nbsp;the&nbsp;line&nbsp;number&nbsp;is&nbsp;&gt;&nbsp;0.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">20</span><span class="keyword">type</span>&nbsp;<span class="ident">Position</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Filename</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="comment">//&nbsp;filename,&nbsp;if&nbsp;any</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Offset</span>&nbsp;&nbsp;&nbsp;<span class="builtintype">int</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;offset,&nbsp;starting&nbsp;at&nbsp;0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Line</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">int</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;line&nbsp;number,&nbsp;starting&nbsp;at&nbsp;1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Column</span>&nbsp;&nbsp;&nbsp;<span class="builtintype">int</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;column&nbsp;number,&nbsp;starting&nbsp;at&nbsp;1&nbsp;(character&nbsp;count)</span><br>
+<span class="lineno">25</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;IsValid&nbsp;returns&nbsp;true&nbsp;if&nbsp;the&nbsp;position&nbsp;is&nbsp;valid.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">pos</span>&nbsp;<span class="op">*</span><span class="ident">Position</span><span class="op">)</span>&nbsp;<span class="ident">IsValid</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="ident">pos</span><span class="op">.</span><span class="ident">Line</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">30</span><span class="comment">//&nbsp;String&nbsp;returns&nbsp;a&nbsp;string&nbsp;in&nbsp;one&nbsp;of&nbsp;several&nbsp;forms:</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspfile:line:column&nbsp;&nbsp;&nbsp;&nbsp;valid&nbsp;position&nbsp;with&nbsp;file&nbsp;name</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspline:column&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;valid&nbsp;position&nbsp;without&nbsp;file&nbsp;name</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspfile&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;invalid&nbsp;position&nbsp;with&nbsp;file&nbsp;name</span><br>
+<span class="lineno">35</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp-&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;invalid&nbsp;position&nbsp;without&nbsp;file&nbsp;name</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">pos</span>&nbsp;<span class="ident">Position</span><span class="op">)</span>&nbsp;<span class="ident">String</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">pos</span><span class="op">.</span><span class="ident">Filename</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">pos</span><span class="op">.</span><span class="ident">IsValid</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">s</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="string">&#34;&#34;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="string">&#34;:&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="ident">fmt</span><span class="op">.</span><span class="ident">Sprintf</span><span class="op">(</span><span class="string">&#34;%d:%d&#34;</span><span class="op">,</span>&nbsp;<span class="ident">pos</span><span class="op">.</span><span class="ident">Line</span><span class="op">,</span>&nbsp;<span class="ident">pos</span><span class="op">.</span><span class="ident">Column</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">s</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#34;&#34;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">&#34;-&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">s</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">50</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Pos&nbsp;is&nbsp;a&nbsp;compact&nbsp;encoding&nbsp;of&nbsp;a&nbsp;source&nbsp;position&nbsp;within&nbsp;a&nbsp;file&nbsp;set.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;It&nbsp;can&nbsp;be&nbsp;converted&nbsp;into&nbsp;a&nbsp;Position&nbsp;for&nbsp;a&nbsp;more&nbsp;convenient,&nbsp;but&nbsp;much</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;larger,&nbsp;representation.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">55</span><span class="comment">//&nbsp;The&nbsp;Pos&nbsp;value&nbsp;for&nbsp;a&nbsp;given&nbsp;file&nbsp;is&nbsp;a&nbsp;number&nbsp;in&nbsp;the&nbsp;range&nbsp;[base,&nbsp;base+size],</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;where&nbsp;base&nbsp;and&nbsp;size&nbsp;are&nbsp;specified&nbsp;when&nbsp;adding&nbsp;the&nbsp;file&nbsp;to&nbsp;the&nbsp;file&nbsp;set&nbsp;via</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;AddFile.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;To&nbsp;create&nbsp;the&nbsp;Pos&nbsp;value&nbsp;for&nbsp;a&nbsp;specific&nbsp;source&nbsp;offset,&nbsp;first&nbsp;add</span><br>
+<span class="lineno">60</span><span class="comment">//&nbsp;the&nbsp;respective&nbsp;file&nbsp;to&nbsp;the&nbsp;current&nbsp;file&nbsp;set&nbsp;(via&nbsp;FileSet.AddFile)</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;and&nbsp;then&nbsp;call&nbsp;File.Pos(offset)&nbsp;for&nbsp;that&nbsp;file.&nbsp;Given&nbsp;a&nbsp;Pos&nbsp;value&nbsp;p</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;for&nbsp;a&nbsp;specific&nbsp;file&nbsp;set&nbsp;fset,&nbsp;the&nbsp;corresponding&nbsp;Position&nbsp;value&nbsp;is</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;obtained&nbsp;by&nbsp;calling&nbsp;fset.Position(p).</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">65</span><span class="comment">//&nbsp;Pos&nbsp;values&nbsp;can&nbsp;be&nbsp;compared&nbsp;directly&nbsp;with&nbsp;the&nbsp;usual&nbsp;comparison&nbsp;operators:</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;If&nbsp;two&nbsp;Pos&nbsp;values&nbsp;p&nbsp;and&nbsp;q&nbsp;are&nbsp;in&nbsp;the&nbsp;same&nbsp;file,&nbsp;comparing&nbsp;p&nbsp;and&nbsp;q&nbsp;is</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;equivalent&nbsp;to&nbsp;comparing&nbsp;the&nbsp;respective&nbsp;source&nbsp;file&nbsp;offsets.&nbsp;If&nbsp;p&nbsp;and&nbsp;q</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;are&nbsp;in&nbsp;different&nbsp;files,&nbsp;p&nbsp;&lt;&nbsp;q&nbsp;is&nbsp;true&nbsp;if&nbsp;the&nbsp;file&nbsp;implied&nbsp;by&nbsp;p&nbsp;was&nbsp;added</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;to&nbsp;the&nbsp;respective&nbsp;file&nbsp;set&nbsp;before&nbsp;the&nbsp;file&nbsp;implied&nbsp;by&nbsp;q.</span><br>
+<span class="lineno">70</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">Pos</span>&nbsp;<span class="builtintype">int</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;zero&nbsp;value&nbsp;for&nbsp;Pos&nbsp;is&nbsp;NoPos;&nbsp;there&nbsp;is&nbsp;no&nbsp;file&nbsp;and&nbsp;line&nbsp;information</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;associated&nbsp;with&nbsp;it,&nbsp;and&nbsp;NoPos().IsValid()&nbsp;is&nbsp;false.&nbsp;NoPos&nbsp;is&nbsp;always</span><br>
+<span class="lineno">75</span><span class="comment">//&nbsp;smaller&nbsp;than&nbsp;any&nbsp;other&nbsp;Pos&nbsp;value.&nbsp;The&nbsp;corresponding&nbsp;Position&nbsp;value</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;for&nbsp;NoPos&nbsp;is&nbsp;the&nbsp;zero&nbsp;value&nbsp;for&nbsp;Position.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">NoPos</span>&nbsp;<span class="ident">Pos</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">80</span><span class="comment">//&nbsp;IsValid&nbsp;returns&nbsp;true&nbsp;if&nbsp;the&nbsp;position&nbsp;is&nbsp;valid.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">p</span>&nbsp;<span class="ident">Pos</span><span class="op">)</span>&nbsp;<span class="ident">IsValid</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">p</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">NoPos</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">85</span><span class="comment">//&nbsp;-----------------------------------------------------------------------------</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;File</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;A&nbsp;File&nbsp;is&nbsp;a&nbsp;handle&nbsp;for&nbsp;a&nbsp;file&nbsp;belonging&nbsp;to&nbsp;a&nbsp;FileSet.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;A&nbsp;File&nbsp;has&nbsp;a&nbsp;name,&nbsp;size,&nbsp;and&nbsp;line&nbsp;offset&nbsp;table.</span><br>
+<span class="lineno">90</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">File</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">set</span>&nbsp;&nbsp;<span class="op">*</span><span class="ident">FileSet</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">name</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="comment">//&nbsp;file&nbsp;name&nbsp;as&nbsp;provided&nbsp;to&nbsp;AddFile</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">base</span>&nbsp;<span class="builtintype">int</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;Pos&nbsp;value&nbsp;range&nbsp;for&nbsp;this&nbsp;file&nbsp;is&nbsp;[base...base+size]</span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">size</span>&nbsp;<span class="builtintype">int</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;file&nbsp;size&nbsp;as&nbsp;provided&nbsp;to&nbsp;AddFile</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;lines&nbsp;and&nbsp;infos&nbsp;are&nbsp;protected&nbsp;by&nbsp;set.mutex</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">lines</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">int</span>&nbsp;<span class="comment">//&nbsp;lines&nbsp;contains&nbsp;the&nbsp;offset&nbsp;of&nbsp;the&nbsp;first&nbsp;character&nbsp;for&nbsp;each&nbsp;line&nbsp;(the&nbsp;first&nbsp;entry&nbsp;is&nbsp;always&nbsp;0)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">infos</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="ident">lineInfo</span><br>
+<span class="lineno">100</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Name&nbsp;returns&nbsp;the&nbsp;file&nbsp;name&nbsp;of&nbsp;file&nbsp;f&nbsp;as&nbsp;registered&nbsp;with&nbsp;AddFile.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">f</span>&nbsp;<span class="op">*</span><span class="ident">File</span><span class="op">)</span>&nbsp;<span class="ident">Name</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">f</span><span class="op">.</span><span class="ident">name</span><br>
+<span class="lineno">105</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Base&nbsp;returns&nbsp;the&nbsp;base&nbsp;offset&nbsp;of&nbsp;file&nbsp;f&nbsp;as&nbsp;registered&nbsp;with&nbsp;AddFile.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">f</span>&nbsp;<span class="op">*</span><span class="ident">File</span><span class="op">)</span>&nbsp;<span class="ident">Base</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">f</span><span class="op">.</span><span class="ident">base</span><br>
+<span class="lineno">110</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Size&nbsp;returns&nbsp;the&nbsp;size&nbsp;of&nbsp;file&nbsp;f&nbsp;as&nbsp;registered&nbsp;with&nbsp;AddFile.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">f</span>&nbsp;<span class="op">*</span><span class="ident">File</span><span class="op">)</span>&nbsp;<span class="ident">Size</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">f</span><span class="op">.</span><span class="ident">size</span><br>
+<span class="lineno">115</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;LineCount&nbsp;returns&nbsp;the&nbsp;number&nbsp;of&nbsp;lines&nbsp;in&nbsp;file&nbsp;f.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">f</span>&nbsp;<span class="op">*</span><span class="ident">File</span><span class="op">)</span>&nbsp;<span class="ident">LineCount</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">f</span><span class="op">.</span><span class="ident">set</span><span class="op">.</span><span class="ident">mutex</span><span class="op">.</span><span class="ident">RLock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">120</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">f</span><span class="op">.</span><span class="ident">lines</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">f</span><span class="op">.</span><span class="ident">set</span><span class="op">.</span><span class="ident">mutex</span><span class="op">.</span><span class="ident">RUnlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">n</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">125</span><span class="comment">//&nbsp;AddLine&nbsp;adds&nbsp;the&nbsp;line&nbsp;offset&nbsp;for&nbsp;a&nbsp;new&nbsp;line.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;line&nbsp;offset&nbsp;must&nbsp;be&nbsp;larger&nbsp;than&nbsp;the&nbsp;offset&nbsp;for&nbsp;the&nbsp;previous&nbsp;line</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;and&nbsp;smaller&nbsp;than&nbsp;the&nbsp;file&nbsp;size;&nbsp;otherwise&nbsp;the&nbsp;line&nbsp;offset&nbsp;is&nbsp;ignored.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">f</span>&nbsp;<span class="op">*</span><span class="ident">File</span><span class="op">)</span>&nbsp;<span class="ident">AddLine</span><span class="op">(</span><span class="ident">offset</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">130</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">f</span><span class="op">.</span><span class="ident">set</span><span class="op">.</span><span class="ident">mutex</span><span class="op">.</span><span class="ident">Lock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">f</span><span class="op">.</span><span class="ident">lines</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="op">(</span><span class="ident">i</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">f</span><span class="op">.</span><span class="ident">lines</span><span class="op">[</span><span class="ident">i</span><span class="op">-</span><span class="num">1</span><span class="op">]</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">offset</span><span class="op">)</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">offset</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">f</span><span class="op">.</span><span class="ident">size</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">f</span><span class="op">.</span><span class="ident">lines</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">append</span><span class="op">(</span><span class="ident">f</span><span class="op">.</span><span class="ident">lines</span><span class="op">,</span>&nbsp;<span class="ident">offset</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">f</span><span class="op">.</span><span class="ident">set</span><span class="op">.</span><span class="ident">mutex</span><span class="op">.</span><span class="ident">Unlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">135</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;MergeLine&nbsp;merges&nbsp;a&nbsp;line&nbsp;with&nbsp;the&nbsp;following&nbsp;line.&nbsp;It&nbsp;is&nbsp;akin&nbsp;to&nbsp;replacing</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;the&nbsp;newline&nbsp;character&nbsp;at&nbsp;the&nbsp;end&nbsp;of&nbsp;the&nbsp;line&nbsp;with&nbsp;a&nbsp;space&nbsp;(to&nbsp;not&nbsp;change&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;remaining&nbsp;offsets).&nbsp;To&nbsp;obtain&nbsp;the&nbsp;line&nbsp;number,&nbsp;consult&nbsp;e.g.&nbsp;Position.Line.</span><br>
+<span class="lineno">140</span><span class="comment">//&nbsp;MergeLine&nbsp;will&nbsp;panic&nbsp;if&nbsp;given&nbsp;an&nbsp;invalid&nbsp;line&nbsp;number.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">f</span>&nbsp;<span class="op">*</span><span class="ident">File</span><span class="op">)</span>&nbsp;<span class="ident">MergeLine</span><span class="op">(</span><span class="ident">line</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">line</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">panic</span><span class="op">(</span><span class="string">&#34;illegal&nbsp;line&nbsp;number&nbsp;(line&nbsp;numbering&nbsp;starts&nbsp;at&nbsp;1)&#34;</span><span class="op">)</span><br>
+<span class="lineno">145</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">f</span><span class="op">.</span><span class="ident">set</span><span class="op">.</span><span class="ident">mutex</span><span class="op">.</span><span class="ident">Lock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">defer</span>&nbsp;<span class="ident">f</span><span class="op">.</span><span class="ident">set</span><span class="op">.</span><span class="ident">mutex</span><span class="op">.</span><span class="ident">Unlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">line</span>&nbsp;<span class="op">&gt;=</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">f</span><span class="op">.</span><span class="ident">lines</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">panic</span><span class="op">(</span><span class="string">&#34;illegal&nbsp;line&nbsp;number&#34;</span><span class="op">)</span><br>
+<span class="lineno">150</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;To&nbsp;merge&nbsp;the&nbsp;line&nbsp;numbered&nbsp;&lt;line&gt;&nbsp;with&nbsp;the&nbsp;line&nbsp;numbered&nbsp;&lt;line+1&gt;,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;we&nbsp;need&nbsp;to&nbsp;remove&nbsp;the&nbsp;entry&nbsp;in&nbsp;lines&nbsp;corresponding&nbsp;to&nbsp;the&nbsp;line</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;numbered&nbsp;&lt;line+1&gt;.&nbsp;The&nbsp;entry&nbsp;in&nbsp;lines&nbsp;corresponding&nbsp;to&nbsp;the&nbsp;line</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;numbered&nbsp;&lt;line+1&gt;&nbsp;is&nbsp;located&nbsp;at&nbsp;index&nbsp;&lt;line&gt;,&nbsp;since&nbsp;indices&nbsp;in&nbsp;lines</span><br>
+<span class="lineno">155</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;are&nbsp;0-based&nbsp;and&nbsp;line&nbsp;numbers&nbsp;are&nbsp;1-based.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">copy</span><span class="op">(</span><span class="ident">f</span><span class="op">.</span><span class="ident">lines</span><span class="op">[</span><span class="ident">line</span><span class="op">:</span><span class="op">]</span><span class="op">,</span>&nbsp;<span class="ident">f</span><span class="op">.</span><span class="ident">lines</span><span class="op">[</span><span class="ident">line</span><span class="op">+</span><span class="num">1</span><span class="op">:</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">f</span><span class="op">.</span><span class="ident">lines</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">f</span><span class="op">.</span><span class="ident">lines</span><span class="op">[</span><span class="op">:</span><span class="builtinfunc">len</span><span class="op">(</span><span class="ident">f</span><span class="op">.</span><span class="ident">lines</span><span class="op">)</span><span class="op">-</span><span class="num">1</span><span class="op">]</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">160</span><span class="comment">//&nbsp;SetLines&nbsp;sets&nbsp;the&nbsp;line&nbsp;offsets&nbsp;for&nbsp;a&nbsp;file&nbsp;and&nbsp;returns&nbsp;true&nbsp;if&nbsp;successful.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;line&nbsp;offsets&nbsp;are&nbsp;the&nbsp;offsets&nbsp;of&nbsp;the&nbsp;first&nbsp;character&nbsp;of&nbsp;each&nbsp;line;</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;for&nbsp;instance&nbsp;for&nbsp;the&nbsp;content&nbsp;&#34;ab\nc\n&#34;&nbsp;the&nbsp;line&nbsp;offsets&nbsp;are&nbsp;{0,&nbsp;3}.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;An&nbsp;empty&nbsp;file&nbsp;has&nbsp;an&nbsp;empty&nbsp;line&nbsp;offset&nbsp;table.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Each&nbsp;line&nbsp;offset&nbsp;must&nbsp;be&nbsp;larger&nbsp;than&nbsp;the&nbsp;offset&nbsp;for&nbsp;the&nbsp;previous&nbsp;line</span><br>
+<span class="lineno">165</span><span class="comment">//&nbsp;and&nbsp;smaller&nbsp;than&nbsp;the&nbsp;file&nbsp;size;&nbsp;otherwise&nbsp;SetLines&nbsp;fails&nbsp;and&nbsp;returns</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;false.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">f</span>&nbsp;<span class="op">*</span><span class="ident">File</span><span class="op">)</span>&nbsp;<span class="ident">SetLines</span><span class="op">(</span><span class="ident">lines</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;verify&nbsp;validity&nbsp;of&nbsp;lines&nbsp;table</span><br>
+<span class="lineno">170</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">size</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">f</span><span class="op">.</span><span class="ident">size</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span><span class="op">,</span>&nbsp;<span class="ident">offset</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">lines</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">offset</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">lines</span><span class="op">[</span><span class="ident">i</span><span class="op">-</span><span class="num">1</span><span class="op">]</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">size</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">offset</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">175</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;set&nbsp;lines&nbsp;table</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">f</span><span class="op">.</span><span class="ident">set</span><span class="op">.</span><span class="ident">mutex</span><span class="op">.</span><span class="ident">Lock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">f</span><span class="op">.</span><span class="ident">lines</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">lines</span><br>
+<span class="lineno">180</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">f</span><span class="op">.</span><span class="ident">set</span><span class="op">.</span><span class="ident">mutex</span><span class="op">.</span><span class="ident">Unlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;SetLinesForContent&nbsp;sets&nbsp;the&nbsp;line&nbsp;offsets&nbsp;for&nbsp;the&nbsp;given&nbsp;file&nbsp;content.</span><br>
+<span class="lineno">185</span><span class="comment">//&nbsp;It&nbsp;ignores&nbsp;position-altering&nbsp;//line&nbsp;comments.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">f</span>&nbsp;<span class="op">*</span><span class="ident">File</span><span class="op">)</span>&nbsp;<span class="ident">SetLinesForContent</span><span class="op">(</span><span class="ident">content</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">lines</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">int</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">line</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">offset</span><span class="op">,</span>&nbsp;<span class="ident">b</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">content</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">190</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">line</span>&nbsp;<span class="op">&gt;=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">lines</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">append</span><span class="op">(</span><span class="ident">lines</span><span class="op">,</span>&nbsp;<span class="ident">line</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">line</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">-</span><span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">b</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;\n&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">195</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">line</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">offset</span>&nbsp;<span class="op">+</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;set&nbsp;lines&nbsp;table</span><br>
+<span class="lineno">200</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">f</span><span class="op">.</span><span class="ident">set</span><span class="op">.</span><span class="ident">mutex</span><span class="op">.</span><span class="ident">Lock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">f</span><span class="op">.</span><span class="ident">lines</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">lines</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">f</span><span class="op">.</span><span class="ident">set</span><span class="op">.</span><span class="ident">mutex</span><span class="op">.</span><span class="ident">Unlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">205</span><span class="comment">//&nbsp;A&nbsp;lineInfo&nbsp;object&nbsp;describes&nbsp;alternative&nbsp;file&nbsp;and&nbsp;line&nbsp;number</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;information&nbsp;(such&nbsp;as&nbsp;provided&nbsp;via&nbsp;a&nbsp;//line&nbsp;comment&nbsp;in&nbsp;a&nbsp;.go</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;file)&nbsp;for&nbsp;a&nbsp;given&nbsp;file&nbsp;offset.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">lineInfo</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;fields&nbsp;are&nbsp;exported&nbsp;to&nbsp;make&nbsp;them&nbsp;accessible&nbsp;to&nbsp;gob</span><br>
+<span class="lineno">210</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Offset</span>&nbsp;&nbsp;&nbsp;<span class="builtintype">int</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Filename</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Line</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">int</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">215</span><span class="comment">//&nbsp;AddLineInfo&nbsp;adds&nbsp;alternative&nbsp;file&nbsp;and&nbsp;line&nbsp;number&nbsp;information&nbsp;for</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;a&nbsp;given&nbsp;file&nbsp;offset.&nbsp;The&nbsp;offset&nbsp;must&nbsp;be&nbsp;larger&nbsp;than&nbsp;the&nbsp;offset&nbsp;for</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;the&nbsp;previously&nbsp;added&nbsp;alternative&nbsp;line&nbsp;info&nbsp;and&nbsp;smaller&nbsp;than&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;file&nbsp;size;&nbsp;otherwise&nbsp;the&nbsp;information&nbsp;is&nbsp;ignored.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">220</span><span class="comment">//&nbsp;AddLineInfo&nbsp;is&nbsp;typically&nbsp;used&nbsp;to&nbsp;register&nbsp;alternative&nbsp;position</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;information&nbsp;for&nbsp;//line&nbsp;filename:line&nbsp;comments&nbsp;in&nbsp;source&nbsp;files.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">f</span>&nbsp;<span class="op">*</span><span class="ident">File</span><span class="op">)</span>&nbsp;<span class="ident">AddLineInfo</span><span class="op">(</span><span class="ident">offset</span>&nbsp;<span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">filename</span>&nbsp;<span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">line</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">f</span><span class="op">.</span><span class="ident">set</span><span class="op">.</span><span class="ident">mutex</span><span class="op">.</span><span class="ident">Lock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">225</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">f</span><span class="op">.</span><span class="ident">infos</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">f</span><span class="op">.</span><span class="ident">infos</span><span class="op">[</span><span class="ident">i</span><span class="op">-</span><span class="num">1</span><span class="op">]</span><span class="op">.</span><span class="ident">Offset</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">offset</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">offset</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">f</span><span class="op">.</span><span class="ident">size</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">f</span><span class="op">.</span><span class="ident">infos</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">append</span><span class="op">(</span><span class="ident">f</span><span class="op">.</span><span class="ident">infos</span><span class="op">,</span>&nbsp;<span class="ident">lineInfo</span><span class="op">{</span><span class="ident">offset</span><span class="op">,</span>&nbsp;<span class="ident">filename</span><span class="op">,</span>&nbsp;<span class="ident">line</span><span class="op">}</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">f</span><span class="op">.</span><span class="ident">set</span><span class="op">.</span><span class="ident">mutex</span><span class="op">.</span><span class="ident">Unlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">230</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Pos&nbsp;returns&nbsp;the&nbsp;Pos&nbsp;value&nbsp;for&nbsp;the&nbsp;given&nbsp;file&nbsp;offset;</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;the&nbsp;offset&nbsp;must&nbsp;be&nbsp;&lt;=&nbsp;f.Size().</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;f.Pos(f.Offset(p))&nbsp;==&nbsp;p.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">235</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">f</span>&nbsp;<span class="op">*</span><span class="ident">File</span><span class="op">)</span>&nbsp;<span class="ident">Pos</span><span class="op">(</span><span class="ident">offset</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="ident">Pos</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">offset</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="ident">f</span><span class="op">.</span><span class="ident">size</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">panic</span><span class="op">(</span><span class="string">&#34;illegal&nbsp;file&nbsp;offset&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">Pos</span><span class="op">(</span><span class="ident">f</span><span class="op">.</span><span class="ident">base</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">offset</span><span class="op">)</span><br>
+<span class="lineno">240</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Offset&nbsp;returns&nbsp;the&nbsp;offset&nbsp;for&nbsp;the&nbsp;given&nbsp;file&nbsp;position&nbsp;p;</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;p&nbsp;must&nbsp;be&nbsp;a&nbsp;valid&nbsp;Pos&nbsp;value&nbsp;in&nbsp;that&nbsp;file.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;f.Offset(f.Pos(offset))&nbsp;==&nbsp;offset.</span><br>
+<span class="lineno">245</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">f</span>&nbsp;<span class="op">*</span><span class="ident">File</span><span class="op">)</span>&nbsp;<span class="ident">Offset</span><span class="op">(</span><span class="ident">p</span>&nbsp;<span class="ident">Pos</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtintype">int</span><span class="op">(</span><span class="ident">p</span><span class="op">)</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">f</span><span class="op">.</span><span class="ident">base</span>&nbsp;<span class="op">||</span>&nbsp;<span class="builtintype">int</span><span class="op">(</span><span class="ident">p</span><span class="op">)</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="ident">f</span><span class="op">.</span><span class="ident">base</span><span class="op">+</span><span class="ident">f</span><span class="op">.</span><span class="ident">size</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">panic</span><span class="op">(</span><span class="string">&#34;illegal&nbsp;Pos&nbsp;value&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">250</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="builtintype">int</span><span class="op">(</span><span class="ident">p</span><span class="op">)</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">f</span><span class="op">.</span><span class="ident">base</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Line&nbsp;returns&nbsp;the&nbsp;line&nbsp;number&nbsp;for&nbsp;the&nbsp;given&nbsp;file&nbsp;position&nbsp;p;</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;p&nbsp;must&nbsp;be&nbsp;a&nbsp;Pos&nbsp;value&nbsp;in&nbsp;that&nbsp;file&nbsp;or&nbsp;NoPos.</span><br>
+<span class="lineno">255</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">f</span>&nbsp;<span class="op">*</span><span class="ident">File</span><span class="op">)</span>&nbsp;<span class="ident">Line</span><span class="op">(</span><span class="ident">p</span>&nbsp;<span class="ident">Pos</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">f</span><span class="op">.</span><span class="ident">Position</span><span class="op">(</span><span class="ident">p</span><span class="op">)</span><span class="op">.</span><span class="ident">Line</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">260</span><span class="keyword">func</span>&nbsp;<span class="ident">searchLineInfos</span><span class="op">(</span><span class="ident">a</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="ident">lineInfo</span><span class="op">,</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">sort</span><span class="op">.</span><span class="ident">Search</span><span class="op">(</span><span class="builtinfunc">len</span><span class="op">(</span><span class="ident">a</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="ident">i</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="ident">a</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><span class="op">.</span><span class="ident">Offset</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">}</span><span class="op">)</span>&nbsp;<span class="op">-</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;unpack&nbsp;returns&nbsp;the&nbsp;filename&nbsp;and&nbsp;line&nbsp;and&nbsp;column&nbsp;number&nbsp;for&nbsp;a&nbsp;file&nbsp;offset.</span><br>
+<span class="lineno">265</span><span class="comment">//&nbsp;If&nbsp;adjusted&nbsp;is&nbsp;set,&nbsp;unpack&nbsp;will&nbsp;return&nbsp;the&nbsp;filename&nbsp;and&nbsp;line&nbsp;information</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;possibly&nbsp;adjusted&nbsp;by&nbsp;//line&nbsp;comments;&nbsp;otherwise&nbsp;those&nbsp;comments&nbsp;are&nbsp;ignored.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">f</span>&nbsp;<span class="op">*</span><span class="ident">File</span><span class="op">)</span>&nbsp;<span class="ident">unpack</span><span class="op">(</span><span class="ident">offset</span>&nbsp;<span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">adjusted</span>&nbsp;<span class="builtintype">bool</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">filename</span>&nbsp;<span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">line</span><span class="op">,</span>&nbsp;<span class="ident">column</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">filename</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">f</span><span class="op">.</span><span class="ident">name</span><br>
+<span class="lineno">270</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">searchInts</span><span class="op">(</span><span class="ident">f</span><span class="op">.</span><span class="ident">lines</span><span class="op">,</span>&nbsp;<span class="ident">offset</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">&gt;=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">line</span><span class="op">,</span>&nbsp;<span class="ident">column</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">i</span><span class="op">+</span><span class="num">1</span><span class="op">,</span>&nbsp;<span class="ident">offset</span><span class="op">-</span><span class="ident">f</span><span class="op">.</span><span class="ident">lines</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><span class="op">+</span><span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">adjusted</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">f</span><span class="op">.</span><span class="ident">infos</span><span class="op">)</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;almost&nbsp;no&nbsp;files&nbsp;have&nbsp;extra&nbsp;line&nbsp;infos</span><br>
+<span class="lineno">275</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">searchLineInfos</span><span class="op">(</span><span class="ident">f</span><span class="op">.</span><span class="ident">infos</span><span class="op">,</span>&nbsp;<span class="ident">offset</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">&gt;=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alt</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">&amp;</span><span class="ident">f</span><span class="op">.</span><span class="ident">infos</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">filename</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">alt</span><span class="op">.</span><span class="ident">Filename</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">searchInts</span><span class="op">(</span><span class="ident">f</span><span class="op">.</span><span class="ident">lines</span><span class="op">,</span>&nbsp;<span class="ident">alt</span><span class="op">.</span><span class="ident">Offset</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">&gt;=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">line</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="ident">alt</span><span class="op">.</span><span class="ident">Line</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">-</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno">280</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">285</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">f</span>&nbsp;<span class="op">*</span><span class="ident">File</span><span class="op">)</span>&nbsp;<span class="ident">position</span><span class="op">(</span><span class="ident">p</span>&nbsp;<span class="ident">Pos</span><span class="op">,</span>&nbsp;<span class="ident">adjusted</span>&nbsp;<span class="builtintype">bool</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">pos</span>&nbsp;<span class="ident">Position</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">offset</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtintype">int</span><span class="op">(</span><span class="ident">p</span><span class="op">)</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">f</span><span class="op">.</span><span class="ident">base</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pos</span><span class="op">.</span><span class="ident">Offset</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">offset</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pos</span><span class="op">.</span><span class="ident">Filename</span><span class="op">,</span>&nbsp;<span class="ident">pos</span><span class="op">.</span><span class="ident">Line</span><span class="op">,</span>&nbsp;<span class="ident">pos</span><span class="op">.</span><span class="ident">Column</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">f</span><span class="op">.</span><span class="ident">unpack</span><span class="op">(</span><span class="ident">offset</span><span class="op">,</span>&nbsp;<span class="ident">adjusted</span><span class="op">)</span><br>
+<span class="lineno">290</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;PositionFor&nbsp;returns&nbsp;the&nbsp;Position&nbsp;value&nbsp;for&nbsp;the&nbsp;given&nbsp;file&nbsp;position&nbsp;p.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;If&nbsp;adjusted&nbsp;is&nbsp;set,&nbsp;the&nbsp;position&nbsp;may&nbsp;be&nbsp;adjusted&nbsp;by&nbsp;position-altering</span><br>
+<span class="lineno">295</span><span class="comment">//&nbsp;//line&nbsp;comments;&nbsp;otherwise&nbsp;those&nbsp;comments&nbsp;are&nbsp;ignored.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;p&nbsp;must&nbsp;be&nbsp;a&nbsp;Pos&nbsp;value&nbsp;in&nbsp;f&nbsp;or&nbsp;NoPos.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">f</span>&nbsp;<span class="op">*</span><span class="ident">File</span><span class="op">)</span>&nbsp;<span class="ident">PositionFor</span><span class="op">(</span><span class="ident">p</span>&nbsp;<span class="ident">Pos</span><span class="op">,</span>&nbsp;<span class="ident">adjusted</span>&nbsp;<span class="builtintype">bool</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">pos</span>&nbsp;<span class="ident">Position</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">p</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">NoPos</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">300</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtintype">int</span><span class="op">(</span><span class="ident">p</span><span class="op">)</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">f</span><span class="op">.</span><span class="ident">base</span>&nbsp;<span class="op">||</span>&nbsp;<span class="builtintype">int</span><span class="op">(</span><span class="ident">p</span><span class="op">)</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="ident">f</span><span class="op">.</span><span class="ident">base</span><span class="op">+</span><span class="ident">f</span><span class="op">.</span><span class="ident">size</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">panic</span><span class="op">(</span><span class="string">&#34;illegal&nbsp;Pos&nbsp;value&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pos</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">f</span><span class="op">.</span><span class="ident">position</span><span class="op">(</span><span class="ident">p</span><span class="op">,</span>&nbsp;<span class="ident">adjusted</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">305</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Position&nbsp;returns&nbsp;the&nbsp;Position&nbsp;value&nbsp;for&nbsp;the&nbsp;given&nbsp;file&nbsp;position&nbsp;p.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Calling&nbsp;f.Position(p)&nbsp;is&nbsp;equivalent&nbsp;to&nbsp;calling&nbsp;f.PositionFor(p,&nbsp;true).</span><br>
+<span class="lineno">310</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">f</span>&nbsp;<span class="op">*</span><span class="ident">File</span><span class="op">)</span>&nbsp;<span class="ident">Position</span><span class="op">(</span><span class="ident">p</span>&nbsp;<span class="ident">Pos</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">pos</span>&nbsp;<span class="ident">Position</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">f</span><span class="op">.</span><span class="ident">PositionFor</span><span class="op">(</span><span class="ident">p</span><span class="op">,</span>&nbsp;<span class="ident">true</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">315</span><span class="comment">//&nbsp;-----------------------------------------------------------------------------</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;FileSet</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;A&nbsp;FileSet&nbsp;represents&nbsp;a&nbsp;set&nbsp;of&nbsp;source&nbsp;files.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Methods&nbsp;of&nbsp;file&nbsp;sets&nbsp;are&nbsp;synchronized;&nbsp;multiple&nbsp;goroutines</span><br>
+<span class="lineno">320</span><span class="comment">//&nbsp;may&nbsp;invoke&nbsp;them&nbsp;concurrently.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">FileSet</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mutex</span>&nbsp;<span class="ident">sync</span><span class="op">.</span><span class="ident">RWMutex</span>&nbsp;<span class="comment">//&nbsp;protects&nbsp;the&nbsp;file&nbsp;set</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">base</span>&nbsp;&nbsp;<span class="builtintype">int</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;base&nbsp;offset&nbsp;for&nbsp;the&nbsp;next&nbsp;file</span><br>
+<span class="lineno">325</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">files</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="op">*</span><span class="ident">File</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;list&nbsp;of&nbsp;files&nbsp;in&nbsp;the&nbsp;order&nbsp;added&nbsp;to&nbsp;the&nbsp;set</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">last</span>&nbsp;&nbsp;<span class="op">*</span><span class="ident">File</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;cache&nbsp;of&nbsp;last&nbsp;file&nbsp;looked&nbsp;up</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;NewFileSet&nbsp;creates&nbsp;a&nbsp;new&nbsp;file&nbsp;set.</span><br>
+<span class="lineno">330</span><span class="keyword">func</span>&nbsp;<span class="ident">NewFileSet</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">FileSet</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="op">&amp;</span><span class="ident">FileSet</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">base</span><span class="op">:</span>&nbsp;<span class="num">1</span><span class="op">,</span>&nbsp;<span class="comment">//&nbsp;0&nbsp;==&nbsp;NoPos</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">335</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Base&nbsp;returns&nbsp;the&nbsp;minimum&nbsp;base&nbsp;offset&nbsp;that&nbsp;must&nbsp;be&nbsp;provided&nbsp;to</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;AddFile&nbsp;when&nbsp;adding&nbsp;the&nbsp;next&nbsp;file.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">FileSet</span><span class="op">)</span>&nbsp;<span class="ident">Base</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">340</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">mutex</span><span class="op">.</span><span class="ident">RLock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">base</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">mutex</span><span class="op">.</span><span class="ident">RUnlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">b</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">345</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;AddFile&nbsp;adds&nbsp;a&nbsp;new&nbsp;file&nbsp;with&nbsp;a&nbsp;given&nbsp;filename,&nbsp;base&nbsp;offset,&nbsp;and&nbsp;file&nbsp;size</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;to&nbsp;the&nbsp;file&nbsp;set&nbsp;s&nbsp;and&nbsp;returns&nbsp;the&nbsp;file.&nbsp;Multiple&nbsp;files&nbsp;may&nbsp;have&nbsp;the&nbsp;same</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;name.&nbsp;The&nbsp;base&nbsp;offset&nbsp;must&nbsp;not&nbsp;be&nbsp;smaller&nbsp;than&nbsp;the&nbsp;FileSet&#39;s&nbsp;Base(),&nbsp;and</span><br>
+<span class="lineno">350</span><span class="comment">//&nbsp;size&nbsp;must&nbsp;not&nbsp;be&nbsp;negative.&nbsp;As&nbsp;a&nbsp;special&nbsp;case,&nbsp;if&nbsp;a&nbsp;negative&nbsp;base&nbsp;is&nbsp;provided,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;the&nbsp;current&nbsp;value&nbsp;of&nbsp;the&nbsp;FileSet&#39;s&nbsp;Base()&nbsp;is&nbsp;used&nbsp;instead.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Adding&nbsp;the&nbsp;file&nbsp;will&nbsp;set&nbsp;the&nbsp;file&nbsp;set&#39;s&nbsp;Base()&nbsp;value&nbsp;to&nbsp;base&nbsp;+&nbsp;size&nbsp;+&nbsp;1</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;as&nbsp;the&nbsp;minimum&nbsp;base&nbsp;value&nbsp;for&nbsp;the&nbsp;next&nbsp;file.&nbsp;The&nbsp;following&nbsp;relationship</span><br>
+<span class="lineno">355</span><span class="comment">//&nbsp;exists&nbsp;between&nbsp;a&nbsp;Pos&nbsp;value&nbsp;p&nbsp;for&nbsp;a&nbsp;given&nbsp;file&nbsp;offset&nbsp;offs:</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspint(p)&nbsp;=&nbsp;base&nbsp;+&nbsp;offs</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;with&nbsp;offs&nbsp;in&nbsp;the&nbsp;range&nbsp;[0,&nbsp;size]&nbsp;and&nbsp;thus&nbsp;p&nbsp;in&nbsp;the&nbsp;range&nbsp;[base,&nbsp;base+size].</span><br>
+<span class="lineno">360</span><span class="comment">//&nbsp;For&nbsp;convenience,&nbsp;File.Pos&nbsp;may&nbsp;be&nbsp;used&nbsp;to&nbsp;create&nbsp;file-specific&nbsp;position</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;values&nbsp;from&nbsp;a&nbsp;file&nbsp;offset.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">FileSet</span><span class="op">)</span>&nbsp;<span class="ident">AddFile</span><span class="op">(</span><span class="ident">filename</span>&nbsp;<span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">base</span><span class="op">,</span>&nbsp;<span class="ident">size</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">File</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">mutex</span><span class="op">.</span><span class="ident">Lock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">365</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">defer</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">mutex</span><span class="op">.</span><span class="ident">Unlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">base</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">base</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">base</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">base</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">base</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">size</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">370</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">panic</span><span class="op">(</span><span class="string">&#34;illegal&nbsp;base&nbsp;or&nbsp;size&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;base&nbsp;&gt;=&nbsp;s.base&nbsp;&amp;&amp;&nbsp;size&nbsp;&gt;=&nbsp;0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">f</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">&amp;</span><span class="ident">File</span><span class="op">{</span><span class="ident">s</span><span class="op">,</span>&nbsp;<span class="ident">filename</span><span class="op">,</span>&nbsp;<span class="ident">base</span><span class="op">,</span>&nbsp;<span class="ident">size</span><span class="op">,</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">int</span><span class="op">{</span><span class="num">0</span><span class="op">}</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">base</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="ident">size</span>&nbsp;<span class="op">+</span>&nbsp;<span class="num">1</span>&nbsp;<span class="comment">//&nbsp;+1&nbsp;because&nbsp;EOF&nbsp;also&nbsp;has&nbsp;a&nbsp;position</span><br>
+<span class="lineno">375</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">base</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">panic</span><span class="op">(</span><span class="string">&#34;token.Pos&nbsp;offset&nbsp;overflow&nbsp;(&gt;&nbsp;2G&nbsp;of&nbsp;source&nbsp;code&nbsp;in&nbsp;file&nbsp;set)&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;add&nbsp;the&nbsp;file&nbsp;to&nbsp;the&nbsp;file&nbsp;set</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">base</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">base</span><br>
+<span class="lineno">380</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">files</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">append</span><span class="op">(</span><span class="ident">s</span><span class="op">.</span><span class="ident">files</span><span class="op">,</span>&nbsp;<span class="ident">f</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">last</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">f</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">f</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">385</span><span class="comment">//&nbsp;Iterate&nbsp;calls&nbsp;f&nbsp;for&nbsp;the&nbsp;files&nbsp;in&nbsp;the&nbsp;file&nbsp;set&nbsp;in&nbsp;the&nbsp;order&nbsp;they&nbsp;were&nbsp;added</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;until&nbsp;f&nbsp;returns&nbsp;false.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">FileSet</span><span class="op">)</span>&nbsp;<span class="ident">Iterate</span><span class="op">(</span><span class="ident">f</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="op">*</span><span class="ident">File</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="num">0</span><span class="op">;</span>&nbsp;<span class="op">;</span>&nbsp;<span class="ident">i</span><span class="op">++</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">390</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">file</span>&nbsp;<span class="op">*</span><span class="ident">File</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">mutex</span><span class="op">.</span><span class="ident">RLock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">s</span><span class="op">.</span><span class="ident">files</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">file</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">files</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">395</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">mutex</span><span class="op">.</span><span class="ident">RUnlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">file</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">||</span>&nbsp;<span class="op">!</span><span class="ident">f</span><span class="op">(</span><span class="ident">file</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">break</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">400</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">searchFiles</span><span class="op">(</span><span class="ident">a</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="op">*</span><span class="ident">File</span><span class="op">,</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">sort</span><span class="op">.</span><span class="ident">Search</span><span class="op">(</span><span class="builtinfunc">len</span><span class="op">(</span><span class="ident">a</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="ident">i</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="ident">a</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><span class="op">.</span><span class="ident">base</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">}</span><span class="op">)</span>&nbsp;<span class="op">-</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">405</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">FileSet</span><span class="op">)</span>&nbsp;<span class="ident">file</span><span class="op">(</span><span class="ident">p</span>&nbsp;<span class="ident">Pos</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">File</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">mutex</span><span class="op">.</span><span class="ident">RLock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;common&nbsp;case:&nbsp;p&nbsp;is&nbsp;in&nbsp;last&nbsp;file</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">f</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">last</span><span class="op">;</span>&nbsp;<span class="ident">f</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">f</span><span class="op">.</span><span class="ident">base</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="builtintype">int</span><span class="op">(</span><span class="ident">p</span><span class="op">)</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="builtintype">int</span><span class="op">(</span><span class="ident">p</span><span class="op">)</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">f</span><span class="op">.</span><span class="ident">base</span><span class="op">+</span><span class="ident">f</span><span class="op">.</span><span class="ident">size</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">410</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">mutex</span><span class="op">.</span><span class="ident">RUnlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">f</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;p&nbsp;is&nbsp;not&nbsp;in&nbsp;last&nbsp;file&nbsp;-&nbsp;search&nbsp;all&nbsp;files</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">searchFiles</span><span class="op">(</span><span class="ident">s</span><span class="op">.</span><span class="ident">files</span><span class="op">,</span>&nbsp;<span class="builtintype">int</span><span class="op">(</span><span class="ident">p</span><span class="op">)</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">&gt;=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">415</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">f</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">files</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;f.base&nbsp;&lt;=&nbsp;int(p)&nbsp;by&nbsp;definition&nbsp;of&nbsp;searchFiles</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtintype">int</span><span class="op">(</span><span class="ident">p</span><span class="op">)</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">f</span><span class="op">.</span><span class="ident">base</span><span class="op">+</span><span class="ident">f</span><span class="op">.</span><span class="ident">size</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">mutex</span><span class="op">.</span><span class="ident">RUnlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">mutex</span><span class="op">.</span><span class="ident">Lock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">420</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">last</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">f</span>&nbsp;<span class="comment">//&nbsp;race&nbsp;is&nbsp;ok&nbsp;-&nbsp;s.last&nbsp;is&nbsp;only&nbsp;a&nbsp;cache</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">mutex</span><span class="op">.</span><span class="ident">Unlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">f</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">425</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">mutex</span><span class="op">.</span><span class="ident">RUnlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;File&nbsp;returns&nbsp;the&nbsp;file&nbsp;that&nbsp;contains&nbsp;the&nbsp;position&nbsp;p.</span><br>
+<span class="lineno">430</span><span class="comment">//&nbsp;If&nbsp;no&nbsp;such&nbsp;file&nbsp;is&nbsp;found&nbsp;(for&nbsp;instance&nbsp;for&nbsp;p&nbsp;==&nbsp;NoPos),</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;the&nbsp;result&nbsp;is&nbsp;nil.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">FileSet</span><span class="op">)</span>&nbsp;<span class="ident">File</span><span class="op">(</span><span class="ident">p</span>&nbsp;<span class="ident">Pos</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">f</span>&nbsp;<span class="op">*</span><span class="ident">File</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">p</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">NoPos</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">435</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">f</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">file</span><span class="op">(</span><span class="ident">p</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">440</span><span class="comment">//&nbsp;PositionFor&nbsp;converts&nbsp;a&nbsp;Pos&nbsp;p&nbsp;in&nbsp;the&nbsp;fileset&nbsp;into&nbsp;a&nbsp;Position&nbsp;value.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;If&nbsp;adjusted&nbsp;is&nbsp;set,&nbsp;the&nbsp;position&nbsp;may&nbsp;be&nbsp;adjusted&nbsp;by&nbsp;position-altering</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;//line&nbsp;comments;&nbsp;otherwise&nbsp;those&nbsp;comments&nbsp;are&nbsp;ignored.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;p&nbsp;must&nbsp;be&nbsp;a&nbsp;Pos&nbsp;value&nbsp;in&nbsp;s&nbsp;or&nbsp;NoPos.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">445</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">FileSet</span><span class="op">)</span>&nbsp;<span class="ident">PositionFor</span><span class="op">(</span><span class="ident">p</span>&nbsp;<span class="ident">Pos</span><span class="op">,</span>&nbsp;<span class="ident">adjusted</span>&nbsp;<span class="builtintype">bool</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">pos</span>&nbsp;<span class="ident">Position</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">p</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">NoPos</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">f</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">file</span><span class="op">(</span><span class="ident">p</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">f</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pos</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">f</span><span class="op">.</span><span class="ident">position</span><span class="op">(</span><span class="ident">p</span><span class="op">,</span>&nbsp;<span class="ident">adjusted</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">450</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Position&nbsp;converts&nbsp;a&nbsp;Pos&nbsp;p&nbsp;in&nbsp;the&nbsp;fileset&nbsp;into&nbsp;a&nbsp;Position&nbsp;value.</span><br>
+<span class="lineno">455</span><span class="comment">//&nbsp;Calling&nbsp;s.Position(p)&nbsp;is&nbsp;equivalent&nbsp;to&nbsp;calling&nbsp;s.PositionFor(p,&nbsp;true).</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">FileSet</span><span class="op">)</span>&nbsp;<span class="ident">Position</span><span class="op">(</span><span class="ident">p</span>&nbsp;<span class="ident">Pos</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">pos</span>&nbsp;<span class="ident">Position</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">PositionFor</span><span class="op">(</span><span class="ident">p</span><span class="op">,</span>&nbsp;<span class="ident">true</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">460</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;-----------------------------------------------------------------------------</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Helper&nbsp;functions</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">searchInts</span><span class="op">(</span><span class="ident">a</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">465</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;This&nbsp;function&nbsp;body&nbsp;is&nbsp;a&nbsp;manually&nbsp;inlined&nbsp;version&nbsp;of:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;&nbsp;&nbsp;return&nbsp;sort.Search(len(a),&nbsp;func(i&nbsp;int)&nbsp;bool&nbsp;{&nbsp;return&nbsp;a[i]&nbsp;&gt;&nbsp;x&nbsp;})&nbsp;-&nbsp;1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;With&nbsp;better&nbsp;compiler&nbsp;optimizations,&nbsp;this&nbsp;may&nbsp;not&nbsp;be&nbsp;needed&nbsp;in&nbsp;the</span><br>
+<span class="lineno">470</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;future,&nbsp;but&nbsp;at&nbsp;the&nbsp;moment&nbsp;this&nbsp;change&nbsp;improves&nbsp;the&nbsp;go/printer</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;benchmark&nbsp;performance&nbsp;by&nbsp;~30%.&nbsp;This&nbsp;has&nbsp;a&nbsp;direct&nbsp;impact&nbsp;on&nbsp;the</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;speed&nbsp;of&nbsp;gofmt&nbsp;and&nbsp;thus&nbsp;seems&nbsp;worthwhile&nbsp;(2011-04-29).</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;TODO(gri):&nbsp;Remove&nbsp;this&nbsp;when&nbsp;compilers&nbsp;have&nbsp;caught&nbsp;up.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">i</span><span class="op">,</span>&nbsp;<span class="ident">j</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">a</span><span class="op">)</span><br>
+<span class="lineno">475</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">j</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">h</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">+</span>&nbsp;<span class="op">(</span><span class="ident">j</span><span class="op">-</span><span class="ident">i</span><span class="op">)</span><span class="op">/</span><span class="num">2</span>&nbsp;<span class="comment">//&nbsp;avoid&nbsp;overflow&nbsp;when&nbsp;computing&nbsp;h</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;i&nbsp;≤&nbsp;h&nbsp;&lt;&nbsp;j</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">a</span><span class="op">[</span><span class="ident">h</span><span class="op">]</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">i</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">h</span>&nbsp;<span class="op">+</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno">480</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">j</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">h</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">-</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno">485</span><span class="op">}</span>
+</div>
+</body>
+</html>

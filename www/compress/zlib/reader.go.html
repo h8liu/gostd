@@ -1,0 +1,176 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2009&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="comment">/*<br>
+<span class="lineno"></span>Package&nbsp;zlib&nbsp;implements&nbsp;reading&nbsp;and&nbsp;writing&nbsp;of&nbsp;zlib&nbsp;format&nbsp;compressed&nbsp;data,<br>
+<span class="lineno"></span>as&nbsp;specified&nbsp;in&nbsp;RFC&nbsp;1950.<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>The&nbsp;implementation&nbsp;provides&nbsp;filters&nbsp;that&nbsp;uncompress&nbsp;during&nbsp;reading<br>
+<span class="lineno">10</span>and&nbsp;compress&nbsp;during&nbsp;writing.&nbsp;&nbsp;For&nbsp;example,&nbsp;to&nbsp;write&nbsp;compressed&nbsp;data<br>
+<span class="lineno"></span>to&nbsp;a&nbsp;buffer:<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspvar&nbsp;b&nbsp;bytes.Buffer<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspw&nbsp;:=&nbsp;zlib.NewWriter(&amp;b)<br>
+<span class="lineno">15</span>&nbsp;&nbsp;&nbsp;&nbspw.Write([]byte(&#34;hello,&nbsp;world\n&#34;))<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspw.Close()<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>and&nbsp;to&nbsp;read&nbsp;that&nbsp;data&nbsp;back:<br>
+<span class="lineno"></span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbspr,&nbsp;err&nbsp;:=&nbsp;zlib.NewReader(&amp;b)<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspio.Copy(os.Stdout,&nbsp;r)<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspr.Close()<br>
+<span class="lineno"></span>*/</span><br>
+<span class="lineno"></span><span class="keyword">package</span>&nbsp;<span class="ident">zlib</span><br>
+<span class="lineno">25</span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;bufio&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;compress/flate&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;errors&#34;</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;hash&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;hash/adler32&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;io&#34;</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">35</span><span class="keyword">const</span>&nbsp;<span class="ident">zlibDeflate</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">8</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;ErrChecksum&nbsp;is&nbsp;returned&nbsp;when&nbsp;reading&nbsp;ZLIB&nbsp;data&nbsp;that&nbsp;has&nbsp;an&nbsp;invalid&nbsp;checksum.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ErrChecksum</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">errors</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="string">&#34;zlib:&nbsp;invalid&nbsp;checksum&#34;</span><span class="op">)</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;ErrDictionary&nbsp;is&nbsp;returned&nbsp;when&nbsp;reading&nbsp;ZLIB&nbsp;data&nbsp;that&nbsp;has&nbsp;an&nbsp;invalid&nbsp;dictionary.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ErrDictionary</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">errors</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="string">&#34;zlib:&nbsp;invalid&nbsp;dictionary&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;ErrHeader&nbsp;is&nbsp;returned&nbsp;when&nbsp;reading&nbsp;ZLIB&nbsp;data&nbsp;that&nbsp;has&nbsp;an&nbsp;invalid&nbsp;header.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ErrHeader</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">errors</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="string">&#34;zlib:&nbsp;invalid&nbsp;header&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno">45</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">reader</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">flate</span><span class="op">.</span><span class="ident">Reader</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">decompressor</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">ReadCloser</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">digest</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">hash</span><span class="op">.</span><span class="ident">Hash32</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">error</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">scratch</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">[</span><span class="num">4</span><span class="op">]</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Resetter&nbsp;resets&nbsp;a&nbsp;ReadCloser&nbsp;returned&nbsp;by&nbsp;NewReader&nbsp;or&nbsp;NewReaderDict&nbsp;to</span><br>
+<span class="lineno">55</span><span class="comment">//&nbsp;to&nbsp;switch&nbsp;to&nbsp;a&nbsp;new&nbsp;underlying&nbsp;Reader.&nbsp;This&nbsp;permits&nbsp;reusing&nbsp;a&nbsp;ReadCloser</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;instead&nbsp;of&nbsp;allocating&nbsp;a&nbsp;new&nbsp;one.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">Resetter</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Reset&nbsp;discards&nbsp;any&nbsp;buffered&nbsp;data&nbsp;and&nbsp;resets&nbsp;the&nbsp;Resetter&nbsp;as&nbsp;if&nbsp;it&nbsp;was</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;newly&nbsp;initialized&nbsp;with&nbsp;the&nbsp;given&nbsp;reader.</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Reset</span><span class="op">(</span><span class="ident">r</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">Reader</span><span class="op">,</span>&nbsp;<span class="ident">dict</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;NewReader&nbsp;creates&nbsp;a&nbsp;new&nbsp;ReadCloser.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Reads&nbsp;from&nbsp;the&nbsp;returned&nbsp;ReadCloser&nbsp;read&nbsp;and&nbsp;decompress&nbsp;data&nbsp;from&nbsp;r.</span><br>
+<span class="lineno">65</span><span class="comment">//&nbsp;The&nbsp;implementation&nbsp;buffers&nbsp;input&nbsp;and&nbsp;may&nbsp;read&nbsp;more&nbsp;data&nbsp;than&nbsp;necessary&nbsp;from&nbsp;r.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;It&nbsp;is&nbsp;the&nbsp;caller&#39;s&nbsp;responsibility&nbsp;to&nbsp;call&nbsp;Close&nbsp;on&nbsp;the&nbsp;ReadCloser&nbsp;when&nbsp;done.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;ReadCloser&nbsp;returned&nbsp;by&nbsp;NewReader&nbsp;also&nbsp;implements&nbsp;Resetter.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">NewReader</span><span class="op">(</span><span class="ident">r</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">Reader</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">io</span><span class="op">.</span><span class="ident">ReadCloser</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">NewReaderDict</span><span class="op">(</span><span class="ident">r</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;NewReaderDict&nbsp;is&nbsp;like&nbsp;NewReader&nbsp;but&nbsp;uses&nbsp;a&nbsp;preset&nbsp;dictionary.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;NewReaderDict&nbsp;ignores&nbsp;the&nbsp;dictionary&nbsp;if&nbsp;the&nbsp;compressed&nbsp;data&nbsp;does&nbsp;not&nbsp;refer&nbsp;to&nbsp;it.</span><br>
+<span class="lineno">75</span><span class="comment">//&nbsp;If&nbsp;the&nbsp;compressed&nbsp;data&nbsp;refers&nbsp;to&nbsp;a&nbsp;different&nbsp;dictionary,&nbsp;NewReaderDict&nbsp;returns&nbsp;ErrDictionary.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;ReadCloser&nbsp;returned&nbsp;by&nbsp;NewReaderDict&nbsp;also&nbsp;implements&nbsp;Resetter.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">NewReaderDict</span><span class="op">(</span><span class="ident">r</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">Reader</span><span class="op">,</span>&nbsp;<span class="ident">dict</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">io</span><span class="op">.</span><span class="ident">ReadCloser</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">z</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">new</span><span class="op">(</span><span class="ident">reader</span><span class="op">)</span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">z</span><span class="op">.</span><span class="ident">Reset</span><span class="op">(</span><span class="ident">r</span><span class="op">,</span>&nbsp;<span class="ident">dict</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">z</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno">85</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">z</span>&nbsp;<span class="op">*</span><span class="ident">reader</span><span class="op">)</span>&nbsp;<span class="ident">Read</span><span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">n</span>&nbsp;<span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">z</span><span class="op">.</span><span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">z</span><span class="op">.</span><span class="ident">err</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">p</span><span class="op">)</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">z</span><span class="op">.</span><span class="ident">decompressor</span><span class="op">.</span><span class="ident">Read</span><span class="op">(</span><span class="ident">p</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">z</span><span class="op">.</span><span class="ident">digest</span><span class="op">.</span><span class="ident">Write</span><span class="op">(</span><span class="ident">p</span><span class="op">[</span><span class="num">0</span><span class="op">:</span><span class="ident">n</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">EOF</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">z</span><span class="op">.</span><span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno">100</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Finished&nbsp;file;&nbsp;check&nbsp;checksum.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">ReadFull</span><span class="op">(</span><span class="ident">z</span><span class="op">.</span><span class="ident">r</span><span class="op">,</span>&nbsp;<span class="ident">z</span><span class="op">.</span><span class="ident">scratch</span><span class="op">[</span><span class="num">0</span><span class="op">:</span><span class="num">4</span><span class="op">]</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">z</span><span class="op">.</span><span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;ZLIB&nbsp;(RFC&nbsp;1950)&nbsp;is&nbsp;big-endian,&nbsp;unlike&nbsp;GZIP&nbsp;(RFC&nbsp;1952).</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">checksum</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtintype">uint32</span><span class="op">(</span><span class="ident">z</span><span class="op">.</span><span class="ident">scratch</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="op">)</span><span class="op">&lt;&lt;</span><span class="num">24</span>&nbsp;<span class="op">|</span>&nbsp;<span class="builtintype">uint32</span><span class="op">(</span><span class="ident">z</span><span class="op">.</span><span class="ident">scratch</span><span class="op">[</span><span class="num">1</span><span class="op">]</span><span class="op">)</span><span class="op">&lt;&lt;</span><span class="num">16</span>&nbsp;<span class="op">|</span>&nbsp;<span class="builtintype">uint32</span><span class="op">(</span><span class="ident">z</span><span class="op">.</span><span class="ident">scratch</span><span class="op">[</span><span class="num">2</span><span class="op">]</span><span class="op">)</span><span class="op">&lt;&lt;</span><span class="num">8</span>&nbsp;<span class="op">|</span>&nbsp;<span class="builtintype">uint32</span><span class="op">(</span><span class="ident">z</span><span class="op">.</span><span class="ident">scratch</span><span class="op">[</span><span class="num">3</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">checksum</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">z</span><span class="op">.</span><span class="ident">digest</span><span class="op">.</span><span class="ident">Sum32</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">110</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">z</span><span class="op">.</span><span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">ErrChecksum</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">z</span><span class="op">.</span><span class="ident">err</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">115</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Calling&nbsp;Close&nbsp;does&nbsp;not&nbsp;close&nbsp;the&nbsp;wrapped&nbsp;io.Reader&nbsp;originally&nbsp;passed&nbsp;to&nbsp;NewReader.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">z</span>&nbsp;<span class="op">*</span><span class="ident">reader</span><span class="op">)</span>&nbsp;<span class="ident">Close</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">z</span><span class="op">.</span><span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">z</span><span class="op">.</span><span class="ident">err</span><br>
+<span class="lineno">120</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">z</span><span class="op">.</span><span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">z</span><span class="op">.</span><span class="ident">decompressor</span><span class="op">.</span><span class="ident">Close</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">z</span><span class="op">.</span><span class="ident">err</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">125</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">z</span>&nbsp;<span class="op">*</span><span class="ident">reader</span><span class="op">)</span>&nbsp;<span class="ident">Reset</span><span class="op">(</span><span class="ident">r</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">Reader</span><span class="op">,</span>&nbsp;<span class="ident">dict</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">fr</span><span class="op">,</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="op">(</span><span class="ident">flate</span><span class="op">.</span><span class="ident">Reader</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">z</span><span class="op">.</span><span class="ident">r</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">fr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">z</span><span class="op">.</span><span class="ident">r</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">bufio</span><span class="op">.</span><span class="ident">NewReader</span><span class="op">(</span><span class="ident">r</span><span class="op">)</span><br>
+<span class="lineno">130</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">ReadFull</span><span class="op">(</span><span class="ident">z</span><span class="op">.</span><span class="ident">r</span><span class="op">,</span>&nbsp;<span class="ident">z</span><span class="op">.</span><span class="ident">scratch</span><span class="op">[</span><span class="num">0</span><span class="op">:</span><span class="num">2</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">135</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">h</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtintype">uint</span><span class="op">(</span><span class="ident">z</span><span class="op">.</span><span class="ident">scratch</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="op">)</span><span class="op">&lt;&lt;</span><span class="num">8</span>&nbsp;<span class="op">|</span>&nbsp;<span class="builtintype">uint</span><span class="op">(</span><span class="ident">z</span><span class="op">.</span><span class="ident">scratch</span><span class="op">[</span><span class="num">1</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">(</span><span class="ident">z</span><span class="op">.</span><span class="ident">scratch</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="op">&amp;</span><span class="num">0x0f</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">zlibDeflate</span><span class="op">)</span>&nbsp;<span class="op">||</span>&nbsp;<span class="op">(</span><span class="ident">h</span><span class="op">%</span><span class="num">31</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">ErrHeader</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">haveDict</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">z</span><span class="op">.</span><span class="ident">scratch</span><span class="op">[</span><span class="num">1</span><span class="op">]</span><span class="op">&amp;</span><span class="num">0x20</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno">140</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">haveDict</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">ReadFull</span><span class="op">(</span><span class="ident">z</span><span class="op">.</span><span class="ident">r</span><span class="op">,</span>&nbsp;<span class="ident">z</span><span class="op">.</span><span class="ident">scratch</span><span class="op">[</span><span class="num">0</span><span class="op">:</span><span class="num">4</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">145</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">checksum</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtintype">uint32</span><span class="op">(</span><span class="ident">z</span><span class="op">.</span><span class="ident">scratch</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="op">)</span><span class="op">&lt;&lt;</span><span class="num">24</span>&nbsp;<span class="op">|</span>&nbsp;<span class="builtintype">uint32</span><span class="op">(</span><span class="ident">z</span><span class="op">.</span><span class="ident">scratch</span><span class="op">[</span><span class="num">1</span><span class="op">]</span><span class="op">)</span><span class="op">&lt;&lt;</span><span class="num">16</span>&nbsp;<span class="op">|</span>&nbsp;<span class="builtintype">uint32</span><span class="op">(</span><span class="ident">z</span><span class="op">.</span><span class="ident">scratch</span><span class="op">[</span><span class="num">2</span><span class="op">]</span><span class="op">)</span><span class="op">&lt;&lt;</span><span class="num">8</span>&nbsp;<span class="op">|</span>&nbsp;<span class="builtintype">uint32</span><span class="op">(</span><span class="ident">z</span><span class="op">.</span><span class="ident">scratch</span><span class="op">[</span><span class="num">3</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">checksum</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">adler32</span><span class="op">.</span><span class="ident">Checksum</span><span class="op">(</span><span class="ident">dict</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">ErrDictionary</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">150</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">z</span><span class="op">.</span><span class="ident">decompressor</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">haveDict</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">z</span><span class="op">.</span><span class="ident">decompressor</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">flate</span><span class="op">.</span><span class="ident">NewReaderDict</span><span class="op">(</span><span class="ident">z</span><span class="op">.</span><span class="ident">r</span><span class="op">,</span>&nbsp;<span class="ident">dict</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">z</span><span class="op">.</span><span class="ident">decompressor</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">flate</span><span class="op">.</span><span class="ident">NewReader</span><span class="op">(</span><span class="ident">z</span><span class="op">.</span><span class="ident">r</span><span class="op">)</span><br>
+<span class="lineno">155</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">z</span><span class="op">.</span><span class="ident">decompressor</span><span class="op">.</span><span class="op">(</span><span class="ident">flate</span><span class="op">.</span><span class="ident">Resetter</span><span class="op">)</span><span class="op">.</span><span class="ident">Reset</span><span class="op">(</span><span class="ident">z</span><span class="op">.</span><span class="ident">r</span><span class="op">,</span>&nbsp;<span class="ident">dict</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">z</span><span class="op">.</span><span class="ident">digest</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">adler32</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">160</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

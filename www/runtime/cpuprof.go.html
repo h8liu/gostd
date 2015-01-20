@@ -1,0 +1,440 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2011&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="comment">//&nbsp;CPU&nbsp;profiling.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Based&nbsp;on&nbsp;algorithms&nbsp;and&nbsp;data&nbsp;structures&nbsp;used&nbsp;in</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;http://code.google.com/p/google-perftools/.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;main&nbsp;difference&nbsp;between&nbsp;this&nbsp;code&nbsp;and&nbsp;the&nbsp;google-perftools</span><br>
+<span class="lineno">10</span><span class="comment">//&nbsp;code&nbsp;is&nbsp;that&nbsp;this&nbsp;code&nbsp;is&nbsp;written&nbsp;to&nbsp;allow&nbsp;copying&nbsp;the&nbsp;profile&nbsp;data</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;to&nbsp;an&nbsp;arbitrary&nbsp;io.Writer,&nbsp;while&nbsp;the&nbsp;google-perftools&nbsp;code&nbsp;always</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;writes&nbsp;to&nbsp;an&nbsp;operating&nbsp;system&nbsp;file.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;signal&nbsp;handler&nbsp;for&nbsp;the&nbsp;profiling&nbsp;clock&nbsp;tick&nbsp;adds&nbsp;a&nbsp;new&nbsp;stack&nbsp;trace</span><br>
+<span class="lineno">15</span><span class="comment">//&nbsp;to&nbsp;a&nbsp;hash&nbsp;table&nbsp;tracking&nbsp;counts&nbsp;for&nbsp;recent&nbsp;traces.&nbsp;&nbsp;Most&nbsp;clock&nbsp;ticks</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;hit&nbsp;in&nbsp;the&nbsp;cache.&nbsp;&nbsp;In&nbsp;the&nbsp;event&nbsp;of&nbsp;a&nbsp;cache&nbsp;miss,&nbsp;an&nbsp;entry&nbsp;must&nbsp;be</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;evicted&nbsp;from&nbsp;the&nbsp;hash&nbsp;table,&nbsp;copied&nbsp;to&nbsp;a&nbsp;log&nbsp;that&nbsp;will&nbsp;eventually&nbsp;be</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;written&nbsp;as&nbsp;profile&nbsp;data.&nbsp;&nbsp;The&nbsp;google-perftools&nbsp;code&nbsp;flushed&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;log&nbsp;itself&nbsp;during&nbsp;the&nbsp;signal&nbsp;handler.&nbsp;&nbsp;This&nbsp;code&nbsp;cannot&nbsp;do&nbsp;that,&nbsp;because</span><br>
+<span class="lineno">20</span><span class="comment">//&nbsp;the&nbsp;io.Writer&nbsp;might&nbsp;block&nbsp;or&nbsp;need&nbsp;system&nbsp;calls&nbsp;or&nbsp;locks&nbsp;that&nbsp;are&nbsp;not</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;safe&nbsp;to&nbsp;use&nbsp;from&nbsp;within&nbsp;the&nbsp;signal&nbsp;handler.&nbsp;&nbsp;Instead,&nbsp;we&nbsp;split&nbsp;the&nbsp;log</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;into&nbsp;two&nbsp;halves&nbsp;and&nbsp;let&nbsp;the&nbsp;signal&nbsp;handler&nbsp;fill&nbsp;one&nbsp;half&nbsp;while&nbsp;a&nbsp;goroutine</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;is&nbsp;writing&nbsp;out&nbsp;the&nbsp;other&nbsp;half.&nbsp;&nbsp;When&nbsp;the&nbsp;signal&nbsp;handler&nbsp;fills&nbsp;its&nbsp;half,&nbsp;it</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;offers&nbsp;to&nbsp;swap&nbsp;with&nbsp;the&nbsp;goroutine.&nbsp;&nbsp;If&nbsp;the&nbsp;writer&nbsp;is&nbsp;not&nbsp;done&nbsp;with&nbsp;its&nbsp;half,</span><br>
+<span class="lineno">25</span><span class="comment">//&nbsp;we&nbsp;lose&nbsp;the&nbsp;stack&nbsp;trace&nbsp;for&nbsp;this&nbsp;clock&nbsp;tick&nbsp;(and&nbsp;record&nbsp;that&nbsp;loss).</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;goroutine&nbsp;interacts&nbsp;with&nbsp;the&nbsp;signal&nbsp;handler&nbsp;by&nbsp;calling&nbsp;getprofile()&nbsp;to</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;get&nbsp;the&nbsp;next&nbsp;log&nbsp;piece&nbsp;to&nbsp;write,&nbsp;implicitly&nbsp;handing&nbsp;back&nbsp;the&nbsp;last&nbsp;log</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;piece&nbsp;it&nbsp;obtained.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">30</span><span class="comment">//&nbsp;The&nbsp;state&nbsp;of&nbsp;this&nbsp;dance&nbsp;between&nbsp;the&nbsp;signal&nbsp;handler&nbsp;and&nbsp;the&nbsp;goroutine</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;is&nbsp;encoded&nbsp;in&nbsp;the&nbsp;Profile.handoff&nbsp;field.&nbsp;&nbsp;If&nbsp;handoff&nbsp;==&nbsp;0,&nbsp;then&nbsp;the&nbsp;goroutine</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;is&nbsp;not&nbsp;using&nbsp;either&nbsp;log&nbsp;half&nbsp;and&nbsp;is&nbsp;waiting&nbsp;(or&nbsp;will&nbsp;soon&nbsp;be&nbsp;waiting)&nbsp;for</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;a&nbsp;new&nbsp;piece&nbsp;by&nbsp;calling&nbsp;notesleep(&amp;p-&gt;wait).&nbsp;&nbsp;If&nbsp;the&nbsp;signal&nbsp;handler</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;changes&nbsp;handoff&nbsp;from&nbsp;0&nbsp;to&nbsp;non-zero,&nbsp;it&nbsp;must&nbsp;call&nbsp;notewakeup(&amp;p-&gt;wait)</span><br>
+<span class="lineno">35</span><span class="comment">//&nbsp;to&nbsp;wake&nbsp;the&nbsp;goroutine.&nbsp;&nbsp;The&nbsp;value&nbsp;indicates&nbsp;the&nbsp;number&nbsp;of&nbsp;entries&nbsp;in&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;log&nbsp;half&nbsp;being&nbsp;handed&nbsp;off.&nbsp;&nbsp;The&nbsp;goroutine&nbsp;leaves&nbsp;the&nbsp;non-zero&nbsp;value&nbsp;in</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;place&nbsp;until&nbsp;it&nbsp;has&nbsp;finished&nbsp;processing&nbsp;the&nbsp;log&nbsp;half&nbsp;and&nbsp;then&nbsp;flips&nbsp;the&nbsp;number</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;back&nbsp;to&nbsp;zero.&nbsp;&nbsp;Setting&nbsp;the&nbsp;high&nbsp;bit&nbsp;in&nbsp;handoff&nbsp;means&nbsp;that&nbsp;the&nbsp;profiling&nbsp;is&nbsp;over,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;and&nbsp;the&nbsp;goroutine&nbsp;is&nbsp;now&nbsp;in&nbsp;charge&nbsp;of&nbsp;flushing&nbsp;the&nbsp;data&nbsp;left&nbsp;in&nbsp;the&nbsp;hash&nbsp;table</span><br>
+<span class="lineno">40</span><span class="comment">//&nbsp;to&nbsp;the&nbsp;log&nbsp;and&nbsp;returning&nbsp;that&nbsp;data.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;handoff&nbsp;field&nbsp;is&nbsp;manipulated&nbsp;using&nbsp;atomic&nbsp;operations.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;For&nbsp;the&nbsp;most&nbsp;part,&nbsp;the&nbsp;manipulation&nbsp;of&nbsp;handoff&nbsp;is&nbsp;orderly:&nbsp;if&nbsp;handoff&nbsp;==&nbsp;0</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;then&nbsp;the&nbsp;signal&nbsp;handler&nbsp;owns&nbsp;it&nbsp;and&nbsp;can&nbsp;change&nbsp;it&nbsp;to&nbsp;non-zero.</span><br>
+<span class="lineno">45</span><span class="comment">//&nbsp;If&nbsp;handoff&nbsp;!=&nbsp;0&nbsp;then&nbsp;the&nbsp;goroutine&nbsp;owns&nbsp;it&nbsp;and&nbsp;can&nbsp;change&nbsp;it&nbsp;to&nbsp;zero.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;If&nbsp;that&nbsp;were&nbsp;the&nbsp;end&nbsp;of&nbsp;the&nbsp;story&nbsp;then&nbsp;we&nbsp;would&nbsp;not&nbsp;need&nbsp;to&nbsp;manipulate</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;handoff&nbsp;using&nbsp;atomic&nbsp;operations.&nbsp;&nbsp;The&nbsp;operations&nbsp;are&nbsp;needed,&nbsp;however,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;in&nbsp;order&nbsp;to&nbsp;let&nbsp;the&nbsp;log&nbsp;closer&nbsp;set&nbsp;the&nbsp;high&nbsp;bit&nbsp;to&nbsp;indicate&nbsp;&#34;EOF&#34;&nbsp;safely</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;in&nbsp;the&nbsp;situation&nbsp;when&nbsp;normally&nbsp;the&nbsp;goroutine&nbsp;&#34;owns&#34;&nbsp;handoff.</span><br>
+<span class="lineno">50</span><br>
+<span class="lineno"></span><span class="keyword">package</span>&nbsp;<span class="ident">runtime</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="string">&#34;unsafe&#34;</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">55</span><span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">numBuckets</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span>&nbsp;<span class="op">&lt;&lt;</span>&nbsp;<span class="num">10</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">logSize</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span>&nbsp;<span class="op">&lt;&lt;</span>&nbsp;<span class="num">17</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">assoc</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">4</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">maxCPUProfStack</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">64</span><br>
+<span class="lineno">60</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">cpuprofEntry</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">count</span>&nbsp;<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">depth</span>&nbsp;<span class="builtintype">uintptr</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stack</span>&nbsp;<span class="op">[</span><span class="ident">maxCPUProfStack</span><span class="op">]</span><span class="builtintype">uintptr</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">cpuProfile</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">on</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">bool</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;profiling&nbsp;is&nbsp;on</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">wait</span>&nbsp;&nbsp;&nbsp;<span class="ident">note</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;goroutine&nbsp;waits&nbsp;here</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">count</span>&nbsp;&nbsp;<span class="builtintype">uintptr</span>&nbsp;<span class="comment">//&nbsp;tick&nbsp;count</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">evicts</span>&nbsp;<span class="builtintype">uintptr</span>&nbsp;<span class="comment">//&nbsp;eviction&nbsp;count</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">lost</span>&nbsp;&nbsp;&nbsp;<span class="builtintype">uintptr</span>&nbsp;<span class="comment">//&nbsp;lost&nbsp;ticks&nbsp;that&nbsp;need&nbsp;to&nbsp;be&nbsp;logged</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Active&nbsp;recent&nbsp;stack&nbsp;traces.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">hash</span>&nbsp;<span class="op">[</span><span class="ident">numBuckets</span><span class="op">]</span><span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">entry</span>&nbsp;<span class="op">[</span><span class="ident">assoc</span><span class="op">]</span><span class="ident">cpuprofEntry</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Log&nbsp;of&nbsp;traces&nbsp;evicted&nbsp;from&nbsp;hash.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Signal&nbsp;handler&nbsp;has&nbsp;filled&nbsp;log[toggle][:nlog].</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Goroutine&nbsp;is&nbsp;writing&nbsp;log[1-toggle][:handoff].</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">log</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">[</span><span class="num">2</span><span class="op">]</span><span class="op">[</span><span class="ident">logSize</span>&nbsp;<span class="op">/</span>&nbsp;<span class="num">2</span><span class="op">]</span><span class="builtintype">uintptr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nlog</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">uintptr</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">toggle</span>&nbsp;&nbsp;<span class="builtintype">int32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">handoff</span>&nbsp;<span class="builtintype">uint32</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Writer&nbsp;state.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Writer&nbsp;maintains&nbsp;its&nbsp;own&nbsp;toggle&nbsp;to&nbsp;avoid&nbsp;races</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;looking&nbsp;at&nbsp;signal&nbsp;handler&#39;s&nbsp;toggle.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">wtoggle</span>&nbsp;&nbsp;<span class="builtintype">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">wholding</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="comment">//&nbsp;holding&nbsp;&amp;&nbsp;need&nbsp;to&nbsp;release&nbsp;a&nbsp;log&nbsp;half</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">flushing</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="comment">//&nbsp;flushing&nbsp;hash&nbsp;table&nbsp;-&nbsp;profile&nbsp;is&nbsp;over</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">eodSent</span>&nbsp;&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="comment">//&nbsp;special&nbsp;end-of-data&nbsp;record&nbsp;sent;&nbsp;=&gt;&nbsp;flushing</span><br>
+<span class="lineno">95</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">cpuprofLock</span>&nbsp;<span class="ident">mutex</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">cpuprof</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">*</span><span class="ident">cpuProfile</span><br>
+<span class="lineno">100</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">eod</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">[</span><span class="num">3</span><span class="op">]</span><span class="builtintype">uintptr</span><span class="op">{</span><span class="num">0</span><span class="op">,</span>&nbsp;<span class="num">1</span><span class="op">,</span>&nbsp;<span class="num">0</span><span class="op">}</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">setcpuprofilerate_m</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="comment">//&nbsp;proc.c</span><br>
+<span class="lineno">105</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">setcpuprofilerate</span><span class="op">(</span><span class="ident">hz</span>&nbsp;<span class="builtintype">int32</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">g</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">getg</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">g</span><span class="op">.</span><span class="ident">m</span><span class="op">.</span><span class="ident">scalararg</span><span class="op">[</span><span class="num">0</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">(</span><span class="ident">hz</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">onM</span><span class="op">(</span><span class="ident">setcpuprofilerate_m</span><span class="op">)</span><br>
+<span class="lineno">110</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;lostProfileData&nbsp;is&nbsp;a&nbsp;no-op&nbsp;function&nbsp;used&nbsp;in&nbsp;profiles</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;to&nbsp;mark&nbsp;the&nbsp;number&nbsp;of&nbsp;profiling&nbsp;stack&nbsp;traces&nbsp;that&nbsp;were</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;discarded&nbsp;due&nbsp;to&nbsp;slow&nbsp;data&nbsp;writers.</span><br>
+<span class="lineno">115</span><span class="keyword">func</span>&nbsp;<span class="ident">lostProfileData</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;SetCPUProfileRate&nbsp;sets&nbsp;the&nbsp;CPU&nbsp;profiling&nbsp;rate&nbsp;to&nbsp;hz&nbsp;samples&nbsp;per&nbsp;second.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;If&nbsp;hz&nbsp;&lt;=&nbsp;0,&nbsp;SetCPUProfileRate&nbsp;turns&nbsp;off&nbsp;profiling.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;If&nbsp;the&nbsp;profiler&nbsp;is&nbsp;on,&nbsp;the&nbsp;rate&nbsp;cannot&nbsp;be&nbsp;changed&nbsp;without&nbsp;first&nbsp;turning&nbsp;it&nbsp;off.</span><br>
+<span class="lineno">120</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Most&nbsp;clients&nbsp;should&nbsp;use&nbsp;the&nbsp;runtime/pprof&nbsp;package&nbsp;or</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;the&nbsp;testing&nbsp;package&#39;s&nbsp;-test.cpuprofile&nbsp;flag&nbsp;instead&nbsp;of&nbsp;calling</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;SetCPUProfileRate&nbsp;directly.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">SetCPUProfileRate</span><span class="op">(</span><span class="ident">hz</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">125</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Clamp&nbsp;hz&nbsp;to&nbsp;something&nbsp;reasonable.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">hz</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">hz</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">hz</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">1000000</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">130</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">hz</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1000000</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">lock</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">cpuprofLock</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">hz</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">135</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">cpuprof</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">cpuprof</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">(</span><span class="op">*</span><span class="ident">cpuProfile</span><span class="op">)</span><span class="op">(</span><span class="ident">sysAlloc</span><span class="op">(</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Sizeof</span><span class="op">(</span><span class="ident">cpuProfile</span><span class="op">{</span><span class="op">}</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="op">&amp;</span><span class="ident">memstats</span><span class="op">.</span><span class="ident">other_sys</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">cpuprof</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">print</span><span class="op">(</span><span class="string">&#34;runtime:&nbsp;cpu&nbsp;profiling&nbsp;cannot&nbsp;allocate&nbsp;memory\n&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">unlock</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">cpuprofLock</span><span class="op">)</span><br>
+<span class="lineno">140</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">cpuprof</span><span class="op">.</span><span class="ident">on</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">cpuprof</span><span class="op">.</span><span class="ident">handoff</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">print</span><span class="op">(</span><span class="string">&#34;runtime:&nbsp;cannot&nbsp;set&nbsp;cpu&nbsp;profile&nbsp;rate&nbsp;until&nbsp;previous&nbsp;profile&nbsp;has&nbsp;finished.\n&#34;</span><span class="op">)</span><br>
+<span class="lineno">145</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">unlock</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">cpuprofLock</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">cpuprof</span><span class="op">.</span><span class="ident">on</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno">150</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;pprof&nbsp;binary&nbsp;header&nbsp;format.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;http://code.google.com/p/google-perftools/source/browse/trunk/src/profiledata.cc#117</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">&amp;</span><span class="ident">cpuprof</span><span class="op">.</span><span class="ident">log</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">[</span><span class="num">0</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;count&nbsp;for&nbsp;header</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">[</span><span class="num">1</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">3</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;depth&nbsp;for&nbsp;header</span><br>
+<span class="lineno">155</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">[</span><span class="num">2</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;version&nbsp;number</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">[</span><span class="num">3</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">(</span><span class="num">1e6</span>&nbsp;<span class="op">/</span>&nbsp;<span class="ident">hz</span><span class="op">)</span>&nbsp;<span class="comment">//&nbsp;period&nbsp;(microseconds)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">[</span><span class="num">4</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">cpuprof</span><span class="op">.</span><span class="ident">nlog</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">5</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">cpuprof</span><span class="op">.</span><span class="ident">toggle</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno">160</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">cpuprof</span><span class="op">.</span><span class="ident">wholding</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">cpuprof</span><span class="op">.</span><span class="ident">wtoggle</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">cpuprof</span><span class="op">.</span><span class="ident">flushing</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">cpuprof</span><span class="op">.</span><span class="ident">eodSent</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">noteclear</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">cpuprof</span><span class="op">.</span><span class="ident">wait</span><span class="op">)</span><br>
+<span class="lineno">165</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">setcpuprofilerate</span><span class="op">(</span><span class="builtintype">int32</span><span class="op">(</span><span class="ident">hz</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="keyword">if</span>&nbsp;<span class="ident">cpuprof</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">cpuprof</span><span class="op">.</span><span class="ident">on</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">setcpuprofilerate</span><span class="op">(</span><span class="num">0</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">cpuprof</span><span class="op">.</span><span class="ident">on</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno">170</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Now&nbsp;add&nbsp;is&nbsp;not&nbsp;running&nbsp;anymore,&nbsp;and&nbsp;getprofile&nbsp;owns&nbsp;the&nbsp;entire&nbsp;log.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Set&nbsp;the&nbsp;high&nbsp;bit&nbsp;in&nbsp;prof-&gt;handoff&nbsp;to&nbsp;tell&nbsp;getprofile.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">cpuprof</span><span class="op">.</span><span class="ident">handoff</span><br>
+<span class="lineno">175</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">n</span><span class="op">&amp;</span><span class="num">0x80000000</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">print</span><span class="op">(</span><span class="string">&#34;runtime:&nbsp;setcpuprofile(off)&nbsp;twice\n&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">cas</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">cpuprof</span><span class="op">.</span><span class="ident">handoff</span><span class="op">,</span>&nbsp;<span class="ident">n</span><span class="op">,</span>&nbsp;<span class="ident">n</span><span class="op">|</span><span class="num">0x80000000</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">180</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;we&nbsp;did&nbsp;the&nbsp;transition&nbsp;from&nbsp;0&nbsp;-&gt;&nbsp;nonzero&nbsp;so&nbsp;we&nbsp;wake&nbsp;getprofile</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">notewakeup</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">cpuprof</span><span class="op">.</span><span class="ident">wait</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">break</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">185</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">unlock</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">cpuprofLock</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">190</span><span class="keyword">func</span>&nbsp;<span class="ident">cpuproftick</span><span class="op">(</span><span class="ident">pc</span>&nbsp;<span class="op">*</span><span class="builtintype">uintptr</span><span class="op">,</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="builtintype">int32</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="ident">maxCPUProfStack</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">maxCPUProfStack</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">(</span><span class="op">*</span><span class="op">[</span><span class="ident">maxCPUProfStack</span><span class="op">]</span><span class="builtintype">uintptr</span><span class="op">)</span><span class="op">(</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="ident">pc</span><span class="op">)</span><span class="op">)</span><span class="op">[</span><span class="op">:</span><span class="ident">n</span><span class="op">]</span><br>
+<span class="lineno">195</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">cpuprof</span><span class="op">.</span><span class="ident">add</span><span class="op">(</span><span class="ident">s</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;add&nbsp;adds&nbsp;the&nbsp;stack&nbsp;trace&nbsp;to&nbsp;the&nbsp;profile.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;It&nbsp;is&nbsp;called&nbsp;from&nbsp;signal&nbsp;handlers&nbsp;and&nbsp;other&nbsp;limited&nbsp;environments</span><br>
+<span class="lineno">200</span><span class="comment">//&nbsp;and&nbsp;cannot&nbsp;allocate&nbsp;memory&nbsp;or&nbsp;acquire&nbsp;locks&nbsp;that&nbsp;might&nbsp;be</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;held&nbsp;at&nbsp;the&nbsp;time&nbsp;of&nbsp;the&nbsp;signal,&nbsp;nor&nbsp;can&nbsp;it&nbsp;use&nbsp;substantial&nbsp;amounts</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;of&nbsp;stack.&nbsp;&nbsp;It&nbsp;is&nbsp;allowed&nbsp;to&nbsp;call&nbsp;evict.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">*</span><span class="ident">cpuProfile</span><span class="op">)</span>&nbsp;<span class="ident">add</span><span class="op">(</span><span class="ident">pc</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">uintptr</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Compute&nbsp;hash.</span><br>
+<span class="lineno">205</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">h</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">(</span><span class="num">0</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">pc</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">h</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">h</span><span class="op">&lt;&lt;</span><span class="num">8</span>&nbsp;<span class="op">|</span>&nbsp;<span class="op">(</span><span class="ident">h</span>&nbsp;<span class="op">&gt;&gt;</span>&nbsp;<span class="op">(</span><span class="num">8</span>&nbsp;<span class="op">*</span>&nbsp;<span class="op">(</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Sizeof</span><span class="op">(</span><span class="ident">h</span><span class="op">)</span>&nbsp;<span class="op">-</span>&nbsp;<span class="num">1</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">h</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="ident">x</span><span class="op">*</span><span class="num">31</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">x</span><span class="op">*</span><span class="num">7</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">x</span><span class="op">*</span><span class="num">3</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">210</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">.</span><span class="ident">count</span><span class="op">++</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Add&nbsp;to&nbsp;entry&nbsp;count&nbsp;if&nbsp;already&nbsp;present&nbsp;in&nbsp;table.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">&amp;</span><span class="ident">p</span><span class="op">.</span><span class="ident">hash</span><span class="op">[</span><span class="ident">h</span><span class="op">%</span><span class="ident">numBuckets</span><span class="op">]</span><br>
+<span class="lineno"></span><span class="ident">Assoc</span><span class="op">:</span><br>
+<span class="lineno">215</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">b</span><span class="op">.</span><span class="ident">entry</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">e</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">&amp;</span><span class="ident">b</span><span class="op">.</span><span class="ident">entry</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">e</span><span class="op">.</span><span class="ident">depth</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">(</span><span class="builtinfunc">len</span><span class="op">(</span><span class="ident">pc</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">continue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">220</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">j</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">pc</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">e</span><span class="op">.</span><span class="ident">stack</span><span class="op">[</span><span class="ident">j</span><span class="op">]</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">pc</span><span class="op">[</span><span class="ident">j</span><span class="op">]</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">continue</span>&nbsp;<span class="ident">Assoc</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">225</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">e</span><span class="op">.</span><span class="ident">count</span><span class="op">++</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Evict&nbsp;entry&nbsp;with&nbsp;smallest&nbsp;count.</span><br>
+<span class="lineno">230</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">*</span><span class="ident">cpuprofEntry</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">b</span><span class="op">.</span><span class="ident">entry</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">b</span><span class="op">.</span><span class="ident">entry</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><span class="op">.</span><span class="ident">count</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">e</span><span class="op">.</span><span class="ident">count</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">e</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">&amp;</span><span class="ident">b</span><span class="op">.</span><span class="ident">entry</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">235</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">e</span><span class="op">.</span><span class="ident">count</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">p</span><span class="op">.</span><span class="ident">evict</span><span class="op">(</span><span class="ident">e</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Could&nbsp;not&nbsp;evict&nbsp;entry.&nbsp;&nbsp;Record&nbsp;lost&nbsp;stack.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">.</span><span class="ident">lost</span><span class="op">++</span><br>
+<span class="lineno">240</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">.</span><span class="ident">evicts</span><span class="op">++</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">245</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Reuse&nbsp;the&nbsp;newly&nbsp;evicted&nbsp;entry.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">e</span><span class="op">.</span><span class="ident">depth</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">(</span><span class="builtinfunc">len</span><span class="op">(</span><span class="ident">pc</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">e</span><span class="op">.</span><span class="ident">count</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">copy</span><span class="op">(</span><span class="ident">e</span><span class="op">.</span><span class="ident">stack</span><span class="op">[</span><span class="op">:</span><span class="op">]</span><span class="op">,</span>&nbsp;<span class="ident">pc</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">250</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;evict&nbsp;copies&nbsp;the&nbsp;given&nbsp;entry&#39;s&nbsp;data&nbsp;into&nbsp;the&nbsp;log,&nbsp;so&nbsp;that</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;the&nbsp;entry&nbsp;can&nbsp;be&nbsp;reused.&nbsp;&nbsp;evict&nbsp;is&nbsp;called&nbsp;from&nbsp;add,&nbsp;which</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;is&nbsp;called&nbsp;from&nbsp;the&nbsp;profiling&nbsp;signal&nbsp;handler,&nbsp;so&nbsp;it&nbsp;must&nbsp;not</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;allocate&nbsp;memory&nbsp;or&nbsp;block.&nbsp;&nbsp;It&nbsp;is&nbsp;safe&nbsp;to&nbsp;call&nbsp;flushlog.</span><br>
+<span class="lineno">255</span><span class="comment">//&nbsp;evict&nbsp;returns&nbsp;true&nbsp;if&nbsp;the&nbsp;entry&nbsp;was&nbsp;copied&nbsp;to&nbsp;the&nbsp;log,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;false&nbsp;if&nbsp;there&nbsp;was&nbsp;no&nbsp;room&nbsp;available.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">*</span><span class="ident">cpuProfile</span><span class="op">)</span>&nbsp;<span class="ident">evict</span><span class="op">(</span><span class="ident">e</span>&nbsp;<span class="op">*</span><span class="ident">cpuprofEntry</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">e</span><span class="op">.</span><span class="ident">depth</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nslot</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">d</span>&nbsp;<span class="op">+</span>&nbsp;<span class="num">2</span><br>
+<span class="lineno">260</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">log</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">&amp;</span><span class="ident">p</span><span class="op">.</span><span class="ident">log</span><span class="op">[</span><span class="ident">p</span><span class="op">.</span><span class="ident">toggle</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">p</span><span class="op">.</span><span class="ident">nlog</span><span class="op">+</span><span class="ident">nslot</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">(</span><span class="builtinfunc">len</span><span class="op">(</span><span class="ident">p</span><span class="op">.</span><span class="ident">log</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">p</span><span class="op">.</span><span class="ident">flushlog</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">265</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">log</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">&amp;</span><span class="ident">p</span><span class="op">.</span><span class="ident">log</span><span class="op">[</span><span class="ident">p</span><span class="op">.</span><span class="ident">toggle</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">q</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">p</span><span class="op">.</span><span class="ident">nlog</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">log</span><span class="op">[</span><span class="ident">q</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">e</span><span class="op">.</span><span class="ident">count</span><br>
+<span class="lineno">270</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">q</span><span class="op">++</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">log</span><span class="op">[</span><span class="ident">q</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">d</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">q</span><span class="op">++</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">copy</span><span class="op">(</span><span class="ident">log</span><span class="op">[</span><span class="ident">q</span><span class="op">:</span><span class="op">]</span><span class="op">,</span>&nbsp;<span class="ident">e</span><span class="op">.</span><span class="ident">stack</span><span class="op">[</span><span class="op">:</span><span class="ident">d</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">q</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="ident">d</span><br>
+<span class="lineno">275</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">.</span><span class="ident">nlog</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">q</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">e</span><span class="op">.</span><span class="ident">count</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">280</span><span class="comment">//&nbsp;flushlog&nbsp;tries&nbsp;to&nbsp;flush&nbsp;the&nbsp;current&nbsp;log&nbsp;and&nbsp;switch&nbsp;to&nbsp;the&nbsp;other&nbsp;one.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;flushlog&nbsp;is&nbsp;called&nbsp;from&nbsp;evict,&nbsp;called&nbsp;from&nbsp;add,&nbsp;called&nbsp;from&nbsp;the&nbsp;signal&nbsp;handler,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;so&nbsp;it&nbsp;cannot&nbsp;allocate&nbsp;memory&nbsp;or&nbsp;block.&nbsp;&nbsp;It&nbsp;can&nbsp;try&nbsp;to&nbsp;swap&nbsp;logs&nbsp;with</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;the&nbsp;writing&nbsp;goroutine,&nbsp;as&nbsp;explained&nbsp;in&nbsp;the&nbsp;comment&nbsp;at&nbsp;the&nbsp;top&nbsp;of&nbsp;this&nbsp;file.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">*</span><span class="ident">cpuProfile</span><span class="op">)</span>&nbsp;<span class="ident">flushlog</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">285</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">cas</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">p</span><span class="op">.</span><span class="ident">handoff</span><span class="op">,</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="builtintype">uint32</span><span class="op">(</span><span class="ident">p</span><span class="op">.</span><span class="ident">nlog</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">notewakeup</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">p</span><span class="op">.</span><span class="ident">wait</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">290</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">.</span><span class="ident">toggle</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">p</span><span class="op">.</span><span class="ident">toggle</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">log</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">&amp;</span><span class="ident">p</span><span class="op">.</span><span class="ident">log</span><span class="op">[</span><span class="ident">p</span><span class="op">.</span><span class="ident">toggle</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">q</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">(</span><span class="num">0</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">p</span><span class="op">.</span><span class="ident">lost</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">lostPC</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">funcPC</span><span class="op">(</span><span class="ident">lostProfileData</span><span class="op">)</span><br>
+<span class="lineno">295</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">log</span><span class="op">[</span><span class="num">0</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">p</span><span class="op">.</span><span class="ident">lost</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">log</span><span class="op">[</span><span class="num">1</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">log</span><span class="op">[</span><span class="num">2</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">lostPC</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">q</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">3</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">.</span><span class="ident">lost</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno">300</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">.</span><span class="ident">nlog</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">q</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">305</span><span class="comment">//&nbsp;getprofile&nbsp;blocks&nbsp;until&nbsp;the&nbsp;next&nbsp;block&nbsp;of&nbsp;profiling&nbsp;data&nbsp;is&nbsp;available</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;and&nbsp;returns&nbsp;it&nbsp;as&nbsp;a&nbsp;[]byte.&nbsp;&nbsp;It&nbsp;is&nbsp;called&nbsp;from&nbsp;the&nbsp;writing&nbsp;goroutine.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">*</span><span class="ident">cpuProfile</span><span class="op">)</span>&nbsp;<span class="ident">getprofile</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">p</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno">310</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">p</span><span class="op">.</span><span class="ident">wholding</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Release&nbsp;previous&nbsp;log&nbsp;to&nbsp;signal&nbsp;handling&nbsp;side.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Loop&nbsp;because&nbsp;we&nbsp;are&nbsp;racing&nbsp;against&nbsp;SetCPUProfileRate(0).</span><br>
+<span class="lineno">315</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">p</span><span class="op">.</span><span class="ident">handoff</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">print</span><span class="op">(</span><span class="string">&#34;runtime:&nbsp;phase&nbsp;error&nbsp;during&nbsp;cpu&nbsp;profile&nbsp;handoff\n&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno">320</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">n</span><span class="op">&amp;</span><span class="num">0x80000000</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">.</span><span class="ident">wtoggle</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">p</span><span class="op">.</span><span class="ident">wtoggle</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">.</span><span class="ident">wholding</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">.</span><span class="ident">flushing</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno">325</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">goto</span>&nbsp;<span class="ident">Flush</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">cas</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">p</span><span class="op">.</span><span class="ident">handoff</span><span class="op">,</span>&nbsp;<span class="ident">n</span><span class="op">,</span>&nbsp;<span class="num">0</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">break</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">330</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">.</span><span class="ident">wtoggle</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">p</span><span class="op">.</span><span class="ident">wtoggle</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">.</span><span class="ident">wholding</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">335</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">p</span><span class="op">.</span><span class="ident">flushing</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">goto</span>&nbsp;<span class="ident">Flush</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">p</span><span class="op">.</span><span class="ident">on</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">p</span><span class="op">.</span><span class="ident">handoff</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">340</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Wait&nbsp;for&nbsp;new&nbsp;log.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">notetsleepg</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">p</span><span class="op">.</span><span class="ident">wait</span><span class="op">,</span>&nbsp;<span class="op">-</span><span class="num">1</span><span class="op">)</span><br>
+<span class="lineno">345</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">noteclear</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">p</span><span class="op">.</span><span class="ident">wait</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">p</span><span class="op">.</span><span class="ident">handoff</span><span class="op">;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">print</span><span class="op">(</span><span class="string">&#34;runtime:&nbsp;phase&nbsp;error&nbsp;during&nbsp;cpu&nbsp;profile&nbsp;wait\n&#34;</span><span class="op">)</span><br>
+<span class="lineno">350</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0x80000000</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">.</span><span class="ident">flushing</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">goto</span>&nbsp;<span class="ident">Flush</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">default</span><span class="op">:</span><br>
+<span class="lineno">355</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span>&nbsp;<span class="op">&amp;^=</span>&nbsp;<span class="num">0x80000000</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Return&nbsp;new&nbsp;log&nbsp;to&nbsp;caller.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">.</span><span class="ident">wholding</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">360</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">uintptrBytes</span><span class="op">(</span><span class="ident">p</span><span class="op">.</span><span class="ident">log</span><span class="op">[</span><span class="ident">p</span><span class="op">.</span><span class="ident">wtoggle</span><span class="op">]</span><span class="op">[</span><span class="op">:</span><span class="ident">n</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;In&nbsp;flush&nbsp;mode.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Add&nbsp;is&nbsp;no&nbsp;longer&nbsp;being&nbsp;called.&nbsp;&nbsp;We&nbsp;own&nbsp;the&nbsp;log.</span><br>
+<span class="lineno">365</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Also,&nbsp;p-&gt;handoff&nbsp;is&nbsp;non-zero,&nbsp;so&nbsp;flushlog&nbsp;will&nbsp;return&nbsp;false.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Evict&nbsp;the&nbsp;hash&nbsp;table&nbsp;into&nbsp;the&nbsp;log&nbsp;and&nbsp;return&nbsp;it.</span><br>
+<span class="lineno"></span><span class="ident">Flush</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">p</span><span class="op">.</span><span class="ident">hash</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">&amp;</span><span class="ident">p</span><span class="op">.</span><span class="ident">hash</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><br>
+<span class="lineno">370</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">j</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">b</span><span class="op">.</span><span class="ident">entry</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">e</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">&amp;</span><span class="ident">b</span><span class="op">.</span><span class="ident">entry</span><span class="op">[</span><span class="ident">j</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">e</span><span class="op">.</span><span class="ident">count</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="op">!</span><span class="ident">p</span><span class="op">.</span><span class="ident">evict</span><span class="op">(</span><span class="ident">e</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Filled&nbsp;the&nbsp;log.&nbsp;&nbsp;Stop&nbsp;the&nbsp;loop&nbsp;and&nbsp;return&nbsp;what&nbsp;we&#39;ve&nbsp;got.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">break</span>&nbsp;<span class="ident">Flush</span><br>
+<span class="lineno">375</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Return&nbsp;pending&nbsp;log&nbsp;data.</span><br>
+<span class="lineno">380</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">p</span><span class="op">.</span><span class="ident">nlog</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Note&nbsp;that&nbsp;we&#39;re&nbsp;using&nbsp;toggle&nbsp;now,&nbsp;not&nbsp;wtoggle,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;because&nbsp;we&#39;re&nbsp;working&nbsp;on&nbsp;the&nbsp;log&nbsp;directly.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">p</span><span class="op">.</span><span class="ident">nlog</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">.</span><span class="ident">nlog</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno">385</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">uintptrBytes</span><span class="op">(</span><span class="ident">p</span><span class="op">.</span><span class="ident">log</span><span class="op">[</span><span class="ident">p</span><span class="op">.</span><span class="ident">toggle</span><span class="op">]</span><span class="op">[</span><span class="op">:</span><span class="ident">n</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Made&nbsp;it&nbsp;through&nbsp;the&nbsp;table&nbsp;without&nbsp;finding&nbsp;anything&nbsp;to&nbsp;log.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">p</span><span class="op">.</span><span class="ident">eodSent</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">390</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;We&nbsp;may&nbsp;not&nbsp;have&nbsp;space&nbsp;to&nbsp;append&nbsp;this&nbsp;to&nbsp;the&nbsp;partial&nbsp;log&nbsp;buf,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;so&nbsp;we&nbsp;always&nbsp;return&nbsp;a&nbsp;new&nbsp;slice&nbsp;for&nbsp;the&nbsp;end-of-data&nbsp;marker.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">.</span><span class="ident">eodSent</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">uintptrBytes</span><span class="op">(</span><span class="ident">eod</span><span class="op">[</span><span class="op">:</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">395</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Finally&nbsp;done.&nbsp;&nbsp;Clean&nbsp;up&nbsp;and&nbsp;return&nbsp;nil.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">.</span><span class="ident">flushing</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">cas</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">p</span><span class="op">.</span><span class="ident">handoff</span><span class="op">,</span>&nbsp;<span class="ident">p</span><span class="op">.</span><span class="ident">handoff</span><span class="op">,</span>&nbsp;<span class="num">0</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">print</span><span class="op">(</span><span class="string">&#34;runtime:&nbsp;profile&nbsp;flush&nbsp;racing&nbsp;with&nbsp;something\n&#34;</span><span class="op">)</span><br>
+<span class="lineno">400</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">uintptrBytes</span><span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">uintptr</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">ret</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">405</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">(</span><span class="op">*</span><span class="ident">sliceStruct</span><span class="op">)</span><span class="op">(</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">p</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">rp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">(</span><span class="op">*</span><span class="ident">sliceStruct</span><span class="op">)</span><span class="op">(</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">ret</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">rp</span><span class="op">.</span><span class="ident">array</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">pp</span><span class="op">.</span><span class="ident">array</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">rp</span><span class="op">.</span><span class="builtinfunc">len</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">pp</span><span class="op">.</span><span class="builtinfunc">len</span>&nbsp;<span class="op">*</span>&nbsp;<span class="builtintype">int</span><span class="op">(</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Sizeof</span><span class="op">(</span><span class="ident">p</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno">410</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">rp</span><span class="op">.</span><span class="builtinfunc">cap</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">rp</span><span class="op">.</span><span class="builtinfunc">len</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">415</span><span class="comment">//&nbsp;CPUProfile&nbsp;returns&nbsp;the&nbsp;next&nbsp;chunk&nbsp;of&nbsp;binary&nbsp;CPU&nbsp;profiling&nbsp;stack&nbsp;trace&nbsp;data,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;blocking&nbsp;until&nbsp;data&nbsp;is&nbsp;available.&nbsp;&nbsp;If&nbsp;profiling&nbsp;is&nbsp;turned&nbsp;off&nbsp;and&nbsp;all&nbsp;the&nbsp;profile</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;data&nbsp;accumulated&nbsp;while&nbsp;it&nbsp;was&nbsp;on&nbsp;has&nbsp;been&nbsp;returned,&nbsp;CPUProfile&nbsp;returns&nbsp;nil.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;caller&nbsp;must&nbsp;save&nbsp;the&nbsp;returned&nbsp;data&nbsp;before&nbsp;calling&nbsp;CPUProfile&nbsp;again.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">420</span><span class="comment">//&nbsp;Most&nbsp;clients&nbsp;should&nbsp;use&nbsp;the&nbsp;runtime/pprof&nbsp;package&nbsp;or</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;the&nbsp;testing&nbsp;package&#39;s&nbsp;-test.cpuprofile&nbsp;flag&nbsp;instead&nbsp;of&nbsp;calling</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;CPUProfile&nbsp;directly.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">CPUProfile</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">cpuprof</span><span class="op">.</span><span class="ident">getprofile</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">425</span><span class="op">}</span>
+</div>
+</body>
+</html>

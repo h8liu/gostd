@@ -1,0 +1,105 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2011&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">multipart</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;bytes&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;io&#34;</span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;os&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;regexp&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;strings&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;testing&#34;</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno">15</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">TestReadForm</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">testBody</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">regexp</span><span class="op">.</span><span class="ident">MustCompile</span><span class="op">(</span><span class="string">&#34;\n&#34;</span><span class="op">)</span><span class="op">.</span><span class="ident">ReplaceAllString</span><span class="op">(</span><span class="ident">message</span><span class="op">,</span>&nbsp;<span class="string">&#34;\r\n&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">strings</span><span class="op">.</span><span class="ident">NewReader</span><span class="op">(</span><span class="ident">testBody</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">NewReader</span><span class="op">(</span><span class="ident">b</span><span class="op">,</span>&nbsp;<span class="ident">boundary</span><span class="op">)</span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">f</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">ReadForm</span><span class="op">(</span><span class="num">25</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatal</span><span class="op">(</span><span class="string">&#34;ReadForm:&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">defer</span>&nbsp;<span class="ident">f</span><span class="op">.</span><span class="ident">RemoveAll</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">g</span><span class="op">,</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">f</span><span class="op">.</span><span class="ident">Value</span><span class="op">[</span><span class="string">&#34;texta&#34;</span><span class="op">]</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="op">,</span>&nbsp;<span class="ident">textaValue</span><span class="op">;</span>&nbsp;<span class="ident">g</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Errorf</span><span class="op">(</span><span class="string">&#34;texta&nbsp;value&nbsp;=&nbsp;%q,&nbsp;want&nbsp;%q&#34;</span><span class="op">,</span>&nbsp;<span class="ident">g</span><span class="op">,</span>&nbsp;<span class="ident">e</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">g</span><span class="op">,</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">f</span><span class="op">.</span><span class="ident">Value</span><span class="op">[</span><span class="string">&#34;textb&#34;</span><span class="op">]</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="op">,</span>&nbsp;<span class="ident">textbValue</span><span class="op">;</span>&nbsp;<span class="ident">g</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Errorf</span><span class="op">(</span><span class="string">&#34;texta&nbsp;value&nbsp;=&nbsp;%q,&nbsp;want&nbsp;%q&#34;</span><span class="op">,</span>&nbsp;<span class="ident">g</span><span class="op">,</span>&nbsp;<span class="ident">e</span><span class="op">)</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fd</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">testFile</span><span class="op">(</span><span class="ident">t</span><span class="op">,</span>&nbsp;<span class="ident">f</span><span class="op">.</span><span class="ident">File</span><span class="op">[</span><span class="string">&#34;filea&#34;</span><span class="op">]</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="op">,</span>&nbsp;<span class="string">&#34;filea.txt&#34;</span><span class="op">,</span>&nbsp;<span class="ident">fileaContents</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">fd</span><span class="op">.</span><span class="op">(</span><span class="op">*</span><span class="ident">os</span><span class="op">.</span><span class="ident">File</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Error</span><span class="op">(</span><span class="string">&#34;file&nbsp;is&nbsp;*os.File,&nbsp;should&nbsp;not&nbsp;be&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fd</span><span class="op">.</span><span class="ident">Close</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fd</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">testFile</span><span class="op">(</span><span class="ident">t</span><span class="op">,</span>&nbsp;<span class="ident">f</span><span class="op">.</span><span class="ident">File</span><span class="op">[</span><span class="string">&#34;fileb&#34;</span><span class="op">]</span><span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="op">,</span>&nbsp;<span class="string">&#34;fileb.txt&#34;</span><span class="op">,</span>&nbsp;<span class="ident">filebContents</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">fd</span><span class="op">.</span><span class="op">(</span><span class="op">*</span><span class="ident">os</span><span class="op">.</span><span class="ident">File</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="op">!</span><span class="ident">ok</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Errorf</span><span class="op">(</span><span class="string">&#34;file&nbsp;has&nbsp;unexpected&nbsp;underlying&nbsp;type&nbsp;%T&#34;</span><span class="op">,</span>&nbsp;<span class="ident">fd</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fd</span><span class="op">.</span><span class="ident">Close</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">testFile</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">,</span>&nbsp;<span class="ident">fh</span>&nbsp;<span class="op">*</span><span class="ident">FileHeader</span><span class="op">,</span>&nbsp;<span class="ident">efn</span><span class="op">,</span>&nbsp;<span class="ident">econtent</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="ident">File</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">fh</span><span class="op">.</span><span class="ident">Filename</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">efn</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Errorf</span><span class="op">(</span><span class="string">&#34;filename&nbsp;=&nbsp;%q,&nbsp;want&nbsp;%q&#34;</span><span class="op">,</span>&nbsp;<span class="ident">fh</span><span class="op">.</span><span class="ident">Filename</span><span class="op">,</span>&nbsp;<span class="ident">efn</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">f</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">fh</span><span class="op">.</span><span class="ident">Open</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatal</span><span class="op">(</span><span class="string">&#34;opening&nbsp;file:&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">new</span><span class="op">(</span><span class="ident">bytes</span><span class="op">.</span><span class="ident">Buffer</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">Copy</span><span class="op">(</span><span class="ident">b</span><span class="op">,</span>&nbsp;<span class="ident">f</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatal</span><span class="op">(</span><span class="string">&#34;copying&nbsp;contents:&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">g</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">b</span><span class="op">.</span><span class="ident">String</span><span class="op">(</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">g</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">econtent</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Errorf</span><span class="op">(</span><span class="string">&#34;contents&nbsp;=&nbsp;%q,&nbsp;want&nbsp;%q&#34;</span><span class="op">,</span>&nbsp;<span class="ident">g</span><span class="op">,</span>&nbsp;<span class="ident">econtent</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">f</span><br>
+<span class="lineno">60</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fileaContents</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">&#34;This&nbsp;is&nbsp;a&nbsp;test&nbsp;file.&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">filebContents</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">&#34;Another&nbsp;test&nbsp;file.&#34;</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">textaValue</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="string">&#34;foo&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">textbValue</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="string">&#34;bar&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">boundary</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="string">`MyBoundary`</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">70</span><span class="keyword">const</span>&nbsp;<span class="ident">message</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">`<br>
+<span class="lineno"></span>--MyBoundary<br>
+<span class="lineno"></span>Content-Disposition:&nbsp;form-data;&nbsp;name=&#34;filea&#34;;&nbsp;filename=&#34;filea.txt&#34;<br>
+<span class="lineno"></span>Content-Type:&nbsp;text/plain<br>
+<span class="lineno"></span><br>
+<span class="lineno">75</span>`</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">fileaContents</span>&nbsp;<span class="op">+</span>&nbsp;<span class="string">`<br>
+<span class="lineno"></span>--MyBoundary<br>
+<span class="lineno"></span>Content-Disposition:&nbsp;form-data;&nbsp;name=&#34;fileb&#34;;&nbsp;filename=&#34;fileb.txt&#34;<br>
+<span class="lineno"></span>Content-Type:&nbsp;text/plain<br>
+<span class="lineno"></span><br>
+<span class="lineno">80</span>`</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">filebContents</span>&nbsp;<span class="op">+</span>&nbsp;<span class="string">`<br>
+<span class="lineno"></span>--MyBoundary<br>
+<span class="lineno"></span>Content-Disposition:&nbsp;form-data;&nbsp;name=&#34;texta&#34;<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>`</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">textaValue</span>&nbsp;<span class="op">+</span>&nbsp;<span class="string">`<br>
+<span class="lineno">85</span>--MyBoundary<br>
+<span class="lineno"></span>Content-Disposition:&nbsp;form-data;&nbsp;name=&#34;textb&#34;<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>`</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">textbValue</span>&nbsp;<span class="op">+</span>&nbsp;<span class="string">`<br>
+<span class="lineno"></span>--MyBoundary--<br>
+<span class="lineno">90</span>`</span>
+</div>
+</body>
+</html>

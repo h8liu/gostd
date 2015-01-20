@@ -1,0 +1,139 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2012&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">strings</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;stringFinder&nbsp;efficiently&nbsp;finds&nbsp;strings&nbsp;in&nbsp;a&nbsp;source&nbsp;text.&nbsp;It&#39;s&nbsp;implemented</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;using&nbsp;the&nbsp;Boyer-Moore&nbsp;string&nbsp;search&nbsp;algorithm:</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;http://en.wikipedia.org/wiki/Boyer-Moore_string_search_algorithm</span><br>
+<span class="lineno">10</span><span class="comment">//&nbsp;http://www.cs.utexas.edu/~moore/publications/fstrpos.pdf&nbsp;(note:&nbsp;this&nbsp;aged</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;document&nbsp;uses&nbsp;1-based&nbsp;indexing)</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">stringFinder</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;pattern&nbsp;is&nbsp;the&nbsp;string&nbsp;that&nbsp;we&nbsp;are&nbsp;searching&nbsp;for&nbsp;in&nbsp;the&nbsp;text.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pattern</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno">15</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;badCharSkip[b]&nbsp;contains&nbsp;the&nbsp;distance&nbsp;between&nbsp;the&nbsp;last&nbsp;byte&nbsp;of&nbsp;pattern</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;and&nbsp;the&nbsp;rightmost&nbsp;occurrence&nbsp;of&nbsp;b&nbsp;in&nbsp;pattern.&nbsp;If&nbsp;b&nbsp;is&nbsp;not&nbsp;in&nbsp;pattern,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;badCharSkip[b]&nbsp;is&nbsp;len(pattern).</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//</span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Whenever&nbsp;a&nbsp;mismatch&nbsp;is&nbsp;found&nbsp;with&nbsp;byte&nbsp;b&nbsp;in&nbsp;the&nbsp;text,&nbsp;we&nbsp;can&nbsp;safely</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;shift&nbsp;the&nbsp;matching&nbsp;frame&nbsp;at&nbsp;least&nbsp;badCharSkip[b]&nbsp;until&nbsp;the&nbsp;next&nbsp;time</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;the&nbsp;matching&nbsp;char&nbsp;could&nbsp;be&nbsp;in&nbsp;alignment.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">badCharSkip</span>&nbsp;<span class="op">[</span><span class="num">256</span><span class="op">]</span><span class="builtintype">int</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;goodSuffixSkip[i]&nbsp;defines&nbsp;how&nbsp;far&nbsp;we&nbsp;can&nbsp;shift&nbsp;the&nbsp;matching&nbsp;frame&nbsp;given</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;that&nbsp;the&nbsp;suffix&nbsp;pattern[i+1:]&nbsp;matches,&nbsp;but&nbsp;the&nbsp;byte&nbsp;pattern[i]&nbsp;does</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;not.&nbsp;There&nbsp;are&nbsp;two&nbsp;cases&nbsp;to&nbsp;consider:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;1.&nbsp;The&nbsp;matched&nbsp;suffix&nbsp;occurs&nbsp;elsewhere&nbsp;in&nbsp;pattern&nbsp;(with&nbsp;a&nbsp;different</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;byte&nbsp;preceding&nbsp;it&nbsp;that&nbsp;we&nbsp;might&nbsp;possibly&nbsp;match).&nbsp;In&nbsp;this&nbsp;case,&nbsp;we&nbsp;can</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;shift&nbsp;the&nbsp;matching&nbsp;frame&nbsp;to&nbsp;align&nbsp;with&nbsp;the&nbsp;next&nbsp;suffix&nbsp;chunk.&nbsp;For</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;example,&nbsp;the&nbsp;pattern&nbsp;&#34;mississi&#34;&nbsp;has&nbsp;the&nbsp;suffix&nbsp;&#34;issi&#34;&nbsp;next&nbsp;occurring</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;(in&nbsp;right-to-left&nbsp;order)&nbsp;at&nbsp;index&nbsp;1,&nbsp;so&nbsp;goodSuffixSkip[3]&nbsp;==</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;shift+len(suffix)&nbsp;==&nbsp;3+4&nbsp;==&nbsp;7.</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;2.&nbsp;If&nbsp;the&nbsp;matched&nbsp;suffix&nbsp;does&nbsp;not&nbsp;occur&nbsp;elsewhere&nbsp;in&nbsp;pattern,&nbsp;then&nbsp;the</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;matching&nbsp;frame&nbsp;may&nbsp;share&nbsp;part&nbsp;of&nbsp;its&nbsp;prefix&nbsp;with&nbsp;the&nbsp;end&nbsp;of&nbsp;the</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;matching&nbsp;suffix.&nbsp;In&nbsp;this&nbsp;case,&nbsp;goodSuffixSkip[i]&nbsp;will&nbsp;contain&nbsp;how&nbsp;far</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;to&nbsp;shift&nbsp;the&nbsp;frame&nbsp;to&nbsp;align&nbsp;this&nbsp;portion&nbsp;of&nbsp;the&nbsp;prefix&nbsp;to&nbsp;the</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;suffix.&nbsp;For&nbsp;example,&nbsp;in&nbsp;the&nbsp;pattern&nbsp;&#34;abcxxxabc&#34;,&nbsp;when&nbsp;the&nbsp;first</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;mismatch&nbsp;from&nbsp;the&nbsp;back&nbsp;is&nbsp;found&nbsp;to&nbsp;be&nbsp;in&nbsp;position&nbsp;3,&nbsp;the&nbsp;matching</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;suffix&nbsp;&#34;xxabc&#34;&nbsp;is&nbsp;not&nbsp;found&nbsp;elsewhere&nbsp;in&nbsp;the&nbsp;pattern.&nbsp;However,&nbsp;its</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;rightmost&nbsp;&#34;abc&#34;&nbsp;(at&nbsp;position&nbsp;6)&nbsp;is&nbsp;a&nbsp;prefix&nbsp;of&nbsp;the&nbsp;whole&nbsp;pattern,&nbsp;so</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;goodSuffixSkip[3]&nbsp;==&nbsp;shift+len(suffix)&nbsp;==&nbsp;6+5&nbsp;==&nbsp;11.</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">goodSuffixSkip</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">int</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">makeStringFinder</span><span class="op">(</span><span class="ident">pattern</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">stringFinder</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">f</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">&amp;</span><span class="ident">stringFinder</span><span class="op">{</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pattern</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">pattern</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">goodSuffixSkip</span><span class="op">:</span>&nbsp;<span class="builtinfunc">make</span><span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">pattern</span><span class="op">)</span><span class="op">)</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;last&nbsp;is&nbsp;the&nbsp;index&nbsp;of&nbsp;the&nbsp;last&nbsp;character&nbsp;in&nbsp;the&nbsp;pattern.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">last</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">pattern</span><span class="op">)</span>&nbsp;<span class="op">-</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno">55</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Build&nbsp;bad&nbsp;character&nbsp;table.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Bytes&nbsp;not&nbsp;in&nbsp;the&nbsp;pattern&nbsp;can&nbsp;skip&nbsp;one&nbsp;pattern&#39;s&nbsp;length.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">f</span><span class="op">.</span><span class="ident">badCharSkip</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">f</span><span class="op">.</span><span class="ident">badCharSkip</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">pattern</span><span class="op">)</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;The&nbsp;loop&nbsp;condition&nbsp;is&nbsp;&lt;&nbsp;instead&nbsp;of&nbsp;&lt;=&nbsp;so&nbsp;that&nbsp;the&nbsp;last&nbsp;byte&nbsp;does&nbsp;not</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;have&nbsp;a&nbsp;zero&nbsp;distance&nbsp;to&nbsp;itself.&nbsp;Finding&nbsp;this&nbsp;byte&nbsp;out&nbsp;of&nbsp;place&nbsp;implies</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;that&nbsp;it&nbsp;is&nbsp;not&nbsp;in&nbsp;the&nbsp;last&nbsp;position.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="num">0</span><span class="op">;</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">last</span><span class="op">;</span>&nbsp;<span class="ident">i</span><span class="op">++</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">f</span><span class="op">.</span><span class="ident">badCharSkip</span><span class="op">[</span><span class="ident">pattern</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">last</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">i</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Build&nbsp;good&nbsp;suffix&nbsp;table.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;First&nbsp;pass:&nbsp;set&nbsp;each&nbsp;value&nbsp;to&nbsp;the&nbsp;next&nbsp;index&nbsp;which&nbsp;starts&nbsp;a&nbsp;prefix&nbsp;of</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;pattern.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">lastPrefix</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">last</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">last</span><span class="op">;</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">&gt;=</span>&nbsp;<span class="num">0</span><span class="op">;</span>&nbsp;<span class="ident">i</span><span class="op">--</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">HasPrefix</span><span class="op">(</span><span class="ident">pattern</span><span class="op">,</span>&nbsp;<span class="ident">pattern</span><span class="op">[</span><span class="ident">i</span><span class="op">+</span><span class="num">1</span><span class="op">:</span><span class="op">]</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">lastPrefix</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">+</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;lastPrefix&nbsp;is&nbsp;the&nbsp;shift,&nbsp;and&nbsp;(last-i)&nbsp;is&nbsp;len(suffix).</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">f</span><span class="op">.</span><span class="ident">goodSuffixSkip</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">lastPrefix</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">last</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">i</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Second&nbsp;pass:&nbsp;find&nbsp;repeats&nbsp;of&nbsp;pattern&#39;s&nbsp;suffix&nbsp;starting&nbsp;from&nbsp;the&nbsp;front.</span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="num">0</span><span class="op">;</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">last</span><span class="op">;</span>&nbsp;<span class="ident">i</span><span class="op">++</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">lenSuffix</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">longestCommonSuffix</span><span class="op">(</span><span class="ident">pattern</span><span class="op">,</span>&nbsp;<span class="ident">pattern</span><span class="op">[</span><span class="num">1</span><span class="op">:</span><span class="ident">i</span><span class="op">+</span><span class="num">1</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">pattern</span><span class="op">[</span><span class="ident">i</span><span class="op">-</span><span class="ident">lenSuffix</span><span class="op">]</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">pattern</span><span class="op">[</span><span class="ident">last</span><span class="op">-</span><span class="ident">lenSuffix</span><span class="op">]</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;(last-i)&nbsp;is&nbsp;the&nbsp;shift,&nbsp;and&nbsp;lenSuffix&nbsp;is&nbsp;len(suffix).</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">f</span><span class="op">.</span><span class="ident">goodSuffixSkip</span><span class="op">[</span><span class="ident">last</span><span class="op">-</span><span class="ident">lenSuffix</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">lenSuffix</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">last</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">i</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">f</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">90</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">longestCommonSuffix</span><span class="op">(</span><span class="ident">a</span><span class="op">,</span>&nbsp;<span class="ident">b</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">i</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="op">;</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">a</span><span class="op">)</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">b</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">i</span><span class="op">++</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">a</span><span class="op">[</span><span class="builtinfunc">len</span><span class="op">(</span><span class="ident">a</span><span class="op">)</span><span class="op">-</span><span class="num">1</span><span class="op">-</span><span class="ident">i</span><span class="op">]</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">b</span><span class="op">[</span><span class="builtinfunc">len</span><span class="op">(</span><span class="ident">b</span><span class="op">)</span><span class="op">-</span><span class="num">1</span><span class="op">-</span><span class="ident">i</span><span class="op">]</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">break</span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">100</span><span class="comment">//&nbsp;next&nbsp;returns&nbsp;the&nbsp;index&nbsp;in&nbsp;text&nbsp;of&nbsp;the&nbsp;first&nbsp;occurrence&nbsp;of&nbsp;the&nbsp;pattern.&nbsp;If</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;the&nbsp;pattern&nbsp;is&nbsp;not&nbsp;found,&nbsp;it&nbsp;returns&nbsp;-1.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">f</span>&nbsp;<span class="op">*</span><span class="ident">stringFinder</span><span class="op">)</span>&nbsp;<span class="ident">next</span><span class="op">(</span><span class="ident">text</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">i</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">f</span><span class="op">.</span><span class="ident">pattern</span><span class="op">)</span>&nbsp;<span class="op">-</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">text</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Compare&nbsp;backwards&nbsp;from&nbsp;the&nbsp;end&nbsp;until&nbsp;the&nbsp;first&nbsp;unmatching&nbsp;character.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">j</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">f</span><span class="op">.</span><span class="ident">pattern</span><span class="op">)</span>&nbsp;<span class="op">-</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">j</span>&nbsp;<span class="op">&gt;=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">text</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">f</span><span class="op">.</span><span class="ident">pattern</span><span class="op">[</span><span class="ident">j</span><span class="op">]</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">i</span><span class="op">--</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">j</span><span class="op">--</span><br>
+<span class="lineno">110</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">j</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">+</span>&nbsp;<span class="num">1</span>&nbsp;<span class="comment">//&nbsp;match</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">i</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="ident">max</span><span class="op">(</span><span class="ident">f</span><span class="op">.</span><span class="ident">badCharSkip</span><span class="op">[</span><span class="ident">text</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><span class="op">]</span><span class="op">,</span>&nbsp;<span class="ident">f</span><span class="op">.</span><span class="ident">goodSuffixSkip</span><span class="op">[</span><span class="ident">j</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno">115</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="op">-</span><span class="num">1</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">max</span><span class="op">(</span><span class="ident">a</span><span class="op">,</span>&nbsp;<span class="ident">b</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">120</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">a</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="ident">b</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">a</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">b</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

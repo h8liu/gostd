@@ -1,0 +1,331 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2014&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">runtime</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="string">&#34;unsafe&#34;</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Declarations&nbsp;for&nbsp;runtime&nbsp;services&nbsp;implemented&nbsp;in&nbsp;C&nbsp;or&nbsp;assembly.</span><br>
+<span class="lineno">10</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">ptrSize</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">4</span>&nbsp;<span class="op">&lt;&lt;</span>&nbsp;<span class="op">(</span><span class="op">^</span><span class="builtintype">uintptr</span><span class="op">(</span><span class="num">0</span><span class="op">)</span>&nbsp;<span class="op">&gt;&gt;</span>&nbsp;<span class="num">63</span><span class="op">)</span>&nbsp;<span class="comment">//&nbsp;unsafe.Sizeof(uintptr(0))&nbsp;but&nbsp;an&nbsp;ideal&nbsp;const</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">regSize</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">4</span>&nbsp;<span class="op">&lt;&lt;</span>&nbsp;<span class="op">(</span><span class="op">^</span><span class="ident">uintreg</span><span class="op">(</span><span class="num">0</span><span class="op">)</span>&nbsp;<span class="op">&gt;&gt;</span>&nbsp;<span class="num">63</span><span class="op">)</span>&nbsp;<span class="comment">//&nbsp;unsafe.Sizeof(uintreg(0))&nbsp;but&nbsp;an&nbsp;ideal&nbsp;const</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Should&nbsp;be&nbsp;a&nbsp;built-in&nbsp;for&nbsp;unsafe.Pointer?</span><br>
+<span class="lineno">15</span><span class="comment">//go:nosplit</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">add</span><span class="op">(</span><span class="ident">p</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">,</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">)</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="builtintype">uintptr</span><span class="op">(</span><span class="ident">p</span><span class="op">)</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">x</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">20</span><span class="comment">//&nbsp;n&nbsp;must&nbsp;be&nbsp;a&nbsp;power&nbsp;of&nbsp;2</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">roundup</span><span class="op">(</span><span class="ident">p</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">,</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">)</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">delta</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">-</span><span class="builtintype">uintptr</span><span class="op">(</span><span class="ident">p</span><span class="op">)</span>&nbsp;<span class="op">&amp;</span>&nbsp;<span class="op">(</span><span class="ident">n</span>&nbsp;<span class="op">-</span>&nbsp;<span class="num">1</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="builtintype">uintptr</span><span class="op">(</span><span class="ident">p</span><span class="op">)</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">delta</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">25</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;in&nbsp;runtime.c</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">getg</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">g</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">acquirem</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">m</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">releasem</span><span class="op">(</span><span class="ident">mp</span>&nbsp;<span class="op">*</span><span class="ident">m</span><span class="op">)</span><br>
+<span class="lineno">30</span><span class="keyword">func</span>&nbsp;<span class="ident">gomcache</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">mcache</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">readgstatus</span><span class="op">(</span><span class="op">*</span><span class="ident">g</span><span class="op">)</span>&nbsp;<span class="builtintype">uint32</span>&nbsp;<span class="comment">//&nbsp;proc.c</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;mcall&nbsp;switches&nbsp;from&nbsp;the&nbsp;g&nbsp;to&nbsp;the&nbsp;g0&nbsp;stack&nbsp;and&nbsp;invokes&nbsp;fn(g),</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;where&nbsp;g&nbsp;is&nbsp;the&nbsp;goroutine&nbsp;that&nbsp;made&nbsp;the&nbsp;call.</span><br>
+<span class="lineno">35</span><span class="comment">//&nbsp;mcall&nbsp;saves&nbsp;g&#39;s&nbsp;current&nbsp;PC/SP&nbsp;in&nbsp;g-&gt;sched&nbsp;so&nbsp;that&nbsp;it&nbsp;can&nbsp;be&nbsp;restored&nbsp;later.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;It&nbsp;is&nbsp;up&nbsp;to&nbsp;fn&nbsp;to&nbsp;arrange&nbsp;for&nbsp;that&nbsp;later&nbsp;execution,&nbsp;typically&nbsp;by&nbsp;recording</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;g&nbsp;in&nbsp;a&nbsp;data&nbsp;structure,&nbsp;causing&nbsp;something&nbsp;to&nbsp;call&nbsp;ready(g)&nbsp;later.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;mcall&nbsp;returns&nbsp;to&nbsp;the&nbsp;original&nbsp;goroutine&nbsp;g&nbsp;later,&nbsp;when&nbsp;g&nbsp;has&nbsp;been&nbsp;rescheduled.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;fn&nbsp;must&nbsp;not&nbsp;return&nbsp;at&nbsp;all;&nbsp;typically&nbsp;it&nbsp;ends&nbsp;by&nbsp;calling&nbsp;schedule,&nbsp;to&nbsp;let&nbsp;the&nbsp;m</span><br>
+<span class="lineno">40</span><span class="comment">//&nbsp;run&nbsp;other&nbsp;goroutines.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;mcall&nbsp;can&nbsp;only&nbsp;be&nbsp;called&nbsp;from&nbsp;g&nbsp;stacks&nbsp;(not&nbsp;g0,&nbsp;not&nbsp;gsignal).</span><br>
+<span class="lineno"></span><span class="comment">//go:noescape</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">mcall</span><span class="op">(</span><span class="ident">fn</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="op">*</span><span class="ident">g</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno">45</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;onM&nbsp;switches&nbsp;from&nbsp;the&nbsp;g&nbsp;to&nbsp;the&nbsp;g0&nbsp;stack&nbsp;and&nbsp;invokes&nbsp;fn().</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;When&nbsp;fn&nbsp;returns,&nbsp;onM&nbsp;switches&nbsp;back&nbsp;to&nbsp;the&nbsp;g&nbsp;and&nbsp;returns,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;continuing&nbsp;execution&nbsp;on&nbsp;the&nbsp;g&nbsp;stack.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;If&nbsp;arguments&nbsp;must&nbsp;be&nbsp;passed&nbsp;to&nbsp;fn,&nbsp;they&nbsp;can&nbsp;be&nbsp;written&nbsp;to</span><br>
+<span class="lineno">50</span><span class="comment">//&nbsp;g-&gt;m-&gt;ptrarg&nbsp;(pointers)&nbsp;and&nbsp;g-&gt;m-&gt;scalararg&nbsp;(non-pointers)</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;before&nbsp;the&nbsp;call&nbsp;and&nbsp;then&nbsp;consulted&nbsp;during&nbsp;fn.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Similarly,&nbsp;fn&nbsp;can&nbsp;pass&nbsp;return&nbsp;values&nbsp;back&nbsp;in&nbsp;those&nbsp;locations.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;If&nbsp;fn&nbsp;is&nbsp;written&nbsp;in&nbsp;Go,&nbsp;it&nbsp;can&nbsp;be&nbsp;a&nbsp;closure,&nbsp;which&nbsp;avoids&nbsp;the&nbsp;need&nbsp;for</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ptrarg&nbsp;and&nbsp;scalararg&nbsp;entirely.</span><br>
+<span class="lineno">55</span><span class="comment">//&nbsp;After&nbsp;reading&nbsp;values&nbsp;out&nbsp;of&nbsp;ptrarg&nbsp;and&nbsp;scalararg&nbsp;it&nbsp;is&nbsp;conventional</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;to&nbsp;zero&nbsp;them&nbsp;to&nbsp;avoid&nbsp;(memory&nbsp;or&nbsp;information)&nbsp;leaks.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;If&nbsp;onM&nbsp;is&nbsp;called&nbsp;from&nbsp;a&nbsp;g0&nbsp;stack,&nbsp;it&nbsp;invokes&nbsp;fn&nbsp;and&nbsp;returns,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;without&nbsp;any&nbsp;stack&nbsp;switches.</span><br>
+<span class="lineno">60</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;If&nbsp;onM&nbsp;is&nbsp;called&nbsp;from&nbsp;a&nbsp;gsignal&nbsp;stack,&nbsp;it&nbsp;crashes&nbsp;the&nbsp;program.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;implication&nbsp;is&nbsp;that&nbsp;functions&nbsp;used&nbsp;in&nbsp;signal&nbsp;handlers&nbsp;must</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;not&nbsp;use&nbsp;onM.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">65</span><span class="comment">//&nbsp;NOTE(rsc):&nbsp;We&nbsp;could&nbsp;introduce&nbsp;a&nbsp;separate&nbsp;onMsignal&nbsp;that&nbsp;is</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;like&nbsp;onM&nbsp;but&nbsp;if&nbsp;called&nbsp;from&nbsp;a&nbsp;gsignal&nbsp;stack&nbsp;would&nbsp;just&nbsp;run&nbsp;fn&nbsp;on</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;that&nbsp;stack.&nbsp;The&nbsp;caller&nbsp;of&nbsp;onMsignal&nbsp;would&nbsp;be&nbsp;required&nbsp;to&nbsp;save&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;old&nbsp;values&nbsp;of&nbsp;ptrarg/scalararg&nbsp;and&nbsp;restore&nbsp;them&nbsp;when&nbsp;the&nbsp;call</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;was&nbsp;finished,&nbsp;in&nbsp;case&nbsp;the&nbsp;signal&nbsp;interrupted&nbsp;an&nbsp;onM&nbsp;sequence</span><br>
+<span class="lineno">70</span><span class="comment">//&nbsp;in&nbsp;progress&nbsp;on&nbsp;the&nbsp;g&nbsp;or&nbsp;g0&nbsp;stacks.&nbsp;Until&nbsp;there&nbsp;is&nbsp;a&nbsp;clear&nbsp;need&nbsp;for&nbsp;this,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;we&nbsp;just&nbsp;reject&nbsp;onM&nbsp;in&nbsp;signal&nbsp;handling&nbsp;contexts&nbsp;entirely.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//go:noescape</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">onM</span><span class="op">(</span><span class="ident">fn</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno">75</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;onMsignal&nbsp;is&nbsp;like&nbsp;onM&nbsp;but&nbsp;is&nbsp;allowed&nbsp;to&nbsp;be&nbsp;used&nbsp;in&nbsp;code&nbsp;that</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;might&nbsp;run&nbsp;on&nbsp;the&nbsp;gsignal&nbsp;stack.&nbsp;Code&nbsp;running&nbsp;on&nbsp;a&nbsp;signal&nbsp;stack</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;may&nbsp;be&nbsp;interrupting&nbsp;an&nbsp;onM&nbsp;sequence&nbsp;on&nbsp;the&nbsp;main&nbsp;stack,&nbsp;so</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;if&nbsp;the&nbsp;onMsignal&nbsp;calling&nbsp;sequence&nbsp;writes&nbsp;to&nbsp;ptrarg/scalararg,</span><br>
+<span class="lineno">80</span><span class="comment">//&nbsp;it&nbsp;must&nbsp;first&nbsp;save&nbsp;the&nbsp;old&nbsp;values&nbsp;and&nbsp;then&nbsp;restore&nbsp;them&nbsp;when</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;finished.&nbsp;As&nbsp;an&nbsp;exception&nbsp;to&nbsp;the&nbsp;rule,&nbsp;it&nbsp;is&nbsp;fine&nbsp;not&nbsp;to&nbsp;save&nbsp;and</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;restore&nbsp;the&nbsp;values&nbsp;if&nbsp;the&nbsp;program&nbsp;is&nbsp;trying&nbsp;to&nbsp;crash&nbsp;rather&nbsp;than</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;return&nbsp;from&nbsp;the&nbsp;signal&nbsp;handler.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Once&nbsp;all&nbsp;the&nbsp;runtime&nbsp;is&nbsp;written&nbsp;in&nbsp;Go,&nbsp;there&nbsp;will&nbsp;be&nbsp;no&nbsp;ptrarg/scalararg</span><br>
+<span class="lineno">85</span><span class="comment">//&nbsp;and&nbsp;the&nbsp;distinction&nbsp;between&nbsp;onM&nbsp;and&nbsp;onMsignal&nbsp;(and&nbsp;perhaps&nbsp;mcall)</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;can&nbsp;go&nbsp;away.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;If&nbsp;onMsignal&nbsp;is&nbsp;called&nbsp;from&nbsp;a&nbsp;gsignal&nbsp;stack,&nbsp;it&nbsp;invokes&nbsp;fn&nbsp;directly,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;without&nbsp;a&nbsp;stack&nbsp;switch.&nbsp;Otherwise&nbsp;onMsignal&nbsp;behaves&nbsp;like&nbsp;onM.</span><br>
+<span class="lineno">90</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//go:noescape</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">onM_signalok</span><span class="op">(</span><span class="ident">fn</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">badonm</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gothrow</span><span class="op">(</span><span class="string">&#34;onM&nbsp;called&nbsp;from&nbsp;signal&nbsp;goroutine&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;C&nbsp;functions&nbsp;that&nbsp;run&nbsp;on&nbsp;the&nbsp;M&nbsp;stack.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Call&nbsp;using&nbsp;mcall.</span><br>
+<span class="lineno">100</span><span class="keyword">func</span>&nbsp;<span class="ident">gosched_m</span><span class="op">(</span><span class="op">*</span><span class="ident">g</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">park_m</span><span class="op">(</span><span class="op">*</span><span class="ident">g</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">recovery_m</span><span class="op">(</span><span class="op">*</span><span class="ident">g</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;More&nbsp;C&nbsp;functions&nbsp;that&nbsp;run&nbsp;on&nbsp;the&nbsp;M&nbsp;stack.</span><br>
+<span class="lineno">105</span><span class="comment">//&nbsp;Call&nbsp;using&nbsp;onM.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">mcacheRefill_m</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">largeAlloc_m</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">gc_m</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">scavenge_m</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">110</span><span class="keyword">func</span>&nbsp;<span class="ident">setFinalizer_m</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">removeFinalizer_m</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">markallocated_m</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">unrollgcprog_m</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">unrollgcproginplace_m</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">115</span><span class="keyword">func</span>&nbsp;<span class="ident">setgcpercent_m</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">setmaxthreads_m</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">ready_m</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">deferproc_m</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">goexit_m</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">120</span><span class="keyword">func</span>&nbsp;<span class="ident">startpanic_m</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">dopanic_m</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">readmemstats_m</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">writeheapdump_m</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">125</span><span class="comment">//&nbsp;memclr&nbsp;clears&nbsp;n&nbsp;bytes&nbsp;starting&nbsp;at&nbsp;ptr.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;in&nbsp;memclr_*.s</span><br>
+<span class="lineno"></span><span class="comment">//go:noescape</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">memclr</span><span class="op">(</span><span class="ident">ptr</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">,</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">130</span><span class="comment">//&nbsp;memmove&nbsp;copies&nbsp;n&nbsp;bytes&nbsp;from&nbsp;&#34;from&#34;&nbsp;to&nbsp;&#34;to&#34;.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;in&nbsp;memmove_*.s</span><br>
+<span class="lineno"></span><span class="comment">//go:noescape</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">memmove</span><span class="op">(</span><span class="ident">to</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">,</span>&nbsp;<span class="ident">from</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">,</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">135</span><span class="keyword">func</span>&nbsp;<span class="ident">starttheworld</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">stoptheworld</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">newextram</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">lockOSThread</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">unlockOSThread</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">140</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;exported&nbsp;value&nbsp;for&nbsp;testing</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">hashLoad</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">loadFactor</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;in&nbsp;asm_*.s</span><br>
+<span class="lineno">145</span><span class="keyword">func</span>&nbsp;<span class="ident">fastrand1</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">uint32</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;in&nbsp;asm_*.s</span><br>
+<span class="lineno"></span><span class="comment">//go:noescape</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">memeq</span><span class="op">(</span><span class="ident">a</span><span class="op">,</span>&nbsp;<span class="ident">b</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">,</span>&nbsp;<span class="ident">size</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span><br>
+<span class="lineno">150</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;noescape&nbsp;hides&nbsp;a&nbsp;pointer&nbsp;from&nbsp;escape&nbsp;analysis.&nbsp;&nbsp;noescape&nbsp;is</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;the&nbsp;identity&nbsp;function&nbsp;but&nbsp;escape&nbsp;analysis&nbsp;doesn&#39;t&nbsp;think&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;output&nbsp;depends&nbsp;on&nbsp;the&nbsp;input.&nbsp;&nbsp;noescape&nbsp;is&nbsp;inlined&nbsp;and&nbsp;currently</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;compiles&nbsp;down&nbsp;to&nbsp;a&nbsp;single&nbsp;xor&nbsp;instruction.</span><br>
+<span class="lineno">155</span><span class="comment">//&nbsp;USE&nbsp;CAREFULLY!</span><br>
+<span class="lineno"></span><span class="comment">//go:nosplit</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">noescape</span><span class="op">(</span><span class="ident">p</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">)</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">x</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">(</span><span class="ident">p</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="ident">x</span>&nbsp;<span class="op">^</span>&nbsp;<span class="num">0</span><span class="op">)</span><br>
+<span class="lineno">160</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">entersyscall</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">reentersyscall</span><span class="op">(</span><span class="ident">pc</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">,</span>&nbsp;<span class="ident">sp</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">entersyscallblock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">165</span><span class="keyword">func</span>&nbsp;<span class="ident">exitsyscall</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">cgocallback</span><span class="op">(</span><span class="ident">fn</span><span class="op">,</span>&nbsp;<span class="ident">frame</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">,</span>&nbsp;<span class="ident">framesize</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">gogo</span><span class="op">(</span><span class="ident">buf</span>&nbsp;<span class="op">*</span><span class="ident">gobuf</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">gosave</span><span class="op">(</span><span class="ident">buf</span>&nbsp;<span class="op">*</span><span class="ident">gobuf</span><span class="op">)</span><br>
+<span class="lineno">170</span><span class="keyword">func</span>&nbsp;<span class="ident">read</span><span class="op">(</span><span class="ident">fd</span>&nbsp;<span class="builtintype">int32</span><span class="op">,</span>&nbsp;<span class="ident">p</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">,</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="builtintype">int32</span><span class="op">)</span>&nbsp;<span class="builtintype">int32</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="builtinfunc">close</span><span class="op">(</span><span class="ident">fd</span>&nbsp;<span class="builtintype">int32</span><span class="op">)</span>&nbsp;<span class="builtintype">int32</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">mincore</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">,</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">,</span>&nbsp;<span class="ident">dst</span>&nbsp;<span class="op">*</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="builtintype">int32</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//go:noescape</span><br>
+<span class="lineno">175</span><span class="keyword">func</span>&nbsp;<span class="ident">jmpdefer</span><span class="op">(</span><span class="ident">fv</span>&nbsp;<span class="op">*</span><span class="ident">funcval</span><span class="op">,</span>&nbsp;<span class="ident">argp</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">exit1</span><span class="op">(</span><span class="ident">code</span>&nbsp;<span class="builtintype">int32</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">asminit</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">setg</span><span class="op">(</span><span class="ident">gg</span>&nbsp;<span class="op">*</span><span class="ident">g</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">exit</span><span class="op">(</span><span class="ident">code</span>&nbsp;<span class="builtintype">int32</span><span class="op">)</span><br>
+<span class="lineno">180</span><span class="keyword">func</span>&nbsp;<span class="ident">breakpoint</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">nanotime</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="ident">int64</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">usleep</span><span class="op">(</span><span class="ident">usec</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;careful:&nbsp;cputicks&nbsp;is&nbsp;not&nbsp;guaranteed&nbsp;to&nbsp;be&nbsp;monotonic!&nbsp;&nbsp;In&nbsp;particular,&nbsp;we&nbsp;have</span><br>
+<span class="lineno">185</span><span class="comment">//&nbsp;noticed&nbsp;drift&nbsp;between&nbsp;cpus&nbsp;on&nbsp;certain&nbsp;os/arch&nbsp;combinations.&nbsp;&nbsp;See&nbsp;issue&nbsp;8976.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">cputicks</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="ident">int64</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">mmap</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">,</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">,</span>&nbsp;<span class="ident">prot</span><span class="op">,</span>&nbsp;<span class="ident">flags</span><span class="op">,</span>&nbsp;<span class="ident">fd</span>&nbsp;<span class="builtintype">int32</span><span class="op">,</span>&nbsp;<span class="ident">off</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">munmap</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">,</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">)</span><br>
+<span class="lineno">190</span><span class="keyword">func</span>&nbsp;<span class="ident">madvise</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">,</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">,</span>&nbsp;<span class="ident">flags</span>&nbsp;<span class="builtintype">int32</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">reflectcall</span><span class="op">(</span><span class="ident">fn</span><span class="op">,</span>&nbsp;<span class="ident">arg</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">,</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="builtintype">uint32</span><span class="op">,</span>&nbsp;<span class="ident">retoffset</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">osyield</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">procyield</span><span class="op">(</span><span class="ident">cycles</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">cgocallback_gofunc</span><span class="op">(</span><span class="ident">fv</span>&nbsp;<span class="op">*</span><span class="ident">funcval</span><span class="op">,</span>&nbsp;<span class="ident">frame</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">,</span>&nbsp;<span class="ident">framesize</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">)</span><br>
+<span class="lineno">195</span><span class="keyword">func</span>&nbsp;<span class="ident">readgogc</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">int32</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">purgecachedstats</span><span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">mcache</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">gostringnocopy</span><span class="op">(</span><span class="ident">b</span>&nbsp;<span class="op">*</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">goexit</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">200</span><span class="comment">//go:noescape</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">write</span><span class="op">(</span><span class="ident">fd</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">,</span>&nbsp;<span class="ident">p</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">,</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="builtintype">int32</span><span class="op">)</span>&nbsp;<span class="builtintype">int32</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//go:noescape</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">cas</span><span class="op">(</span><span class="ident">ptr</span>&nbsp;<span class="op">*</span><span class="builtintype">uint32</span><span class="op">,</span>&nbsp;<span class="ident">old</span><span class="op">,</span>&nbsp;<span class="builtinfunc">new</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span><br>
+<span class="lineno">205</span><br>
+<span class="lineno"></span><span class="comment">//go:noescape</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">casp</span><span class="op">(</span><span class="ident">ptr</span>&nbsp;<span class="op">*</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">,</span>&nbsp;<span class="ident">old</span><span class="op">,</span>&nbsp;<span class="builtinfunc">new</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//go:noescape</span><br>
+<span class="lineno">210</span><span class="keyword">func</span>&nbsp;<span class="ident">casuintptr</span><span class="op">(</span><span class="ident">ptr</span>&nbsp;<span class="op">*</span><span class="builtintype">uintptr</span><span class="op">,</span>&nbsp;<span class="ident">old</span><span class="op">,</span>&nbsp;<span class="builtinfunc">new</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//go:noescape</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">atomicstoreuintptr</span><span class="op">(</span><span class="ident">ptr</span>&nbsp;<span class="op">*</span><span class="builtintype">uintptr</span><span class="op">,</span>&nbsp;<span class="builtinfunc">new</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">215</span><span class="comment">//go:noescape</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">atomicloaduintptr</span><span class="op">(</span><span class="ident">ptr</span>&nbsp;<span class="op">*</span><span class="builtintype">uintptr</span><span class="op">)</span>&nbsp;<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//go:noescape</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">atomicloaduint</span><span class="op">(</span><span class="ident">ptr</span>&nbsp;<span class="op">*</span><span class="builtintype">uint</span><span class="op">)</span>&nbsp;<span class="builtintype">uint</span><br>
+<span class="lineno">220</span><br>
+<span class="lineno"></span><span class="comment">//go:noescape</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">setcallerpc</span><span class="op">(</span><span class="ident">argp</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">,</span>&nbsp;<span class="ident">pc</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;getcallerpc&nbsp;returns&nbsp;the&nbsp;program&nbsp;counter&nbsp;(PC)&nbsp;of&nbsp;its&nbsp;caller&#39;s&nbsp;caller.</span><br>
+<span class="lineno">225</span><span class="comment">//&nbsp;getcallersp&nbsp;returns&nbsp;the&nbsp;stack&nbsp;pointer&nbsp;(SP)&nbsp;of&nbsp;its&nbsp;caller&#39;s&nbsp;caller.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;For&nbsp;both,&nbsp;the&nbsp;argp&nbsp;must&nbsp;be&nbsp;a&nbsp;pointer&nbsp;to&nbsp;the&nbsp;caller&#39;s&nbsp;first&nbsp;function&nbsp;argument.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;implementation&nbsp;may&nbsp;or&nbsp;may&nbsp;not&nbsp;use&nbsp;argp,&nbsp;depending&nbsp;on</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;the&nbsp;architecture.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">230</span><span class="comment">//&nbsp;For&nbsp;example:</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspfunc&nbsp;f(arg1,&nbsp;arg2,&nbsp;arg3&nbsp;int)&nbsp;{</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsppc&nbsp;:=&nbsp;getcallerpc(unsafe.Pointer(&amp;arg1))</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspsp&nbsp;:=&nbsp;getcallerpc(unsafe.Pointer(&amp;arg2))</span><br>
+<span class="lineno">235</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp}</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;These&nbsp;two&nbsp;lines&nbsp;find&nbsp;the&nbsp;PC&nbsp;and&nbsp;SP&nbsp;immediately&nbsp;following</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;the&nbsp;call&nbsp;to&nbsp;f&nbsp;(where&nbsp;f&nbsp;will&nbsp;return).</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">240</span><span class="comment">//&nbsp;The&nbsp;call&nbsp;to&nbsp;getcallerpc&nbsp;and&nbsp;getcallersp&nbsp;must&nbsp;be&nbsp;done&nbsp;in&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;frame&nbsp;being&nbsp;asked&nbsp;about.&nbsp;It&nbsp;would&nbsp;not&nbsp;be&nbsp;correct&nbsp;for&nbsp;f&nbsp;to&nbsp;pass&nbsp;&amp;arg1</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;to&nbsp;another&nbsp;function&nbsp;g&nbsp;and&nbsp;let&nbsp;g&nbsp;call&nbsp;getcallerpc/getcallersp.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;call&nbsp;inside&nbsp;g&nbsp;might&nbsp;return&nbsp;information&nbsp;about&nbsp;g&#39;s&nbsp;caller&nbsp;or</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;information&nbsp;about&nbsp;f&#39;s&nbsp;caller&nbsp;or&nbsp;complete&nbsp;garbage.</span><br>
+<span class="lineno">245</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;result&nbsp;of&nbsp;getcallersp&nbsp;is&nbsp;correct&nbsp;at&nbsp;the&nbsp;time&nbsp;of&nbsp;the&nbsp;return,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;but&nbsp;it&nbsp;may&nbsp;be&nbsp;invalidated&nbsp;by&nbsp;any&nbsp;subsequent&nbsp;call&nbsp;to&nbsp;a&nbsp;function</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;that&nbsp;might&nbsp;relocate&nbsp;the&nbsp;stack&nbsp;in&nbsp;order&nbsp;to&nbsp;grow&nbsp;or&nbsp;shrink&nbsp;it.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;A&nbsp;general&nbsp;rule&nbsp;is&nbsp;that&nbsp;the&nbsp;result&nbsp;of&nbsp;getcallersp&nbsp;should&nbsp;be&nbsp;used</span><br>
+<span class="lineno">250</span><span class="comment">//&nbsp;immediately&nbsp;and&nbsp;can&nbsp;only&nbsp;be&nbsp;passed&nbsp;to&nbsp;nosplit&nbsp;functions.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//go:noescape</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">getcallerpc</span><span class="op">(</span><span class="ident">argp</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">)</span>&nbsp;<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">255</span><span class="comment">//go:noescape</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">getcallersp</span><span class="op">(</span><span class="ident">argp</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">)</span>&nbsp;<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//go:noescape</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">asmcgocall</span><span class="op">(</span><span class="ident">fn</span><span class="op">,</span>&nbsp;<span class="ident">arg</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">)</span><br>
+<span class="lineno">260</span><br>
+<span class="lineno"></span><span class="comment">//go:noescape</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">asmcgocall_errno</span><span class="op">(</span><span class="ident">fn</span><span class="op">,</span>&nbsp;<span class="ident">arg</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">)</span>&nbsp;<span class="builtintype">int32</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//go:noescape</span><br>
+<span class="lineno">265</span><span class="keyword">func</span>&nbsp;<span class="ident">open</span><span class="op">(</span><span class="ident">name</span>&nbsp;<span class="op">*</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="ident">mode</span><span class="op">,</span>&nbsp;<span class="ident">perm</span>&nbsp;<span class="builtintype">int32</span><span class="op">)</span>&nbsp;<span class="builtintype">int32</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//go:noescape</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">gotraceback</span><span class="op">(</span><span class="op">*</span><span class="builtintype">bool</span><span class="op">)</span>&nbsp;<span class="builtintype">int32</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">270</span><span class="keyword">const</span>&nbsp;<span class="ident">_NoArgs</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">^</span><span class="builtintype">uintptr</span><span class="op">(</span><span class="num">0</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">newstack</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">newproc</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">morestack</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">275</span><span class="keyword">func</span>&nbsp;<span class="ident">mstart</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">rt0_go</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;return0&nbsp;is&nbsp;a&nbsp;stub&nbsp;used&nbsp;to&nbsp;return&nbsp;0&nbsp;from&nbsp;deferproc.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;It&nbsp;is&nbsp;called&nbsp;at&nbsp;the&nbsp;very&nbsp;end&nbsp;of&nbsp;deferproc&nbsp;to&nbsp;signal</span><br>
+<span class="lineno">280</span><span class="comment">//&nbsp;the&nbsp;calling&nbsp;Go&nbsp;function&nbsp;that&nbsp;it&nbsp;should&nbsp;not&nbsp;jump</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;to&nbsp;deferreturn.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;in&nbsp;asm_*.s</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">return0</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">285</span><span class="comment">//&nbsp;thunk&nbsp;to&nbsp;call&nbsp;time.now.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">timenow</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">sec</span>&nbsp;<span class="ident">int64</span><span class="op">,</span>&nbsp;<span class="ident">nsec</span>&nbsp;<span class="builtintype">int32</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;in&nbsp;asm_*.s</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;not&nbsp;called&nbsp;directly;&nbsp;definitions&nbsp;here&nbsp;supply&nbsp;type&nbsp;information&nbsp;for&nbsp;traceback.</span><br>
+<span class="lineno">290</span><span class="keyword">func</span>&nbsp;<span class="ident">call16</span><span class="op">(</span><span class="ident">fn</span><span class="op">,</span>&nbsp;<span class="ident">arg</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">,</span>&nbsp;<span class="ident">n</span><span class="op">,</span>&nbsp;<span class="ident">retoffset</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">call32</span><span class="op">(</span><span class="ident">fn</span><span class="op">,</span>&nbsp;<span class="ident">arg</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">,</span>&nbsp;<span class="ident">n</span><span class="op">,</span>&nbsp;<span class="ident">retoffset</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">call64</span><span class="op">(</span><span class="ident">fn</span><span class="op">,</span>&nbsp;<span class="ident">arg</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">,</span>&nbsp;<span class="ident">n</span><span class="op">,</span>&nbsp;<span class="ident">retoffset</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">call128</span><span class="op">(</span><span class="ident">fn</span><span class="op">,</span>&nbsp;<span class="ident">arg</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">,</span>&nbsp;<span class="ident">n</span><span class="op">,</span>&nbsp;<span class="ident">retoffset</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">call256</span><span class="op">(</span><span class="ident">fn</span><span class="op">,</span>&nbsp;<span class="ident">arg</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">,</span>&nbsp;<span class="ident">n</span><span class="op">,</span>&nbsp;<span class="ident">retoffset</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span><br>
+<span class="lineno">295</span><span class="keyword">func</span>&nbsp;<span class="ident">call512</span><span class="op">(</span><span class="ident">fn</span><span class="op">,</span>&nbsp;<span class="ident">arg</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">,</span>&nbsp;<span class="ident">n</span><span class="op">,</span>&nbsp;<span class="ident">retoffset</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">call1024</span><span class="op">(</span><span class="ident">fn</span><span class="op">,</span>&nbsp;<span class="ident">arg</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">,</span>&nbsp;<span class="ident">n</span><span class="op">,</span>&nbsp;<span class="ident">retoffset</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">call2048</span><span class="op">(</span><span class="ident">fn</span><span class="op">,</span>&nbsp;<span class="ident">arg</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">,</span>&nbsp;<span class="ident">n</span><span class="op">,</span>&nbsp;<span class="ident">retoffset</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">call4096</span><span class="op">(</span><span class="ident">fn</span><span class="op">,</span>&nbsp;<span class="ident">arg</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">,</span>&nbsp;<span class="ident">n</span><span class="op">,</span>&nbsp;<span class="ident">retoffset</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">call8192</span><span class="op">(</span><span class="ident">fn</span><span class="op">,</span>&nbsp;<span class="ident">arg</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">,</span>&nbsp;<span class="ident">n</span><span class="op">,</span>&nbsp;<span class="ident">retoffset</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span><br>
+<span class="lineno">300</span><span class="keyword">func</span>&nbsp;<span class="ident">call16384</span><span class="op">(</span><span class="ident">fn</span><span class="op">,</span>&nbsp;<span class="ident">arg</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">,</span>&nbsp;<span class="ident">n</span><span class="op">,</span>&nbsp;<span class="ident">retoffset</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">call32768</span><span class="op">(</span><span class="ident">fn</span><span class="op">,</span>&nbsp;<span class="ident">arg</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">,</span>&nbsp;<span class="ident">n</span><span class="op">,</span>&nbsp;<span class="ident">retoffset</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">call65536</span><span class="op">(</span><span class="ident">fn</span><span class="op">,</span>&nbsp;<span class="ident">arg</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">,</span>&nbsp;<span class="ident">n</span><span class="op">,</span>&nbsp;<span class="ident">retoffset</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">call131072</span><span class="op">(</span><span class="ident">fn</span><span class="op">,</span>&nbsp;<span class="ident">arg</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">,</span>&nbsp;<span class="ident">n</span><span class="op">,</span>&nbsp;<span class="ident">retoffset</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">call262144</span><span class="op">(</span><span class="ident">fn</span><span class="op">,</span>&nbsp;<span class="ident">arg</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">,</span>&nbsp;<span class="ident">n</span><span class="op">,</span>&nbsp;<span class="ident">retoffset</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span><br>
+<span class="lineno">305</span><span class="keyword">func</span>&nbsp;<span class="ident">call524288</span><span class="op">(</span><span class="ident">fn</span><span class="op">,</span>&nbsp;<span class="ident">arg</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">,</span>&nbsp;<span class="ident">n</span><span class="op">,</span>&nbsp;<span class="ident">retoffset</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">call1048576</span><span class="op">(</span><span class="ident">fn</span><span class="op">,</span>&nbsp;<span class="ident">arg</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">,</span>&nbsp;<span class="ident">n</span><span class="op">,</span>&nbsp;<span class="ident">retoffset</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">call2097152</span><span class="op">(</span><span class="ident">fn</span><span class="op">,</span>&nbsp;<span class="ident">arg</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">,</span>&nbsp;<span class="ident">n</span><span class="op">,</span>&nbsp;<span class="ident">retoffset</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">call4194304</span><span class="op">(</span><span class="ident">fn</span><span class="op">,</span>&nbsp;<span class="ident">arg</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">,</span>&nbsp;<span class="ident">n</span><span class="op">,</span>&nbsp;<span class="ident">retoffset</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">call8388608</span><span class="op">(</span><span class="ident">fn</span><span class="op">,</span>&nbsp;<span class="ident">arg</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">,</span>&nbsp;<span class="ident">n</span><span class="op">,</span>&nbsp;<span class="ident">retoffset</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span><br>
+<span class="lineno">310</span><span class="keyword">func</span>&nbsp;<span class="ident">call16777216</span><span class="op">(</span><span class="ident">fn</span><span class="op">,</span>&nbsp;<span class="ident">arg</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">,</span>&nbsp;<span class="ident">n</span><span class="op">,</span>&nbsp;<span class="ident">retoffset</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">call33554432</span><span class="op">(</span><span class="ident">fn</span><span class="op">,</span>&nbsp;<span class="ident">arg</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">,</span>&nbsp;<span class="ident">n</span><span class="op">,</span>&nbsp;<span class="ident">retoffset</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">call67108864</span><span class="op">(</span><span class="ident">fn</span><span class="op">,</span>&nbsp;<span class="ident">arg</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">,</span>&nbsp;<span class="ident">n</span><span class="op">,</span>&nbsp;<span class="ident">retoffset</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">call134217728</span><span class="op">(</span><span class="ident">fn</span><span class="op">,</span>&nbsp;<span class="ident">arg</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">,</span>&nbsp;<span class="ident">n</span><span class="op">,</span>&nbsp;<span class="ident">retoffset</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">call268435456</span><span class="op">(</span><span class="ident">fn</span><span class="op">,</span>&nbsp;<span class="ident">arg</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">,</span>&nbsp;<span class="ident">n</span><span class="op">,</span>&nbsp;<span class="ident">retoffset</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span><br>
+<span class="lineno">315</span><span class="keyword">func</span>&nbsp;<span class="ident">call536870912</span><span class="op">(</span><span class="ident">fn</span><span class="op">,</span>&nbsp;<span class="ident">arg</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">,</span>&nbsp;<span class="ident">n</span><span class="op">,</span>&nbsp;<span class="ident">retoffset</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">call1073741824</span><span class="op">(</span><span class="ident">fn</span><span class="op">,</span>&nbsp;<span class="ident">arg</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">,</span>&nbsp;<span class="ident">n</span><span class="op">,</span>&nbsp;<span class="ident">retoffset</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span>
+</div>
+</body>
+</html>

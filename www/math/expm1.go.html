@@ -1,0 +1,252 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2010&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">math</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;original&nbsp;C&nbsp;code,&nbsp;the&nbsp;long&nbsp;comment,&nbsp;and&nbsp;the&nbsp;constants</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;below&nbsp;are&nbsp;from&nbsp;FreeBSD&#39;s&nbsp;/usr/src/lib/msun/src/s_expm1.c</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;and&nbsp;came&nbsp;with&nbsp;this&nbsp;notice.&nbsp;&nbsp;The&nbsp;go&nbsp;code&nbsp;is&nbsp;a&nbsp;simplified</span><br>
+<span class="lineno">10</span><span class="comment">//&nbsp;version&nbsp;of&nbsp;the&nbsp;original&nbsp;C.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;====================================================</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Copyright&nbsp;(C)&nbsp;1993&nbsp;by&nbsp;Sun&nbsp;Microsystems,&nbsp;Inc.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">15</span><span class="comment">//&nbsp;Developed&nbsp;at&nbsp;SunPro,&nbsp;a&nbsp;Sun&nbsp;Microsystems,&nbsp;Inc.&nbsp;business.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Permission&nbsp;to&nbsp;use,&nbsp;copy,&nbsp;modify,&nbsp;and&nbsp;distribute&nbsp;this</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;software&nbsp;is&nbsp;freely&nbsp;granted,&nbsp;provided&nbsp;that&nbsp;this&nbsp;notice</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;is&nbsp;preserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;====================================================</span><br>
+<span class="lineno">20</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;expm1(x)</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Returns&nbsp;exp(x)-1,&nbsp;the&nbsp;exponential&nbsp;of&nbsp;x&nbsp;minus&nbsp;1.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Method</span><br>
+<span class="lineno">25</span><span class="comment">//&nbsp;&nbsp;&nbsp;1.&nbsp;Argument&nbsp;reduction:</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Given&nbsp;x,&nbsp;find&nbsp;r&nbsp;and&nbsp;integer&nbsp;k&nbsp;such&nbsp;that</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;x&nbsp;=&nbsp;k*ln2&nbsp;+&nbsp;r,&nbsp;&nbsp;|r|&nbsp;&lt;=&nbsp;0.5*ln2&nbsp;~&nbsp;0.34658</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">30</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Here&nbsp;a&nbsp;correction&nbsp;term&nbsp;c&nbsp;will&nbsp;be&nbsp;computed&nbsp;to&nbsp;compensate</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;error&nbsp;in&nbsp;r&nbsp;when&nbsp;rounded&nbsp;to&nbsp;a&nbsp;floating-point&nbsp;number.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;2.&nbsp;Approximating&nbsp;expm1(r)&nbsp;by&nbsp;a&nbsp;special&nbsp;rational&nbsp;function&nbsp;on</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;the&nbsp;interval&nbsp;[0,0.34658]:</span><br>
+<span class="lineno">35</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Since</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;r*(exp(r)+1)/(exp(r)-1)&nbsp;=&nbsp;2+&nbsp;r**2/6&nbsp;-&nbsp;r**4/360&nbsp;+&nbsp;...</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;we&nbsp;define&nbsp;R1(r*r)&nbsp;by</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;r*(exp(r)+1)/(exp(r)-1)&nbsp;=&nbsp;2+&nbsp;r**2/6&nbsp;*&nbsp;R1(r*r)</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;That&nbsp;is,</span><br>
+<span class="lineno">40</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;R1(r**2)&nbsp;=&nbsp;6/r&nbsp;*((exp(r)+1)/(exp(r)-1)&nbsp;-&nbsp;2/r)</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=&nbsp;6/r&nbsp;*&nbsp;(&nbsp;1&nbsp;+&nbsp;2.0*(1/(exp(r)-1)&nbsp;-&nbsp;1/r))</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=&nbsp;1&nbsp;-&nbsp;r**2/60&nbsp;+&nbsp;r**4/2520&nbsp;-&nbsp;r**6/100800&nbsp;+&nbsp;...</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;We&nbsp;use&nbsp;a&nbsp;special&nbsp;Reme&nbsp;algorithm&nbsp;on&nbsp;[0,0.347]&nbsp;to&nbsp;generate</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;a&nbsp;polynomial&nbsp;of&nbsp;degree&nbsp;5&nbsp;in&nbsp;r*r&nbsp;to&nbsp;approximate&nbsp;R1.&nbsp;The</span><br>
+<span class="lineno">45</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;maximum&nbsp;error&nbsp;of&nbsp;this&nbsp;polynomial&nbsp;approximation&nbsp;is&nbsp;bounded</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;by&nbsp;2**-61.&nbsp;In&nbsp;other&nbsp;words,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;R1(z)&nbsp;~&nbsp;1.0&nbsp;+&nbsp;Q1*z&nbsp;+&nbsp;Q2*z**2&nbsp;+&nbsp;Q3*z**3&nbsp;+&nbsp;Q4*z**4&nbsp;+&nbsp;Q5*z**5</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;where&nbsp;&nbsp;&nbsp;Q1&nbsp;&nbsp;=&nbsp;&nbsp;-1.6666666666666567384E-2,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Q2&nbsp;&nbsp;=&nbsp;&nbsp;&nbsp;3.9682539681370365873E-4,</span><br>
+<span class="lineno">50</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Q3&nbsp;&nbsp;=&nbsp;&nbsp;-9.9206344733435987357E-6,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Q4&nbsp;&nbsp;=&nbsp;&nbsp;&nbsp;2.5051361420808517002E-7,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Q5&nbsp;&nbsp;=&nbsp;&nbsp;-6.2843505682382617102E-9;</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(where&nbsp;z=r*r,&nbsp;and&nbsp;the&nbsp;values&nbsp;of&nbsp;Q1&nbsp;to&nbsp;Q5&nbsp;are&nbsp;listed&nbsp;below)</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;with&nbsp;error&nbsp;bounded&nbsp;by</span><br>
+<span class="lineno">55</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;5&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-61</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;1.0+Q1*z+...+Q5*z&nbsp;&nbsp;&nbsp;-&nbsp;&nbsp;R1(z)&nbsp;|&nbsp;&lt;=&nbsp;2</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;expm1(r)&nbsp;=&nbsp;exp(r)-1&nbsp;is&nbsp;then&nbsp;computed&nbsp;by&nbsp;the&nbsp;following</span><br>
+<span class="lineno">60</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;specific&nbsp;way&nbsp;which&nbsp;minimize&nbsp;the&nbsp;accumulation&nbsp;rounding&nbsp;error:</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;3</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;r&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;r&nbsp;&nbsp;&nbsp;&nbsp;[&nbsp;3&nbsp;-&nbsp;(R1&nbsp;+&nbsp;R1*r/2)&nbsp;&nbsp;]</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;expm1(r)&nbsp;=&nbsp;r&nbsp;+&nbsp;---&nbsp;+&nbsp;---&nbsp;*&nbsp;[--------------------]</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2&nbsp;&nbsp;&nbsp;&nbsp;[&nbsp;6&nbsp;-&nbsp;r*(3&nbsp;-&nbsp;R1*r/2)&nbsp;]</span><br>
+<span class="lineno">65</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;To&nbsp;compensate&nbsp;the&nbsp;error&nbsp;in&nbsp;the&nbsp;argument&nbsp;reduction,&nbsp;we&nbsp;use</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;expm1(r+c)&nbsp;=&nbsp;expm1(r)&nbsp;+&nbsp;c&nbsp;+&nbsp;expm1(r)*c</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;~&nbsp;expm1(r)&nbsp;+&nbsp;c&nbsp;+&nbsp;r*c</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Thus&nbsp;c+r*c&nbsp;will&nbsp;be&nbsp;added&nbsp;in&nbsp;as&nbsp;the&nbsp;correction&nbsp;terms&nbsp;for</span><br>
+<span class="lineno">70</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;expm1(r+c).&nbsp;Now&nbsp;rearrange&nbsp;the&nbsp;term&nbsp;to&nbsp;avoid&nbsp;optimization</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;screw&nbsp;up:</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2&nbsp;)</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;({&nbsp;&nbsp;(&nbsp;r&nbsp;&nbsp;&nbsp;&nbsp;[&nbsp;R1&nbsp;-&nbsp;&nbsp;(3&nbsp;-&nbsp;R1*r/2)&nbsp;]&nbsp;&nbsp;)&nbsp;&nbsp;}&nbsp;&nbsp;&nbsp;&nbsp;r&nbsp;&nbsp;)</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;expm1(r+c)~r&nbsp;-&nbsp;({r*(---&nbsp;*&nbsp;[--------------------]-c)-c}&nbsp;-&nbsp;---&nbsp;)</span><br>
+<span class="lineno">75</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;({&nbsp;&nbsp;(&nbsp;2&nbsp;&nbsp;&nbsp;&nbsp;[&nbsp;6&nbsp;-&nbsp;r*(3&nbsp;-&nbsp;R1*r/2)&nbsp;]&nbsp;&nbsp;)&nbsp;&nbsp;}&nbsp;&nbsp;&nbsp;&nbsp;2&nbsp;&nbsp;)</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;)</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=&nbsp;r&nbsp;-&nbsp;E</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;3.&nbsp;Scale&nbsp;back&nbsp;to&nbsp;obtain&nbsp;expm1(x):</span><br>
+<span class="lineno">80</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;From&nbsp;step&nbsp;1,&nbsp;we&nbsp;have</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;expm1(x)&nbsp;=&nbsp;either&nbsp;2**k*[expm1(r)+1]&nbsp;-&nbsp;1</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=&nbsp;or&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2**k*[expm1(r)&nbsp;+&nbsp;(1-2**-k)]</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;4.&nbsp;Implementation&nbsp;notes:</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(A).&nbsp;To&nbsp;save&nbsp;one&nbsp;multiplication,&nbsp;we&nbsp;scale&nbsp;the&nbsp;coefficient&nbsp;Qi</span><br>
+<span class="lineno">85</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;to&nbsp;Qi*2**i,&nbsp;and&nbsp;replace&nbsp;z&nbsp;by&nbsp;(x**2)/2.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(B).&nbsp;To&nbsp;achieve&nbsp;maximum&nbsp;accuracy,&nbsp;we&nbsp;compute&nbsp;expm1(x)&nbsp;by</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(i)&nbsp;&nbsp;&nbsp;if&nbsp;x&nbsp;&lt;&nbsp;-56*ln2,&nbsp;return&nbsp;-1.0,&nbsp;(raise&nbsp;inexact&nbsp;if&nbsp;x!=inf)</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(ii)&nbsp;&nbsp;if&nbsp;k=0,&nbsp;return&nbsp;r-E</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(iii)&nbsp;if&nbsp;k=-1,&nbsp;return&nbsp;0.5*(r-E)-0.5</span><br>
+<span class="lineno">90</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(iv)&nbsp;&nbsp;if&nbsp;k=1&nbsp;if&nbsp;r&nbsp;&lt;&nbsp;-0.25,&nbsp;return&nbsp;2*((r+0.5)-&nbsp;E)</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;else&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;&nbsp;1.0+2.0*(r-E);</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(v)&nbsp;&nbsp;&nbsp;if&nbsp;(k&lt;-2||k&gt;56)&nbsp;return&nbsp;2**k(1-(E-r))&nbsp;-&nbsp;1&nbsp;(or&nbsp;exp(x)-1)</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(vi)&nbsp;&nbsp;if&nbsp;k&nbsp;&lt;=&nbsp;20,&nbsp;return&nbsp;2**k((1-2**-k)-(E-r)),&nbsp;else</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(vii)&nbsp;return&nbsp;2**k(1-((E+2**-k)-r))</span><br>
+<span class="lineno">95</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Special&nbsp;cases:</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;expm1(INF)&nbsp;is&nbsp;INF,&nbsp;expm1(NaN)&nbsp;is&nbsp;NaN;</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;expm1(-INF)&nbsp;is&nbsp;-1,&nbsp;and</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;finite&nbsp;argument,&nbsp;only&nbsp;expm1(0)=0&nbsp;is&nbsp;exact.</span><br>
+<span class="lineno">100</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Accuracy:</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;according&nbsp;to&nbsp;an&nbsp;error&nbsp;analysis,&nbsp;the&nbsp;error&nbsp;is&nbsp;always&nbsp;less&nbsp;than</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1&nbsp;ulp&nbsp;(unit&nbsp;in&nbsp;the&nbsp;last&nbsp;place).</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">105</span><span class="comment">//&nbsp;Misc.&nbsp;info.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;For&nbsp;IEEE&nbsp;double</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if&nbsp;x&nbsp;&gt;&nbsp;&nbsp;7.09782712893383973096e+02&nbsp;then&nbsp;expm1(x)&nbsp;overflow</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Constants:</span><br>
+<span class="lineno">110</span><span class="comment">//&nbsp;The&nbsp;hexadecimal&nbsp;values&nbsp;are&nbsp;the&nbsp;intended&nbsp;ones&nbsp;for&nbsp;the&nbsp;following</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;constants.&nbsp;The&nbsp;decimal&nbsp;values&nbsp;may&nbsp;be&nbsp;used,&nbsp;provided&nbsp;that&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;compiler&nbsp;will&nbsp;convert&nbsp;from&nbsp;decimal&nbsp;to&nbsp;binary&nbsp;accurately&nbsp;enough</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;to&nbsp;produce&nbsp;the&nbsp;hexadecimal&nbsp;values&nbsp;shown.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">115</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Expm1&nbsp;returns&nbsp;e**x&nbsp;-&nbsp;1,&nbsp;the&nbsp;base-e&nbsp;exponential&nbsp;of&nbsp;x&nbsp;minus&nbsp;1.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;It&nbsp;is&nbsp;more&nbsp;accurate&nbsp;than&nbsp;Exp(x)&nbsp;-&nbsp;1&nbsp;when&nbsp;x&nbsp;is&nbsp;near&nbsp;zero.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Special&nbsp;cases&nbsp;are:</span><br>
+<span class="lineno">120</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspExpm1(+Inf)&nbsp;=&nbsp;+Inf</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspExpm1(-Inf)&nbsp;=&nbsp;-1</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspExpm1(NaN)&nbsp;=&nbsp;NaN</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Very&nbsp;large&nbsp;values&nbsp;overflow&nbsp;to&nbsp;-1&nbsp;or&nbsp;+Inf.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">Expm1</span><span class="op">(</span><span class="ident">x</span>&nbsp;<span class="builtintype">float64</span><span class="op">)</span>&nbsp;<span class="builtintype">float64</span><br>
+<span class="lineno">125</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">expm1</span><span class="op">(</span><span class="ident">x</span>&nbsp;<span class="builtintype">float64</span><span class="op">)</span>&nbsp;<span class="builtintype">float64</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Othreshold</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">7.09782712893383973096e+02</span>&nbsp;<span class="comment">//&nbsp;0x40862E42FEFA39EF</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Ln2X56</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">3.88162421113569373274e+01</span>&nbsp;<span class="comment">//&nbsp;0x4043687a9f1af2b1</span><br>
+<span class="lineno">130</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Ln2HalfX3</span>&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">1.03972077083991796413e+00</span>&nbsp;<span class="comment">//&nbsp;0x3ff0a2b23f3bab73</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Ln2Half</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">3.46573590279972654709e-01</span>&nbsp;<span class="comment">//&nbsp;0x3fd62e42fefa39ef</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Ln2Hi</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">6.93147180369123816490e-01</span>&nbsp;<span class="comment">//&nbsp;0x3fe62e42fee00000</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Ln2Lo</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">1.90821492927058770002e-10</span>&nbsp;<span class="comment">//&nbsp;0x3dea39ef35793c76</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">InvLn2</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">1.44269504088896338700e+00</span>&nbsp;<span class="comment">//&nbsp;0x3ff71547652b82fe</span><br>
+<span class="lineno">135</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Tiny</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">1.0</span>&nbsp;<span class="op">/</span>&nbsp;<span class="op">(</span><span class="num">1</span>&nbsp;<span class="op">&lt;&lt;</span>&nbsp;<span class="num">54</span><span class="op">)</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;2**-54&nbsp;=&nbsp;0x3c90000000000000</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;scaled&nbsp;coefficients&nbsp;related&nbsp;to&nbsp;expm1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Q1</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">-</span><span class="num">3.33333333333331316428e-02</span>&nbsp;<span class="comment">//&nbsp;0xBFA11111111110F4</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Q2</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1.58730158725481460165e-03</span>&nbsp;&nbsp;<span class="comment">//&nbsp;0x3F5A01A019FE5585</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Q3</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">-</span><span class="num">7.93650757867487942473e-05</span>&nbsp;<span class="comment">//&nbsp;0xBF14CE199EAADBB7</span><br>
+<span class="lineno">140</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Q4</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">4.00821782732936239552e-06</span>&nbsp;&nbsp;<span class="comment">//&nbsp;0x3ED0CFCA86E65239</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Q5</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">-</span><span class="num">2.01099218183624371326e-07</span>&nbsp;<span class="comment">//&nbsp;0xBE8AFDB76E09C32D</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;special&nbsp;cases</span><br>
+<span class="lineno">145</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">IsInf</span><span class="op">(</span><span class="ident">x</span><span class="op">,</span>&nbsp;<span class="num">1</span><span class="op">)</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">IsNaN</span><span class="op">(</span><span class="ident">x</span><span class="op">)</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">x</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">IsInf</span><span class="op">(</span><span class="ident">x</span><span class="op">,</span>&nbsp;<span class="op">-</span><span class="num">1</span><span class="op">)</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="op">-</span><span class="num">1</span><br>
+<span class="lineno">150</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">absx</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">x</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sign</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">155</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">absx</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">-</span><span class="ident">absx</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sign</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;filter&nbsp;out&nbsp;huge&nbsp;argument</span><br>
+<span class="lineno">160</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">absx</span>&nbsp;<span class="op">&gt;=</span>&nbsp;<span class="ident">Ln2X56</span>&nbsp;<span class="op">{</span>&nbsp;<span class="comment">//&nbsp;if&nbsp;|x|&nbsp;&gt;=&nbsp;56&nbsp;*&nbsp;ln2</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">absx</span>&nbsp;<span class="op">&gt;=</span>&nbsp;<span class="ident">Othreshold</span>&nbsp;<span class="op">{</span>&nbsp;<span class="comment">//&nbsp;if&nbsp;|x|&nbsp;&gt;=&nbsp;709.78...</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">Inf</span><span class="op">(</span><span class="num">1</span><span class="op">)</span>&nbsp;<span class="comment">//&nbsp;overflow</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">sign</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">165</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="op">-</span><span class="num">1</span>&nbsp;<span class="comment">//&nbsp;x&nbsp;&lt;&nbsp;-56*ln2,&nbsp;return&nbsp;-1.0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;argument&nbsp;reduction</span><br>
+<span class="lineno">170</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="builtintype">float64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">k</span>&nbsp;<span class="builtintype">int</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">absx</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="ident">Ln2Half</span>&nbsp;<span class="op">{</span>&nbsp;<span class="comment">//&nbsp;if&nbsp;&nbsp;|x|&nbsp;&gt;&nbsp;0.5&nbsp;*&nbsp;ln2</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">hi</span><span class="op">,</span>&nbsp;<span class="ident">lo</span>&nbsp;<span class="builtintype">float64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">absx</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">Ln2HalfX3</span>&nbsp;<span class="op">{</span>&nbsp;<span class="comment">//&nbsp;and&nbsp;|x|&nbsp;&lt;&nbsp;1.5&nbsp;*&nbsp;ln2</span><br>
+<span class="lineno">175</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">sign</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">hi</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">Ln2Hi</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">lo</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">Ln2Lo</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">k</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">180</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">hi</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">Ln2Hi</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">lo</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">-</span><span class="ident">Ln2Lo</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">k</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">-</span><span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">185</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">sign</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">k</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtintype">int</span><span class="op">(</span><span class="ident">InvLn2</span><span class="op">*</span><span class="ident">x</span>&nbsp;<span class="op">+</span>&nbsp;<span class="num">0.5</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">k</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtintype">int</span><span class="op">(</span><span class="ident">InvLn2</span><span class="op">*</span><span class="ident">x</span>&nbsp;<span class="op">-</span>&nbsp;<span class="num">0.5</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">190</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtintype">float64</span><span class="op">(</span><span class="ident">k</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">hi</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">t</span><span class="op">*</span><span class="ident">Ln2Hi</span>&nbsp;<span class="comment">//&nbsp;t&nbsp;*&nbsp;Ln2Hi&nbsp;is&nbsp;exact&nbsp;here</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">lo</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">t</span>&nbsp;<span class="op">*</span>&nbsp;<span class="ident">Ln2Lo</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">x</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">hi</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">lo</span><br>
+<span class="lineno">195</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">(</span><span class="ident">hi</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">x</span><span class="op">)</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">lo</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="keyword">if</span>&nbsp;<span class="ident">absx</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">Tiny</span>&nbsp;<span class="op">{</span>&nbsp;<span class="comment">//&nbsp;when&nbsp;|x|&nbsp;&lt;&nbsp;2**-54,&nbsp;return&nbsp;x</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">x</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">k</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno">200</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;x&nbsp;is&nbsp;now&nbsp;in&nbsp;primary&nbsp;range</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">hfx</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="num">0.5</span>&nbsp;<span class="op">*</span>&nbsp;<span class="ident">x</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">hxs</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">*</span>&nbsp;<span class="ident">hfx</span><br>
+<span class="lineno">205</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r1</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="num">1</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">hxs</span><span class="op">*</span><span class="op">(</span><span class="ident">Q1</span><span class="op">+</span><span class="ident">hxs</span><span class="op">*</span><span class="op">(</span><span class="ident">Q2</span><span class="op">+</span><span class="ident">hxs</span><span class="op">*</span><span class="op">(</span><span class="ident">Q3</span><span class="op">+</span><span class="ident">hxs</span><span class="op">*</span><span class="op">(</span><span class="ident">Q4</span><span class="op">+</span><span class="ident">hxs</span><span class="op">*</span><span class="ident">Q5</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="num">3</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">r1</span><span class="op">*</span><span class="ident">hfx</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">e</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">hxs</span>&nbsp;<span class="op">*</span>&nbsp;<span class="op">(</span><span class="op">(</span><span class="ident">r1</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">t</span><span class="op">)</span>&nbsp;<span class="op">/</span>&nbsp;<span class="op">(</span><span class="num">6.0</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">x</span><span class="op">*</span><span class="ident">t</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">k</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">e</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">(</span><span class="ident">x</span><span class="op">*</span><span class="op">(</span><span class="ident">e</span><span class="op">-</span><span class="ident">c</span><span class="op">)</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">c</span><span class="op">)</span><br>
+<span class="lineno">210</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">e</span>&nbsp;<span class="op">-=</span>&nbsp;<span class="ident">hxs</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">k</span>&nbsp;<span class="op">==</span>&nbsp;<span class="op">-</span><span class="num">1</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0.5</span><span class="op">*</span><span class="op">(</span><span class="ident">x</span><span class="op">-</span><span class="ident">e</span><span class="op">)</span>&nbsp;<span class="op">-</span>&nbsp;<span class="num">0.5</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">k</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">1</span><span class="op">:</span><br>
+<span class="lineno">215</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="op">-</span><span class="num">0.25</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="op">-</span><span class="num">2</span>&nbsp;<span class="op">*</span>&nbsp;<span class="op">(</span><span class="ident">e</span>&nbsp;<span class="op">-</span>&nbsp;<span class="op">(</span><span class="ident">x</span>&nbsp;<span class="op">+</span>&nbsp;<span class="num">0.5</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">1</span>&nbsp;<span class="op">+</span>&nbsp;<span class="num">2</span><span class="op">*</span><span class="op">(</span><span class="ident">x</span><span class="op">-</span><span class="ident">e</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">k</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="op">-</span><span class="num">2</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">k</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">56</span><span class="op">:</span>&nbsp;<span class="comment">//&nbsp;suffice&nbsp;to&nbsp;return&nbsp;exp(x)-1</span><br>
+<span class="lineno">220</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">y</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="num">1</span>&nbsp;<span class="op">-</span>&nbsp;<span class="op">(</span><span class="ident">e</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">x</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">y</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">Float64frombits</span><span class="op">(</span><span class="ident">Float64bits</span><span class="op">(</span><span class="ident">y</span><span class="op">)</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">uint64</span><span class="op">(</span><span class="ident">k</span><span class="op">)</span><span class="op">&lt;&lt;</span><span class="num">52</span><span class="op">)</span>&nbsp;<span class="comment">//&nbsp;add&nbsp;k&nbsp;to&nbsp;y&#39;s&nbsp;exponent</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">y</span>&nbsp;<span class="op">-</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">k</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">20</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">225</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">Float64frombits</span><span class="op">(</span><span class="num">0x3ff0000000000000</span>&nbsp;<span class="op">-</span>&nbsp;<span class="op">(</span><span class="num">0x20000000000000</span>&nbsp;<span class="op">&gt;&gt;</span>&nbsp;<span class="builtintype">uint</span><span class="op">(</span><span class="ident">k</span><span class="op">)</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="comment">//&nbsp;t=1-2**-k</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">y</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">t</span>&nbsp;<span class="op">-</span>&nbsp;<span class="op">(</span><span class="ident">e</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">x</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">y</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">Float64frombits</span><span class="op">(</span><span class="ident">Float64bits</span><span class="op">(</span><span class="ident">y</span><span class="op">)</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">uint64</span><span class="op">(</span><span class="ident">k</span><span class="op">)</span><span class="op">&lt;&lt;</span><span class="num">52</span><span class="op">)</span>&nbsp;<span class="comment">//&nbsp;add&nbsp;k&nbsp;to&nbsp;y&#39;s&nbsp;exponent</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">y</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">230</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">Float64frombits</span><span class="op">(</span><span class="ident">uint64</span><span class="op">(</span><span class="op">(</span><span class="num">0x3ff</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">k</span><span class="op">)</span>&nbsp;<span class="op">&lt;&lt;</span>&nbsp;<span class="num">52</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="comment">//&nbsp;2**-k</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">y</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">-</span>&nbsp;<span class="op">(</span><span class="ident">e</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">t</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">y</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">y</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">Float64frombits</span><span class="op">(</span><span class="ident">Float64bits</span><span class="op">(</span><span class="ident">y</span><span class="op">)</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">uint64</span><span class="op">(</span><span class="ident">k</span><span class="op">)</span><span class="op">&lt;&lt;</span><span class="num">52</span><span class="op">)</span>&nbsp;<span class="comment">//&nbsp;add&nbsp;k&nbsp;to&nbsp;y&#39;s&nbsp;exponent</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">y</span><br>
+<span class="lineno">235</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">-</span>&nbsp;<span class="op">(</span><span class="ident">x</span><span class="op">*</span><span class="ident">e</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">hxs</span><span class="op">)</span>&nbsp;<span class="comment">//&nbsp;c&nbsp;is&nbsp;0</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

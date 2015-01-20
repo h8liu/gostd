@@ -1,0 +1,47 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2012&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">flate</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;forwardCopy&nbsp;is&nbsp;like&nbsp;the&nbsp;built-in&nbsp;copy&nbsp;function&nbsp;except&nbsp;that&nbsp;it&nbsp;always&nbsp;goes</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;forward&nbsp;from&nbsp;the&nbsp;start,&nbsp;even&nbsp;if&nbsp;the&nbsp;dst&nbsp;and&nbsp;src&nbsp;overlap.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;It&nbsp;is&nbsp;equivalent&nbsp;to:</span><br>
+<span class="lineno">10</span><span class="comment">//&nbsp;&nbsp;&nbsp;for&nbsp;i&nbsp;:=&nbsp;0;&nbsp;i&nbsp;&lt;&nbsp;n;&nbsp;i++&nbsp;{</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;mem[dst+i]&nbsp;=&nbsp;mem[src+i]</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;}</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">forwardCopy</span><span class="op">(</span><span class="ident">mem</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="ident">dst</span><span class="op">,</span>&nbsp;<span class="ident">src</span><span class="op">,</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">dst</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">src</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">15</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">copy</span><span class="op">(</span><span class="ident">mem</span><span class="op">[</span><span class="ident">dst</span><span class="op">:</span><span class="ident">dst</span><span class="op">+</span><span class="ident">n</span><span class="op">]</span><span class="op">,</span>&nbsp;<span class="ident">mem</span><span class="op">[</span><span class="ident">src</span><span class="op">:</span><span class="ident">src</span><span class="op">+</span><span class="ident">n</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">dst</span>&nbsp;<span class="op">&gt;=</span>&nbsp;<span class="ident">src</span><span class="op">+</span><span class="ident">n</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">copy</span><span class="op">(</span><span class="ident">mem</span><span class="op">[</span><span class="ident">dst</span><span class="op">:</span><span class="ident">dst</span><span class="op">+</span><span class="ident">n</span><span class="op">]</span><span class="op">,</span>&nbsp;<span class="ident">mem</span><span class="op">[</span><span class="ident">src</span><span class="op">:</span><span class="ident">src</span><span class="op">+</span><span class="ident">n</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;There&nbsp;is&nbsp;some&nbsp;forward&nbsp;overlap.&nbsp;&nbsp;The&nbsp;destination</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;will&nbsp;be&nbsp;filled&nbsp;with&nbsp;a&nbsp;repeated&nbsp;pattern&nbsp;of&nbsp;mem[src:src+k].</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;We&nbsp;copy&nbsp;one&nbsp;instance&nbsp;of&nbsp;the&nbsp;pattern&nbsp;here,&nbsp;then&nbsp;repeat.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Each&nbsp;time&nbsp;around&nbsp;this&nbsp;loop&nbsp;k&nbsp;will&nbsp;double.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">k</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">dst</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">src</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">copy</span><span class="op">(</span><span class="ident">mem</span><span class="op">[</span><span class="ident">dst</span><span class="op">:</span><span class="ident">dst</span><span class="op">+</span><span class="ident">k</span><span class="op">]</span><span class="op">,</span>&nbsp;<span class="ident">mem</span><span class="op">[</span><span class="ident">src</span><span class="op">:</span><span class="ident">src</span><span class="op">+</span><span class="ident">k</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span>&nbsp;<span class="op">-=</span>&nbsp;<span class="ident">k</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dst</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="ident">k</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

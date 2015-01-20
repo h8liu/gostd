@@ -1,0 +1,638 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2010&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">json</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;JSON&nbsp;value&nbsp;parser&nbsp;state&nbsp;machine.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Just&nbsp;about&nbsp;at&nbsp;the&nbsp;limit&nbsp;of&nbsp;what&nbsp;is&nbsp;reasonable&nbsp;to&nbsp;write&nbsp;by&nbsp;hand.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Some&nbsp;parts&nbsp;are&nbsp;a&nbsp;bit&nbsp;tedious,&nbsp;but&nbsp;overall&nbsp;it&nbsp;nicely&nbsp;factors&nbsp;out&nbsp;the</span><br>
+<span class="lineno">10</span><span class="comment">//&nbsp;otherwise&nbsp;common&nbsp;code&nbsp;from&nbsp;the&nbsp;multiple&nbsp;scanning&nbsp;functions</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;in&nbsp;this&nbsp;package&nbsp;(Compact,&nbsp;Indent,&nbsp;checkValid,&nbsp;nextValue,&nbsp;etc).</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;This&nbsp;file&nbsp;starts&nbsp;with&nbsp;two&nbsp;simple&nbsp;examples&nbsp;using&nbsp;the&nbsp;scanner</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;before&nbsp;diving&nbsp;into&nbsp;the&nbsp;scanner&nbsp;itself.</span><br>
+<span class="lineno">15</span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="string">&#34;strconv&#34;</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;checkValid&nbsp;verifies&nbsp;that&nbsp;data&nbsp;is&nbsp;valid&nbsp;JSON-encoded&nbsp;data.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;scan&nbsp;is&nbsp;passed&nbsp;in&nbsp;for&nbsp;use&nbsp;by&nbsp;checkValid&nbsp;to&nbsp;avoid&nbsp;an&nbsp;allocation.</span><br>
+<span class="lineno">20</span><span class="keyword">func</span>&nbsp;<span class="ident">checkValid</span><span class="op">(</span><span class="ident">data</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="ident">scan</span>&nbsp;<span class="op">*</span><span class="ident">scanner</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">scan</span><span class="op">.</span><span class="ident">reset</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">data</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">scan</span><span class="op">.</span><span class="ident">bytes</span><span class="op">++</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">scan</span><span class="op">.</span><span class="ident">step</span><span class="op">(</span><span class="ident">scan</span><span class="op">,</span>&nbsp;<span class="builtintype">int</span><span class="op">(</span><span class="ident">c</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">scanError</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scan</span><span class="op">.</span><span class="ident">err</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">scan</span><span class="op">.</span><span class="ident">eof</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">scanError</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scan</span><span class="op">.</span><span class="ident">err</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;nextValue&nbsp;splits&nbsp;data&nbsp;after&nbsp;the&nbsp;next&nbsp;whole&nbsp;JSON&nbsp;value,</span><br>
+<span class="lineno">35</span><span class="comment">//&nbsp;returning&nbsp;that&nbsp;value&nbsp;and&nbsp;the&nbsp;bytes&nbsp;that&nbsp;follow&nbsp;it&nbsp;as&nbsp;separate&nbsp;slices.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;scan&nbsp;is&nbsp;passed&nbsp;in&nbsp;for&nbsp;use&nbsp;by&nbsp;nextValue&nbsp;to&nbsp;avoid&nbsp;an&nbsp;allocation.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">nextValue</span><span class="op">(</span><span class="ident">data</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="ident">scan</span>&nbsp;<span class="op">*</span><span class="ident">scanner</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">value</span><span class="op">,</span>&nbsp;<span class="ident">rest</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">scan</span><span class="op">.</span><span class="ident">reset</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span><span class="op">,</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">data</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">scan</span><span class="op">.</span><span class="ident">step</span><span class="op">(</span><span class="ident">scan</span><span class="op">,</span>&nbsp;<span class="builtintype">int</span><span class="op">(</span><span class="ident">c</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">v</span>&nbsp;<span class="op">&gt;=</span>&nbsp;<span class="ident">scanEnd</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="ident">v</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">scanError</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">scan</span><span class="op">.</span><span class="ident">err</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">scanEnd</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">data</span><span class="op">[</span><span class="num">0</span><span class="op">:</span><span class="ident">i</span><span class="op">]</span><span class="op">,</span>&nbsp;<span class="ident">data</span><span class="op">[</span><span class="ident">i</span><span class="op">:</span><span class="op">]</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">scan</span><span class="op">.</span><span class="ident">eof</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">scanError</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">scan</span><span class="op">.</span><span class="ident">err</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">data</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">55</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;A&nbsp;SyntaxError&nbsp;is&nbsp;a&nbsp;description&nbsp;of&nbsp;a&nbsp;JSON&nbsp;syntax&nbsp;error.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">SyntaxError</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">msg</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">string</span>&nbsp;<span class="comment">//&nbsp;description&nbsp;of&nbsp;error</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Offset</span>&nbsp;<span class="ident">int64</span>&nbsp;&nbsp;<span class="comment">//&nbsp;error&nbsp;occurred&nbsp;after&nbsp;reading&nbsp;Offset&nbsp;bytes</span><br>
+<span class="lineno">60</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">e</span>&nbsp;<span class="op">*</span><span class="ident">SyntaxError</span><span class="op">)</span>&nbsp;<span class="ident">Error</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="ident">e</span><span class="op">.</span><span class="ident">msg</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;A&nbsp;scanner&nbsp;is&nbsp;a&nbsp;JSON&nbsp;scanning&nbsp;state&nbsp;machine.</span><br>
+<span class="lineno">65</span><span class="comment">//&nbsp;Callers&nbsp;call&nbsp;scan.reset()&nbsp;and&nbsp;then&nbsp;pass&nbsp;bytes&nbsp;in&nbsp;one&nbsp;at&nbsp;a&nbsp;time</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;by&nbsp;calling&nbsp;scan.step(&amp;scan,&nbsp;c)&nbsp;for&nbsp;each&nbsp;byte.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;return&nbsp;value,&nbsp;referred&nbsp;to&nbsp;as&nbsp;an&nbsp;opcode,&nbsp;tells&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;caller&nbsp;about&nbsp;significant&nbsp;parsing&nbsp;events&nbsp;like&nbsp;beginning</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;and&nbsp;ending&nbsp;literals,&nbsp;objects,&nbsp;and&nbsp;arrays,&nbsp;so&nbsp;that&nbsp;the</span><br>
+<span class="lineno">70</span><span class="comment">//&nbsp;caller&nbsp;can&nbsp;follow&nbsp;along&nbsp;if&nbsp;it&nbsp;wishes.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;return&nbsp;value&nbsp;scanEnd&nbsp;indicates&nbsp;that&nbsp;a&nbsp;single&nbsp;top-level</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;JSON&nbsp;value&nbsp;has&nbsp;been&nbsp;completed,&nbsp;*before*&nbsp;the&nbsp;byte&nbsp;that</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;just&nbsp;got&nbsp;passed&nbsp;in.&nbsp;&nbsp;(The&nbsp;indication&nbsp;must&nbsp;be&nbsp;delayed&nbsp;in&nbsp;order</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;to&nbsp;recognize&nbsp;the&nbsp;end&nbsp;of&nbsp;numbers:&nbsp;is&nbsp;123&nbsp;a&nbsp;whole&nbsp;value&nbsp;or</span><br>
+<span class="lineno">75</span><span class="comment">//&nbsp;the&nbsp;beginning&nbsp;of&nbsp;12345e+6?).</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">scanner</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;The&nbsp;step&nbsp;is&nbsp;a&nbsp;func&nbsp;to&nbsp;be&nbsp;called&nbsp;to&nbsp;execute&nbsp;the&nbsp;next&nbsp;transition.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Also&nbsp;tried&nbsp;using&nbsp;an&nbsp;integer&nbsp;constant&nbsp;and&nbsp;a&nbsp;single&nbsp;func</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;with&nbsp;a&nbsp;switch,&nbsp;but&nbsp;using&nbsp;the&nbsp;func&nbsp;directly&nbsp;was&nbsp;10%&nbsp;faster</span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;on&nbsp;a&nbsp;64-bit&nbsp;Mac&nbsp;Mini,&nbsp;and&nbsp;it&#39;s&nbsp;nicer&nbsp;to&nbsp;read.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">step</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="op">*</span><span class="ident">scanner</span><span class="op">,</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Reached&nbsp;end&nbsp;of&nbsp;top-level&nbsp;value.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">endTop</span>&nbsp;<span class="builtintype">bool</span><br>
+<span class="lineno">85</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Stack&nbsp;of&nbsp;what&nbsp;we&#39;re&nbsp;in&nbsp;the&nbsp;middle&nbsp;of&nbsp;-&nbsp;array&nbsp;values,&nbsp;object&nbsp;keys,&nbsp;object&nbsp;values.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">parseState</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">int</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Error&nbsp;that&nbsp;happened,&nbsp;if&nbsp;any.</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;1-byte&nbsp;redo&nbsp;(see&nbsp;undo&nbsp;method)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">redo</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">bool</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">redoCode</span>&nbsp;&nbsp;<span class="builtintype">int</span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">redoState</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="op">*</span><span class="ident">scanner</span><span class="op">,</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;total&nbsp;bytes&nbsp;consumed,&nbsp;updated&nbsp;by&nbsp;decoder.Decode</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">bytes</span>&nbsp;<span class="ident">int64</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">100</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;These&nbsp;values&nbsp;are&nbsp;returned&nbsp;by&nbsp;the&nbsp;state&nbsp;transition&nbsp;functions</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;assigned&nbsp;to&nbsp;scanner.state&nbsp;and&nbsp;the&nbsp;method&nbsp;scanner.eof.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;They&nbsp;give&nbsp;details&nbsp;about&nbsp;the&nbsp;current&nbsp;state&nbsp;of&nbsp;the&nbsp;scan&nbsp;that</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;callers&nbsp;might&nbsp;be&nbsp;interested&nbsp;to&nbsp;know&nbsp;about.</span><br>
+<span class="lineno">105</span><span class="comment">//&nbsp;It&nbsp;is&nbsp;okay&nbsp;to&nbsp;ignore&nbsp;the&nbsp;return&nbsp;value&nbsp;of&nbsp;any&nbsp;particular</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;call&nbsp;to&nbsp;scanner.state:&nbsp;if&nbsp;one&nbsp;call&nbsp;returns&nbsp;scanError,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;every&nbsp;subsequent&nbsp;call&nbsp;will&nbsp;return&nbsp;scanError&nbsp;too.</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Continue.</span><br>
+<span class="lineno">110</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">scanContinue</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="ident">iota</span>&nbsp;<span class="comment">//&nbsp;uninteresting&nbsp;byte</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">scanBeginLiteral</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;end&nbsp;implied&nbsp;by&nbsp;next&nbsp;result&nbsp;!=&nbsp;scanContinue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">scanBeginObject</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;begin&nbsp;object</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">scanObjectKey</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;just&nbsp;finished&nbsp;object&nbsp;key&nbsp;(string)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">scanObjectValue</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;just&nbsp;finished&nbsp;non-last&nbsp;object&nbsp;value</span><br>
+<span class="lineno">115</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">scanEndObject</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;end&nbsp;object&nbsp;(implies&nbsp;scanObjectValue&nbsp;if&nbsp;possible)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">scanBeginArray</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;begin&nbsp;array</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">scanArrayValue</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;just&nbsp;finished&nbsp;array&nbsp;value</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">scanEndArray</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;end&nbsp;array&nbsp;(implies&nbsp;scanArrayValue&nbsp;if&nbsp;possible)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">scanSkipSpace</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;space&nbsp;byte;&nbsp;can&nbsp;skip;&nbsp;known&nbsp;to&nbsp;be&nbsp;last&nbsp;&#34;continue&#34;&nbsp;result</span><br>
+<span class="lineno">120</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Stop.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">scanEnd</span>&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;top-level&nbsp;value&nbsp;ended&nbsp;*before*&nbsp;this&nbsp;byte;&nbsp;known&nbsp;to&nbsp;be&nbsp;first&nbsp;&#34;stop&#34;&nbsp;result</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">scanError</span>&nbsp;<span class="comment">//&nbsp;hit&nbsp;an&nbsp;error,&nbsp;scanner.err.</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno">125</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;These&nbsp;values&nbsp;are&nbsp;stored&nbsp;in&nbsp;the&nbsp;parseState&nbsp;stack.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;They&nbsp;give&nbsp;the&nbsp;current&nbsp;state&nbsp;of&nbsp;a&nbsp;composite&nbsp;value</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;being&nbsp;scanned.&nbsp;&nbsp;If&nbsp;the&nbsp;parser&nbsp;is&nbsp;inside&nbsp;a&nbsp;nested&nbsp;value</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;the&nbsp;parseState&nbsp;describes&nbsp;the&nbsp;nested&nbsp;state,&nbsp;outermost&nbsp;at&nbsp;entry&nbsp;0.</span><br>
+<span class="lineno">130</span><span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">parseObjectKey</span>&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="ident">iota</span>&nbsp;<span class="comment">//&nbsp;parsing&nbsp;object&nbsp;key&nbsp;(before&nbsp;colon)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">parseObjectValue</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;parsing&nbsp;object&nbsp;value&nbsp;(after&nbsp;colon)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">parseArrayValue</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;parsing&nbsp;array&nbsp;value</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno">135</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;reset&nbsp;prepares&nbsp;the&nbsp;scanner&nbsp;for&nbsp;use.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;It&nbsp;must&nbsp;be&nbsp;called&nbsp;before&nbsp;calling&nbsp;s.step.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">scanner</span><span class="op">)</span>&nbsp;<span class="ident">reset</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">step</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateBeginValue</span><br>
+<span class="lineno">140</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">parseState</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">parseState</span><span class="op">[</span><span class="num">0</span><span class="op">:</span><span class="num">0</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">redo</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">endTop</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">145</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;eof&nbsp;tells&nbsp;the&nbsp;scanner&nbsp;that&nbsp;the&nbsp;end&nbsp;of&nbsp;input&nbsp;has&nbsp;been&nbsp;reached.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;It&nbsp;returns&nbsp;a&nbsp;scan&nbsp;status&nbsp;just&nbsp;as&nbsp;s.step&nbsp;does.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">scanner</span><span class="op">)</span>&nbsp;<span class="ident">eof</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">150</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanError</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">endTop</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanEnd</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">155</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">step</span><span class="op">(</span><span class="ident">s</span><span class="op">,</span>&nbsp;<span class="string">&#39;&nbsp;&#39;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">endTop</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanEnd</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">err</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">160</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">&amp;</span><span class="ident">SyntaxError</span><span class="op">{</span><span class="string">&#34;unexpected&nbsp;end&nbsp;of&nbsp;JSON&nbsp;input&#34;</span><span class="op">,</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">bytes</span><span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanError</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">165</span><span class="comment">//&nbsp;pushParseState&nbsp;pushes&nbsp;a&nbsp;new&nbsp;parse&nbsp;state&nbsp;p&nbsp;onto&nbsp;the&nbsp;parse&nbsp;stack.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">scanner</span><span class="op">)</span>&nbsp;<span class="ident">pushParseState</span><span class="op">(</span><span class="ident">p</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">parseState</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">append</span><span class="op">(</span><span class="ident">s</span><span class="op">.</span><span class="ident">parseState</span><span class="op">,</span>&nbsp;<span class="ident">p</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">170</span><span class="comment">//&nbsp;popParseState&nbsp;pops&nbsp;a&nbsp;parse&nbsp;state&nbsp;(already&nbsp;obtained)&nbsp;off&nbsp;the&nbsp;stack</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;and&nbsp;updates&nbsp;s.step&nbsp;accordingly.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">scanner</span><span class="op">)</span>&nbsp;<span class="ident">popParseState</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">s</span><span class="op">.</span><span class="ident">parseState</span><span class="op">)</span>&nbsp;<span class="op">-</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">parseState</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">parseState</span><span class="op">[</span><span class="num">0</span><span class="op">:</span><span class="ident">n</span><span class="op">]</span><br>
+<span class="lineno">175</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">redo</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">step</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateEndTop</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">endTop</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">180</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">step</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateEndValue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">isSpace</span><span class="op">(</span><span class="ident">c</span>&nbsp;<span class="builtintype">rune</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">185</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;&nbsp;&#39;</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;\t&#39;</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;\r&#39;</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;\n&#39;</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;stateBeginValueOrEmpty&nbsp;is&nbsp;the&nbsp;state&nbsp;after&nbsp;reading&nbsp;`[`.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">stateBeginValueOrEmpty</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">scanner</span><span class="op">,</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">190</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="string">&#39;&nbsp;&#39;</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">isSpace</span><span class="op">(</span><span class="builtintype">rune</span><span class="op">(</span><span class="ident">c</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanSkipSpace</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;]&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">stateEndValue</span><span class="op">(</span><span class="ident">s</span><span class="op">,</span>&nbsp;<span class="ident">c</span><span class="op">)</span><br>
+<span class="lineno">195</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">stateBeginValue</span><span class="op">(</span><span class="ident">s</span><span class="op">,</span>&nbsp;<span class="ident">c</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;stateBeginValue&nbsp;is&nbsp;the&nbsp;state&nbsp;at&nbsp;the&nbsp;beginning&nbsp;of&nbsp;the&nbsp;input.</span><br>
+<span class="lineno">200</span><span class="keyword">func</span>&nbsp;<span class="ident">stateBeginValue</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">scanner</span><span class="op">,</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="string">&#39;&nbsp;&#39;</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">isSpace</span><span class="op">(</span><span class="builtintype">rune</span><span class="op">(</span><span class="ident">c</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanSkipSpace</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">205</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="string">&#39;{&#39;</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">step</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateBeginStringOrEmpty</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">pushParseState</span><span class="op">(</span><span class="ident">parseObjectKey</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanBeginObject</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="string">&#39;[&#39;</span><span class="op">:</span><br>
+<span class="lineno">210</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">step</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateBeginValueOrEmpty</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">pushParseState</span><span class="op">(</span><span class="ident">parseArrayValue</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanBeginArray</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="string">&#39;&#34;&#39;</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">step</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateInString</span><br>
+<span class="lineno">215</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanBeginLiteral</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="string">&#39;-&#39;</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">step</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateNeg</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanBeginLiteral</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="string">&#39;0&#39;</span><span class="op">:</span>&nbsp;<span class="comment">//&nbsp;beginning&nbsp;of&nbsp;0.123</span><br>
+<span class="lineno">220</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">step</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">state0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanBeginLiteral</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="string">&#39;t&#39;</span><span class="op">:</span>&nbsp;<span class="comment">//&nbsp;beginning&nbsp;of&nbsp;true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">step</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateT</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanBeginLiteral</span><br>
+<span class="lineno">225</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="string">&#39;f&#39;</span><span class="op">:</span>&nbsp;<span class="comment">//&nbsp;beginning&nbsp;of&nbsp;false</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">step</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateF</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanBeginLiteral</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="string">&#39;n&#39;</span><span class="op">:</span>&nbsp;<span class="comment">//&nbsp;beginning&nbsp;of&nbsp;null</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">step</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateN</span><br>
+<span class="lineno">230</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanBeginLiteral</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="string">&#39;1&#39;</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="string">&#39;9&#39;</span>&nbsp;<span class="op">{</span>&nbsp;<span class="comment">//&nbsp;beginning&nbsp;of&nbsp;1234.5</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">step</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">state1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanBeginLiteral</span><br>
+<span class="lineno">235</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="builtintype">error</span><span class="op">(</span><span class="ident">c</span><span class="op">,</span>&nbsp;<span class="string">&#34;looking&nbsp;for&nbsp;beginning&nbsp;of&nbsp;value&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;stateBeginStringOrEmpty&nbsp;is&nbsp;the&nbsp;state&nbsp;after&nbsp;reading&nbsp;`{`.</span><br>
+<span class="lineno">240</span><span class="keyword">func</span>&nbsp;<span class="ident">stateBeginStringOrEmpty</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">scanner</span><span class="op">,</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="string">&#39;&nbsp;&#39;</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">isSpace</span><span class="op">(</span><span class="builtintype">rune</span><span class="op">(</span><span class="ident">c</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanSkipSpace</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;}&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">245</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">s</span><span class="op">.</span><span class="ident">parseState</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">parseState</span><span class="op">[</span><span class="ident">n</span><span class="op">-</span><span class="num">1</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">parseObjectValue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">stateEndValue</span><span class="op">(</span><span class="ident">s</span><span class="op">,</span>&nbsp;<span class="ident">c</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">stateBeginString</span><span class="op">(</span><span class="ident">s</span><span class="op">,</span>&nbsp;<span class="ident">c</span><span class="op">)</span><br>
+<span class="lineno">250</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;stateBeginString&nbsp;is&nbsp;the&nbsp;state&nbsp;after&nbsp;reading&nbsp;`{&#34;key&#34;:&nbsp;value,`.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">stateBeginString</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">scanner</span><span class="op">,</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="string">&#39;&nbsp;&#39;</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">isSpace</span><span class="op">(</span><span class="builtintype">rune</span><span class="op">(</span><span class="ident">c</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">255</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanSkipSpace</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;&#34;&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">step</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateInString</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanBeginLiteral</span><br>
+<span class="lineno">260</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="builtintype">error</span><span class="op">(</span><span class="ident">c</span><span class="op">,</span>&nbsp;<span class="string">&#34;looking&nbsp;for&nbsp;beginning&nbsp;of&nbsp;object&nbsp;key&nbsp;string&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;stateEndValue&nbsp;is&nbsp;the&nbsp;state&nbsp;after&nbsp;completing&nbsp;a&nbsp;value,</span><br>
+<span class="lineno">265</span><span class="comment">//&nbsp;such&nbsp;as&nbsp;after&nbsp;reading&nbsp;`{}`&nbsp;or&nbsp;`true`&nbsp;or&nbsp;`[&#34;x&#34;`.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">stateEndValue</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">scanner</span><span class="op">,</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">s</span><span class="op">.</span><span class="ident">parseState</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Completed&nbsp;top-level&nbsp;before&nbsp;the&nbsp;current&nbsp;byte.</span><br>
+<span class="lineno">270</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">step</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateEndTop</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">endTop</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">stateEndTop</span><span class="op">(</span><span class="ident">s</span><span class="op">,</span>&nbsp;<span class="ident">c</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="string">&#39;&nbsp;&#39;</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">isSpace</span><span class="op">(</span><span class="builtintype">rune</span><span class="op">(</span><span class="ident">c</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">275</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">step</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateEndValue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanSkipSpace</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ps</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">parseState</span><span class="op">[</span><span class="ident">n</span><span class="op">-</span><span class="num">1</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="ident">ps</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">280</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">parseObjectKey</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;:&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">parseState</span><span class="op">[</span><span class="ident">n</span><span class="op">-</span><span class="num">1</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">parseObjectValue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">step</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateBeginValue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanObjectKey</span><br>
+<span class="lineno">285</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="builtintype">error</span><span class="op">(</span><span class="ident">c</span><span class="op">,</span>&nbsp;<span class="string">&#34;after&nbsp;object&nbsp;key&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">parseObjectValue</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;,&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">parseState</span><span class="op">[</span><span class="ident">n</span><span class="op">-</span><span class="num">1</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">parseObjectKey</span><br>
+<span class="lineno">290</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">step</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateBeginString</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanObjectValue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;}&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">popParseState</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">295</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanEndObject</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="builtintype">error</span><span class="op">(</span><span class="ident">c</span><span class="op">,</span>&nbsp;<span class="string">&#34;after&nbsp;object&nbsp;key:value&nbsp;pair&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">parseArrayValue</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;,&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">300</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">step</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateBeginValue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanArrayValue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;]&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">popParseState</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">305</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanEndArray</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="builtintype">error</span><span class="op">(</span><span class="ident">c</span><span class="op">,</span>&nbsp;<span class="string">&#34;after&nbsp;array&nbsp;element&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="builtintype">error</span><span class="op">(</span><span class="ident">c</span><span class="op">,</span>&nbsp;<span class="string">&#34;&#34;</span><span class="op">)</span><br>
+<span class="lineno">310</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;stateEndTop&nbsp;is&nbsp;the&nbsp;state&nbsp;after&nbsp;finishing&nbsp;the&nbsp;top-level&nbsp;value,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;such&nbsp;as&nbsp;after&nbsp;reading&nbsp;`{}`&nbsp;or&nbsp;`[1,2,3]`.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Only&nbsp;space&nbsp;characters&nbsp;should&nbsp;be&nbsp;seen&nbsp;now.</span><br>
+<span class="lineno">315</span><span class="keyword">func</span>&nbsp;<span class="ident">stateEndTop</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">scanner</span><span class="op">,</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="string">&#39;&nbsp;&#39;</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="string">&#39;\t&#39;</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="string">&#39;\r&#39;</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="string">&#39;\n&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Complain&nbsp;about&nbsp;non-space&nbsp;byte&nbsp;on&nbsp;next&nbsp;call.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="builtintype">error</span><span class="op">(</span><span class="ident">c</span><span class="op">,</span>&nbsp;<span class="string">&#34;after&nbsp;top-level&nbsp;value&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">320</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanEnd</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;stateInString&nbsp;is&nbsp;the&nbsp;state&nbsp;after&nbsp;reading&nbsp;`&#34;`.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">stateInString</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">scanner</span><span class="op">,</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">325</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;&#34;&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">step</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateEndValue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanContinue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;\\&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">330</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">step</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateInStringEsc</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanContinue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">0x20</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="builtintype">error</span><span class="op">(</span><span class="ident">c</span><span class="op">,</span>&nbsp;<span class="string">&#34;in&nbsp;string&nbsp;literal&#34;</span><span class="op">)</span><br>
+<span class="lineno">335</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanContinue</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;stateInStringEsc&nbsp;is&nbsp;the&nbsp;state&nbsp;after&nbsp;reading&nbsp;`&#34;\`&nbsp;during&nbsp;a&nbsp;quoted&nbsp;string.</span><br>
+<span class="lineno">340</span><span class="keyword">func</span>&nbsp;<span class="ident">stateInStringEsc</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">scanner</span><span class="op">,</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="string">&#39;b&#39;</span><span class="op">,</span>&nbsp;<span class="string">&#39;f&#39;</span><span class="op">,</span>&nbsp;<span class="string">&#39;n&#39;</span><span class="op">,</span>&nbsp;<span class="string">&#39;r&#39;</span><span class="op">,</span>&nbsp;<span class="string">&#39;t&#39;</span><span class="op">,</span>&nbsp;<span class="string">&#39;\\&#39;</span><span class="op">,</span>&nbsp;<span class="string">&#39;/&#39;</span><span class="op">,</span>&nbsp;<span class="string">&#39;&#34;&#39;</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">step</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateInString</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanContinue</span><br>
+<span class="lineno">345</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;u&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">step</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateInStringEscU</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanContinue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">350</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="builtintype">error</span><span class="op">(</span><span class="ident">c</span><span class="op">,</span>&nbsp;<span class="string">&#34;in&nbsp;string&nbsp;escape&nbsp;code&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;stateInStringEscU&nbsp;is&nbsp;the&nbsp;state&nbsp;after&nbsp;reading&nbsp;`&#34;\u`&nbsp;during&nbsp;a&nbsp;quoted&nbsp;string.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">stateInStringEscU</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">scanner</span><span class="op">,</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">355</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="string">&#39;0&#39;</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="string">&#39;9&#39;</span>&nbsp;<span class="op">||</span>&nbsp;<span class="string">&#39;a&#39;</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="string">&#39;f&#39;</span>&nbsp;<span class="op">||</span>&nbsp;<span class="string">&#39;A&#39;</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="string">&#39;F&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">step</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateInStringEscU1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanContinue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;numbers</span><br>
+<span class="lineno">360</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="builtintype">error</span><span class="op">(</span><span class="ident">c</span><span class="op">,</span>&nbsp;<span class="string">&#34;in&nbsp;\\u&nbsp;hexadecimal&nbsp;character&nbsp;escape&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;stateInStringEscU1&nbsp;is&nbsp;the&nbsp;state&nbsp;after&nbsp;reading&nbsp;`&#34;\u1`&nbsp;during&nbsp;a&nbsp;quoted&nbsp;string.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">stateInStringEscU1</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">scanner</span><span class="op">,</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">365</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="string">&#39;0&#39;</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="string">&#39;9&#39;</span>&nbsp;<span class="op">||</span>&nbsp;<span class="string">&#39;a&#39;</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="string">&#39;f&#39;</span>&nbsp;<span class="op">||</span>&nbsp;<span class="string">&#39;A&#39;</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="string">&#39;F&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">step</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateInStringEscU12</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanContinue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;numbers</span><br>
+<span class="lineno">370</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="builtintype">error</span><span class="op">(</span><span class="ident">c</span><span class="op">,</span>&nbsp;<span class="string">&#34;in&nbsp;\\u&nbsp;hexadecimal&nbsp;character&nbsp;escape&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;stateInStringEscU12&nbsp;is&nbsp;the&nbsp;state&nbsp;after&nbsp;reading&nbsp;`&#34;\u12`&nbsp;during&nbsp;a&nbsp;quoted&nbsp;string.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">stateInStringEscU12</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">scanner</span><span class="op">,</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">375</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="string">&#39;0&#39;</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="string">&#39;9&#39;</span>&nbsp;<span class="op">||</span>&nbsp;<span class="string">&#39;a&#39;</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="string">&#39;f&#39;</span>&nbsp;<span class="op">||</span>&nbsp;<span class="string">&#39;A&#39;</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="string">&#39;F&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">step</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateInStringEscU123</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanContinue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;numbers</span><br>
+<span class="lineno">380</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="builtintype">error</span><span class="op">(</span><span class="ident">c</span><span class="op">,</span>&nbsp;<span class="string">&#34;in&nbsp;\\u&nbsp;hexadecimal&nbsp;character&nbsp;escape&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;stateInStringEscU123&nbsp;is&nbsp;the&nbsp;state&nbsp;after&nbsp;reading&nbsp;`&#34;\u123`&nbsp;during&nbsp;a&nbsp;quoted&nbsp;string.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">stateInStringEscU123</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">scanner</span><span class="op">,</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">385</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="string">&#39;0&#39;</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="string">&#39;9&#39;</span>&nbsp;<span class="op">||</span>&nbsp;<span class="string">&#39;a&#39;</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="string">&#39;f&#39;</span>&nbsp;<span class="op">||</span>&nbsp;<span class="string">&#39;A&#39;</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="string">&#39;F&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">step</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateInString</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanContinue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;numbers</span><br>
+<span class="lineno">390</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="builtintype">error</span><span class="op">(</span><span class="ident">c</span><span class="op">,</span>&nbsp;<span class="string">&#34;in&nbsp;\\u&nbsp;hexadecimal&nbsp;character&nbsp;escape&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;stateNeg&nbsp;is&nbsp;the&nbsp;state&nbsp;after&nbsp;reading&nbsp;`-`&nbsp;during&nbsp;a&nbsp;number.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">stateNeg</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">scanner</span><span class="op">,</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">395</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;0&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">step</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">state0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanContinue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="string">&#39;1&#39;</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="string">&#39;9&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">400</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">step</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">state1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanContinue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="builtintype">error</span><span class="op">(</span><span class="ident">c</span><span class="op">,</span>&nbsp;<span class="string">&#34;in&nbsp;numeric&nbsp;literal&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">405</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;state1&nbsp;is&nbsp;the&nbsp;state&nbsp;after&nbsp;reading&nbsp;a&nbsp;non-zero&nbsp;integer&nbsp;during&nbsp;a&nbsp;number,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;such&nbsp;as&nbsp;after&nbsp;reading&nbsp;`1`&nbsp;or&nbsp;`100`&nbsp;but&nbsp;not&nbsp;`0`.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">state1</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">scanner</span><span class="op">,</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="string">&#39;0&#39;</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="string">&#39;9&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">410</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">step</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">state1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanContinue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">state0</span><span class="op">(</span><span class="ident">s</span><span class="op">,</span>&nbsp;<span class="ident">c</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">415</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;state0&nbsp;is&nbsp;the&nbsp;state&nbsp;after&nbsp;reading&nbsp;`0`&nbsp;during&nbsp;a&nbsp;number.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">state0</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">scanner</span><span class="op">,</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;.&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">step</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateDot</span><br>
+<span class="lineno">420</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanContinue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;e&#39;</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;E&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">step</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateE</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanContinue</span><br>
+<span class="lineno">425</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">stateEndValue</span><span class="op">(</span><span class="ident">s</span><span class="op">,</span>&nbsp;<span class="ident">c</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;stateDot&nbsp;is&nbsp;the&nbsp;state&nbsp;after&nbsp;reading&nbsp;the&nbsp;integer&nbsp;and&nbsp;decimal&nbsp;point&nbsp;in&nbsp;a&nbsp;number,</span><br>
+<span class="lineno">430</span><span class="comment">//&nbsp;such&nbsp;as&nbsp;after&nbsp;reading&nbsp;`1.`.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">stateDot</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">scanner</span><span class="op">,</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="string">&#39;0&#39;</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="string">&#39;9&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">step</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateDot0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanContinue</span><br>
+<span class="lineno">435</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="builtintype">error</span><span class="op">(</span><span class="ident">c</span><span class="op">,</span>&nbsp;<span class="string">&#34;after&nbsp;decimal&nbsp;point&nbsp;in&nbsp;numeric&nbsp;literal&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;stateDot0&nbsp;is&nbsp;the&nbsp;state&nbsp;after&nbsp;reading&nbsp;the&nbsp;integer,&nbsp;decimal&nbsp;point,&nbsp;and&nbsp;subsequent</span><br>
+<span class="lineno">440</span><span class="comment">//&nbsp;digits&nbsp;of&nbsp;a&nbsp;number,&nbsp;such&nbsp;as&nbsp;after&nbsp;reading&nbsp;`3.14`.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">stateDot0</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">scanner</span><span class="op">,</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="string">&#39;0&#39;</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="string">&#39;9&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">step</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateDot0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanContinue</span><br>
+<span class="lineno">445</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;e&#39;</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;E&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">step</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateE</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanContinue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">450</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">stateEndValue</span><span class="op">(</span><span class="ident">s</span><span class="op">,</span>&nbsp;<span class="ident">c</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;stateE&nbsp;is&nbsp;the&nbsp;state&nbsp;after&nbsp;reading&nbsp;the&nbsp;mantissa&nbsp;and&nbsp;e&nbsp;in&nbsp;a&nbsp;number,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;such&nbsp;as&nbsp;after&nbsp;reading&nbsp;`314e`&nbsp;or&nbsp;`0.314e`.</span><br>
+<span class="lineno">455</span><span class="keyword">func</span>&nbsp;<span class="ident">stateE</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">scanner</span><span class="op">,</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;+&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">step</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateESign</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanContinue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">460</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;-&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">step</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateESign</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanContinue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">stateESign</span><span class="op">(</span><span class="ident">s</span><span class="op">,</span>&nbsp;<span class="ident">c</span><span class="op">)</span><br>
+<span class="lineno">465</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;stateESign&nbsp;is&nbsp;the&nbsp;state&nbsp;after&nbsp;reading&nbsp;the&nbsp;mantissa,&nbsp;e,&nbsp;and&nbsp;sign&nbsp;in&nbsp;a&nbsp;number,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;such&nbsp;as&nbsp;after&nbsp;reading&nbsp;`314e-`&nbsp;or&nbsp;`0.314e+`.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">stateESign</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">scanner</span><span class="op">,</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">470</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="string">&#39;0&#39;</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="string">&#39;9&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">step</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateE0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanContinue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="builtintype">error</span><span class="op">(</span><span class="ident">c</span><span class="op">,</span>&nbsp;<span class="string">&#34;in&nbsp;exponent&nbsp;of&nbsp;numeric&nbsp;literal&#34;</span><span class="op">)</span><br>
+<span class="lineno">475</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;stateE0&nbsp;is&nbsp;the&nbsp;state&nbsp;after&nbsp;reading&nbsp;the&nbsp;mantissa,&nbsp;e,&nbsp;optional&nbsp;sign,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;and&nbsp;at&nbsp;least&nbsp;one&nbsp;digit&nbsp;of&nbsp;the&nbsp;exponent&nbsp;in&nbsp;a&nbsp;number,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;such&nbsp;as&nbsp;after&nbsp;reading&nbsp;`314e-2`&nbsp;or&nbsp;`0.314e+1`&nbsp;or&nbsp;`3.14e0`.</span><br>
+<span class="lineno">480</span><span class="keyword">func</span>&nbsp;<span class="ident">stateE0</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">scanner</span><span class="op">,</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="string">&#39;0&#39;</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="string">&#39;9&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">step</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateE0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanContinue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">485</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">stateEndValue</span><span class="op">(</span><span class="ident">s</span><span class="op">,</span>&nbsp;<span class="ident">c</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;stateT&nbsp;is&nbsp;the&nbsp;state&nbsp;after&nbsp;reading&nbsp;`t`.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">stateT</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">scanner</span><span class="op">,</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">490</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;r&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">step</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateTr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanContinue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="builtintype">error</span><span class="op">(</span><span class="ident">c</span><span class="op">,</span>&nbsp;<span class="string">&#34;in&nbsp;literal&nbsp;true&nbsp;(expecting&nbsp;&#39;r&#39;)&#34;</span><span class="op">)</span><br>
+<span class="lineno">495</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;stateTr&nbsp;is&nbsp;the&nbsp;state&nbsp;after&nbsp;reading&nbsp;`tr`.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">stateTr</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">scanner</span><span class="op">,</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;u&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">500</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">step</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateTru</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanContinue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="builtintype">error</span><span class="op">(</span><span class="ident">c</span><span class="op">,</span>&nbsp;<span class="string">&#34;in&nbsp;literal&nbsp;true&nbsp;(expecting&nbsp;&#39;u&#39;)&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">505</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;stateTru&nbsp;is&nbsp;the&nbsp;state&nbsp;after&nbsp;reading&nbsp;`tru`.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">stateTru</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">scanner</span><span class="op">,</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;e&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">step</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateEndValue</span><br>
+<span class="lineno">510</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanContinue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="builtintype">error</span><span class="op">(</span><span class="ident">c</span><span class="op">,</span>&nbsp;<span class="string">&#34;in&nbsp;literal&nbsp;true&nbsp;(expecting&nbsp;&#39;e&#39;)&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">515</span><span class="comment">//&nbsp;stateF&nbsp;is&nbsp;the&nbsp;state&nbsp;after&nbsp;reading&nbsp;`f`.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">stateF</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">scanner</span><span class="op">,</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;a&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">step</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateFa</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanContinue</span><br>
+<span class="lineno">520</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="builtintype">error</span><span class="op">(</span><span class="ident">c</span><span class="op">,</span>&nbsp;<span class="string">&#34;in&nbsp;literal&nbsp;false&nbsp;(expecting&nbsp;&#39;a&#39;)&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;stateFa&nbsp;is&nbsp;the&nbsp;state&nbsp;after&nbsp;reading&nbsp;`fa`.</span><br>
+<span class="lineno">525</span><span class="keyword">func</span>&nbsp;<span class="ident">stateFa</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">scanner</span><span class="op">,</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;l&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">step</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateFal</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanContinue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">530</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="builtintype">error</span><span class="op">(</span><span class="ident">c</span><span class="op">,</span>&nbsp;<span class="string">&#34;in&nbsp;literal&nbsp;false&nbsp;(expecting&nbsp;&#39;l&#39;)&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;stateFal&nbsp;is&nbsp;the&nbsp;state&nbsp;after&nbsp;reading&nbsp;`fal`.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">stateFal</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">scanner</span><span class="op">,</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">535</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;s&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">step</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateFals</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanContinue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="builtintype">error</span><span class="op">(</span><span class="ident">c</span><span class="op">,</span>&nbsp;<span class="string">&#34;in&nbsp;literal&nbsp;false&nbsp;(expecting&nbsp;&#39;s&#39;)&#34;</span><span class="op">)</span><br>
+<span class="lineno">540</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;stateFals&nbsp;is&nbsp;the&nbsp;state&nbsp;after&nbsp;reading&nbsp;`fals`.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">stateFals</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">scanner</span><span class="op">,</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;e&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">545</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">step</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateEndValue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanContinue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="builtintype">error</span><span class="op">(</span><span class="ident">c</span><span class="op">,</span>&nbsp;<span class="string">&#34;in&nbsp;literal&nbsp;false&nbsp;(expecting&nbsp;&#39;e&#39;)&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">550</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;stateN&nbsp;is&nbsp;the&nbsp;state&nbsp;after&nbsp;reading&nbsp;`n`.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">stateN</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">scanner</span><span class="op">,</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;u&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">step</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateNu</span><br>
+<span class="lineno">555</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanContinue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="builtintype">error</span><span class="op">(</span><span class="ident">c</span><span class="op">,</span>&nbsp;<span class="string">&#34;in&nbsp;literal&nbsp;null&nbsp;(expecting&nbsp;&#39;u&#39;)&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">560</span><span class="comment">//&nbsp;stateNu&nbsp;is&nbsp;the&nbsp;state&nbsp;after&nbsp;reading&nbsp;`nu`.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">stateNu</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">scanner</span><span class="op">,</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;l&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">step</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateNul</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanContinue</span><br>
+<span class="lineno">565</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="builtintype">error</span><span class="op">(</span><span class="ident">c</span><span class="op">,</span>&nbsp;<span class="string">&#34;in&nbsp;literal&nbsp;null&nbsp;(expecting&nbsp;&#39;l&#39;)&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;stateNul&nbsp;is&nbsp;the&nbsp;state&nbsp;after&nbsp;reading&nbsp;`nul`.</span><br>
+<span class="lineno">570</span><span class="keyword">func</span>&nbsp;<span class="ident">stateNul</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">scanner</span><span class="op">,</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;l&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">step</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateEndValue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanContinue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">575</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="builtintype">error</span><span class="op">(</span><span class="ident">c</span><span class="op">,</span>&nbsp;<span class="string">&#34;in&nbsp;literal&nbsp;null&nbsp;(expecting&nbsp;&#39;l&#39;)&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;stateError&nbsp;is&nbsp;the&nbsp;state&nbsp;after&nbsp;reaching&nbsp;a&nbsp;syntax&nbsp;error,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;such&nbsp;as&nbsp;after&nbsp;reading&nbsp;`[1}`&nbsp;or&nbsp;`5.1.2`.</span><br>
+<span class="lineno">580</span><span class="keyword">func</span>&nbsp;<span class="ident">stateError</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">scanner</span><span class="op">,</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanError</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;error&nbsp;records&nbsp;an&nbsp;error&nbsp;and&nbsp;switches&nbsp;to&nbsp;the&nbsp;error&nbsp;state.</span><br>
+<span class="lineno">585</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">scanner</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span><span class="op">(</span><span class="ident">c</span>&nbsp;<span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">context</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">step</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateError</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">&amp;</span><span class="ident">SyntaxError</span><span class="op">{</span><span class="string">&#34;invalid&nbsp;character&nbsp;&#34;</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">quoteChar</span><span class="op">(</span><span class="ident">c</span><span class="op">)</span>&nbsp;<span class="op">+</span>&nbsp;<span class="string">&#34;&nbsp;&#34;</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">context</span><span class="op">,</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">bytes</span><span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">scanError</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">590</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;quoteChar&nbsp;formats&nbsp;c&nbsp;as&nbsp;a&nbsp;quoted&nbsp;character&nbsp;literal</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">quoteChar</span><span class="op">(</span><span class="ident">c</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;special&nbsp;cases&nbsp;-&nbsp;different&nbsp;from&nbsp;quoted&nbsp;strings</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;\&#39;&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">595</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="string">`&#39;\&#39;&#39;`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;&#34;&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="string">`&#39;&#34;&#39;`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">600</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;use&nbsp;quoted&nbsp;string&nbsp;with&nbsp;different&nbsp;quotation&nbsp;marks</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">strconv</span><span class="op">.</span><span class="ident">Quote</span><span class="op">(</span><span class="builtintype">string</span><span class="op">(</span><span class="ident">c</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="string">&#34;&#39;&#34;</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">s</span><span class="op">[</span><span class="num">1</span><span class="op">:</span><span class="builtinfunc">len</span><span class="op">(</span><span class="ident">s</span><span class="op">)</span><span class="op">-</span><span class="num">1</span><span class="op">]</span>&nbsp;<span class="op">+</span>&nbsp;<span class="string">&#34;&#39;&#34;</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">605</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;undo&nbsp;causes&nbsp;the&nbsp;scanner&nbsp;to&nbsp;return&nbsp;scanCode&nbsp;from&nbsp;the&nbsp;next&nbsp;state&nbsp;transition.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;This&nbsp;gives&nbsp;callers&nbsp;a&nbsp;simple&nbsp;1-byte&nbsp;undo&nbsp;mechanism.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">scanner</span><span class="op">)</span>&nbsp;<span class="ident">undo</span><span class="op">(</span><span class="ident">scanCode</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">redo</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">610</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">panic</span><span class="op">(</span><span class="string">&#34;json:&nbsp;invalid&nbsp;use&nbsp;of&nbsp;scanner&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">redoCode</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">scanCode</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">redoState</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">step</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">step</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">stateRedo</span><br>
+<span class="lineno">615</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">redo</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;stateRedo&nbsp;helps&nbsp;implement&nbsp;the&nbsp;scanner&#39;s&nbsp;1-byte&nbsp;undo.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">stateRedo</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">scanner</span><span class="op">,</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">620</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">redo</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">step</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">redoState</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">redoCode</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

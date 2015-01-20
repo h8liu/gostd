@@ -1,0 +1,290 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2009&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="comment">//&nbsp;Semaphore&nbsp;implementation&nbsp;exposed&nbsp;to&nbsp;Go.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Intended&nbsp;use&nbsp;is&nbsp;provide&nbsp;a&nbsp;sleep&nbsp;and&nbsp;wakeup</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;primitive&nbsp;that&nbsp;can&nbsp;be&nbsp;used&nbsp;in&nbsp;the&nbsp;contended&nbsp;case</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;of&nbsp;other&nbsp;synchronization&nbsp;primitives.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Thus&nbsp;it&nbsp;targets&nbsp;the&nbsp;same&nbsp;goal&nbsp;as&nbsp;Linux&#39;s&nbsp;futex,</span><br>
+<span class="lineno">10</span><span class="comment">//&nbsp;but&nbsp;it&nbsp;has&nbsp;much&nbsp;simpler&nbsp;semantics.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;That&nbsp;is,&nbsp;don&#39;t&nbsp;think&nbsp;of&nbsp;these&nbsp;as&nbsp;semaphores.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Think&nbsp;of&nbsp;them&nbsp;as&nbsp;a&nbsp;way&nbsp;to&nbsp;implement&nbsp;sleep&nbsp;and&nbsp;wakeup</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;such&nbsp;that&nbsp;every&nbsp;sleep&nbsp;is&nbsp;paired&nbsp;with&nbsp;a&nbsp;single&nbsp;wakeup,</span><br>
+<span class="lineno">15</span><span class="comment">//&nbsp;even&nbsp;if,&nbsp;due&nbsp;to&nbsp;races,&nbsp;the&nbsp;wakeup&nbsp;happens&nbsp;before&nbsp;the&nbsp;sleep.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;See&nbsp;Mullender&nbsp;and&nbsp;Cox,&nbsp;``Semaphores&nbsp;in&nbsp;Plan&nbsp;9,&#39;&#39;</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;http://swtch.com/semaphore.pdf</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">20</span><span class="keyword">package</span>&nbsp;<span class="ident">runtime</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="string">&#34;unsafe&#34;</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Asynchronous&nbsp;semaphore&nbsp;for&nbsp;sync.Mutex.</span><br>
+<span class="lineno">25</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">semaRoot</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">lock</span>&nbsp;&nbsp;<span class="ident">mutex</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">head</span>&nbsp;&nbsp;<span class="op">*</span><span class="ident">sudog</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tail</span>&nbsp;&nbsp;<span class="op">*</span><span class="ident">sudog</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nwait</span>&nbsp;<span class="builtintype">uint32</span>&nbsp;<span class="comment">//&nbsp;Number&nbsp;of&nbsp;waiters.&nbsp;Read&nbsp;w/o&nbsp;the&nbsp;lock.</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Prime&nbsp;to&nbsp;not&nbsp;correlate&nbsp;with&nbsp;any&nbsp;user&nbsp;patterns.</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">semTabSize</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">251</span><br>
+<span class="lineno">35</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">semtable</span>&nbsp;<span class="op">[</span><span class="ident">semTabSize</span><span class="op">]</span><span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">root</span>&nbsp;<span class="ident">semaRoot</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pad</span>&nbsp;&nbsp;<span class="op">[</span><span class="ident">_CacheLineSize</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Sizeof</span><span class="op">(</span><span class="ident">semaRoot</span><span class="op">{</span><span class="op">}</span><span class="op">)</span><span class="op">]</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">40</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Called&nbsp;from&nbsp;sync/net&nbsp;packages.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">asyncsemacquire</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="op">*</span><span class="builtintype">uint32</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">semacquire</span><span class="op">(</span><span class="ident">addr</span><span class="op">,</span>&nbsp;<span class="ident">true</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">45</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">asyncsemrelease</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="op">*</span><span class="builtintype">uint32</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">semrelease</span><span class="op">(</span><span class="ident">addr</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">50</span><span class="comment">//&nbsp;Called&nbsp;from&nbsp;runtime.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">semacquire</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="op">*</span><span class="builtintype">uint32</span><span class="op">,</span>&nbsp;<span class="ident">profile</span>&nbsp;<span class="builtintype">bool</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">getg</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">gp</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">gp</span><span class="op">.</span><span class="ident">m</span><span class="op">.</span><span class="ident">curg</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gothrow</span><span class="op">(</span><span class="string">&#34;semacquire&nbsp;not&nbsp;on&nbsp;the&nbsp;G&nbsp;stack&#34;</span><span class="op">)</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Easy&nbsp;case.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">cansemacquire</span><span class="op">(</span><span class="ident">addr</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Harder&nbsp;case:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;&nbsp;&nbsp;&nbspincrement&nbsp;waiter&nbsp;count</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;&nbsp;&nbsp;&nbsptry&nbsp;cansemacquire&nbsp;one&nbsp;more&nbsp;time,&nbsp;return&nbsp;if&nbsp;succeeded</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;&nbsp;&nbsp;&nbspenqueue&nbsp;itself&nbsp;as&nbsp;a&nbsp;waiter</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;&nbsp;&nbsp;&nbspsleep</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp(waiter&nbsp;descriptor&nbsp;is&nbsp;dequeued&nbsp;by&nbsp;signaler)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">acquireSudog</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">root</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">semroot</span><span class="op">(</span><span class="ident">addr</span><span class="op">)</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t0</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">int64</span><span class="op">(</span><span class="num">0</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">releasetime</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">profile</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">blockprofilerate</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t0</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">cputicks</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">releasetime</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">-</span><span class="num">1</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">lock</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">root</span><span class="op">.</span><span class="ident">lock</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Add&nbsp;ourselves&nbsp;to&nbsp;nwait&nbsp;to&nbsp;disable&nbsp;&#34;easy&nbsp;case&#34;&nbsp;in&nbsp;semrelease.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">xadd</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">root</span><span class="op">.</span><span class="ident">nwait</span><span class="op">,</span>&nbsp;<span class="num">1</span><span class="op">)</span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Check&nbsp;cansemacquire&nbsp;to&nbsp;avoid&nbsp;missed&nbsp;wakeup.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">cansemacquire</span><span class="op">(</span><span class="ident">addr</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">xadd</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">root</span><span class="op">.</span><span class="ident">nwait</span><span class="op">,</span>&nbsp;<span class="op">-</span><span class="num">1</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">unlock</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">root</span><span class="op">.</span><span class="ident">lock</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">break</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Any&nbsp;semrelease&nbsp;after&nbsp;the&nbsp;cansemacquire&nbsp;knows&nbsp;we&#39;re&nbsp;waiting</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;(we&nbsp;set&nbsp;nwait&nbsp;above),&nbsp;so&nbsp;go&nbsp;to&nbsp;sleep.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">root</span><span class="op">.</span><span class="ident">queue</span><span class="op">(</span><span class="ident">addr</span><span class="op">,</span>&nbsp;<span class="ident">s</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">goparkunlock</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">root</span><span class="op">.</span><span class="ident">lock</span><span class="op">,</span>&nbsp;<span class="string">&#34;semacquire&#34;</span><span class="op">)</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">cansemacquire</span><span class="op">(</span><span class="ident">addr</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">break</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">releasetime</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">blockevent</span><span class="op">(</span><span class="ident">int64</span><span class="op">(</span><span class="ident">s</span><span class="op">.</span><span class="ident">releasetime</span><span class="op">)</span><span class="op">-</span><span class="ident">t0</span><span class="op">,</span>&nbsp;<span class="num">3</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">releaseSudog</span><span class="op">(</span><span class="ident">s</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">100</span><span class="keyword">func</span>&nbsp;<span class="ident">semrelease</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="op">*</span><span class="builtintype">uint32</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">root</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">semroot</span><span class="op">(</span><span class="ident">addr</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">xadd</span><span class="op">(</span><span class="ident">addr</span><span class="op">,</span>&nbsp;<span class="num">1</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Easy&nbsp;case:&nbsp;no&nbsp;waiters?</span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;This&nbsp;check&nbsp;must&nbsp;happen&nbsp;after&nbsp;the&nbsp;xadd,&nbsp;to&nbsp;avoid&nbsp;a&nbsp;missed&nbsp;wakeup</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;(see&nbsp;loop&nbsp;in&nbsp;semacquire).</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">atomicload</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">root</span><span class="op">.</span><span class="ident">nwait</span><span class="op">)</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">110</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Harder&nbsp;case:&nbsp;search&nbsp;for&nbsp;a&nbsp;waiter&nbsp;and&nbsp;wake&nbsp;it.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">lock</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">root</span><span class="op">.</span><span class="ident">lock</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">atomicload</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">root</span><span class="op">.</span><span class="ident">nwait</span><span class="op">)</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;The&nbsp;count&nbsp;is&nbsp;already&nbsp;consumed&nbsp;by&nbsp;another&nbsp;goroutine,</span><br>
+<span class="lineno">115</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;so&nbsp;no&nbsp;need&nbsp;to&nbsp;wake&nbsp;up&nbsp;another&nbsp;goroutine.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">unlock</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">root</span><span class="op">.</span><span class="ident">lock</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">root</span><span class="op">.</span><span class="ident">head</span><br>
+<span class="lineno">120</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="op">;</span>&nbsp;<span class="ident">s</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span><span class="op">;</span>&nbsp;<span class="ident">s</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">next</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">elem</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="ident">addr</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">xadd</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">root</span><span class="op">.</span><span class="ident">nwait</span><span class="op">,</span>&nbsp;<span class="op">-</span><span class="num">1</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">root</span><span class="op">.</span><span class="ident">dequeue</span><span class="op">(</span><span class="ident">s</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">break</span><br>
+<span class="lineno">125</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">unlock</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">root</span><span class="op">.</span><span class="ident">lock</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">s</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">releasetime</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">130</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">releasetime</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">cputicks</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">goready</span><span class="op">(</span><span class="ident">s</span><span class="op">.</span><span class="ident">g</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">135</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">semroot</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="op">*</span><span class="builtintype">uint32</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">semaRoot</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="op">&amp;</span><span class="ident">semtable</span><span class="op">[</span><span class="op">(</span><span class="builtintype">uintptr</span><span class="op">(</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="ident">addr</span><span class="op">)</span><span class="op">)</span><span class="op">&gt;&gt;</span><span class="num">3</span><span class="op">)</span><span class="op">%</span><span class="ident">semTabSize</span><span class="op">]</span><span class="op">.</span><span class="ident">root</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">140</span><span class="keyword">func</span>&nbsp;<span class="ident">cansemacquire</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="op">*</span><span class="builtintype">uint32</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">atomicload</span><span class="op">(</span><span class="ident">addr</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">v</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno">145</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">cas</span><span class="op">(</span><span class="ident">addr</span><span class="op">,</span>&nbsp;<span class="ident">v</span><span class="op">,</span>&nbsp;<span class="ident">v</span><span class="op">-</span><span class="num">1</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">150</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">root</span>&nbsp;<span class="op">*</span><span class="ident">semaRoot</span><span class="op">)</span>&nbsp;<span class="ident">queue</span><span class="op">(</span><span class="ident">addr</span>&nbsp;<span class="op">*</span><span class="builtintype">uint32</span><span class="op">,</span>&nbsp;<span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">sudog</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">g</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">getg</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">elem</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="ident">addr</span><span class="op">)</span><br>
+<span class="lineno">155</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">next</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">prev</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">root</span><span class="op">.</span><span class="ident">tail</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">root</span><span class="op">.</span><span class="ident">tail</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">root</span><span class="op">.</span><span class="ident">tail</span><span class="op">.</span><span class="ident">next</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">s</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">160</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">root</span><span class="op">.</span><span class="ident">head</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">s</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">root</span><span class="op">.</span><span class="ident">tail</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">s</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">165</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">root</span>&nbsp;<span class="op">*</span><span class="ident">semaRoot</span><span class="op">)</span>&nbsp;<span class="ident">dequeue</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">sudog</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">next</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">next</span><span class="op">.</span><span class="ident">prev</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">prev</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">root</span><span class="op">.</span><span class="ident">tail</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">prev</span><br>
+<span class="lineno">170</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">prev</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">prev</span><span class="op">.</span><span class="ident">next</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">next</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">root</span><span class="op">.</span><span class="ident">head</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">next</span><br>
+<span class="lineno">175</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">elem</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">next</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">prev</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">180</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Synchronous&nbsp;semaphore&nbsp;for&nbsp;sync.Cond.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">syncSema</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">lock</span>&nbsp;<span class="ident">mutex</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">head</span>&nbsp;<span class="op">*</span><span class="ident">sudog</span><br>
+<span class="lineno">185</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tail</span>&nbsp;<span class="op">*</span><span class="ident">sudog</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Syncsemacquire&nbsp;waits&nbsp;for&nbsp;a&nbsp;pairing&nbsp;syncsemrelease&nbsp;on&nbsp;the&nbsp;same&nbsp;semaphore&nbsp;s.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">syncsemacquire</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">syncSema</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">190</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">lock</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">s</span><span class="op">.</span><span class="ident">lock</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">head</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">head</span><span class="op">.</span><span class="ident">nrelease</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Have&nbsp;pending&nbsp;release,&nbsp;consume&nbsp;it.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">wake</span>&nbsp;<span class="op">*</span><span class="ident">sudog</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">head</span><span class="op">.</span><span class="ident">nrelease</span><span class="op">--</span><br>
+<span class="lineno">195</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">head</span><span class="op">.</span><span class="ident">nrelease</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">wake</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">head</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">head</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">wake</span><span class="op">.</span><span class="ident">next</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">head</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">tail</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno">200</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">unlock</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">s</span><span class="op">.</span><span class="ident">lock</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">wake</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">wake</span><span class="op">.</span><span class="ident">next</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno">205</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">goready</span><span class="op">(</span><span class="ident">wake</span><span class="op">.</span><span class="ident">g</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Enqueue&nbsp;itself.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">w</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">acquireSudog</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">210</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">w</span><span class="op">.</span><span class="ident">g</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">getg</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">w</span><span class="op">.</span><span class="ident">nrelease</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">-</span><span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">w</span><span class="op">.</span><span class="ident">next</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">w</span><span class="op">.</span><span class="ident">releasetime</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t0</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">int64</span><span class="op">(</span><span class="num">0</span><span class="op">)</span><br>
+<span class="lineno">215</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">blockprofilerate</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t0</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">cputicks</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">w</span><span class="op">.</span><span class="ident">releasetime</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">-</span><span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">tail</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">220</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">head</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">w</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">tail</span><span class="op">.</span><span class="ident">next</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">w</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">tail</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">w</span><br>
+<span class="lineno">225</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">goparkunlock</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">s</span><span class="op">.</span><span class="ident">lock</span><span class="op">,</span>&nbsp;<span class="string">&#34;semacquire&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">t0</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">blockevent</span><span class="op">(</span><span class="ident">int64</span><span class="op">(</span><span class="ident">w</span><span class="op">.</span><span class="ident">releasetime</span><span class="op">)</span><span class="op">-</span><span class="ident">t0</span><span class="op">,</span>&nbsp;<span class="num">2</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">releaseSudog</span><span class="op">(</span><span class="ident">w</span><span class="op">)</span><br>
+<span class="lineno">230</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Syncsemrelease&nbsp;waits&nbsp;for&nbsp;n&nbsp;pairing&nbsp;syncsemacquire&nbsp;on&nbsp;the&nbsp;same&nbsp;semaphore&nbsp;s.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">syncsemrelease</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">syncSema</span><span class="op">,</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">235</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">lock</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">s</span><span class="op">.</span><span class="ident">lock</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">head</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">head</span><span class="op">.</span><span class="ident">nrelease</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Have&nbsp;pending&nbsp;acquire,&nbsp;satisfy&nbsp;it.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">wake</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">head</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">head</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">wake</span><span class="op">.</span><span class="ident">next</span><br>
+<span class="lineno">240</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">head</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">tail</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">wake</span><span class="op">.</span><span class="ident">releasetime</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">wake</span><span class="op">.</span><span class="ident">releasetime</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">cputicks</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">245</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">wake</span><span class="op">.</span><span class="ident">next</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">goready</span><span class="op">(</span><span class="ident">wake</span><span class="op">.</span><span class="ident">g</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span><span class="op">--</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">250</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;enqueue&nbsp;itself</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">w</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">acquireSudog</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">w</span><span class="op">.</span><span class="ident">g</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">getg</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">w</span><span class="op">.</span><span class="ident">nrelease</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtintype">int32</span><span class="op">(</span><span class="ident">n</span><span class="op">)</span><br>
+<span class="lineno">255</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">w</span><span class="op">.</span><span class="ident">next</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">w</span><span class="op">.</span><span class="ident">releasetime</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">tail</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">head</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">w</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">260</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">tail</span><span class="op">.</span><span class="ident">next</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">w</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">tail</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">w</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">goparkunlock</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">s</span><span class="op">.</span><span class="ident">lock</span><span class="op">,</span>&nbsp;<span class="string">&#34;semarelease&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">releaseSudog</span><span class="op">(</span><span class="ident">w</span><span class="op">)</span><br>
+<span class="lineno">265</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">unlock</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">s</span><span class="op">.</span><span class="ident">lock</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">270</span><span class="keyword">func</span>&nbsp;<span class="ident">syncsemcheck</span><span class="op">(</span><span class="ident">sz</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">sz</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Sizeof</span><span class="op">(</span><span class="ident">syncSema</span><span class="op">{</span><span class="op">}</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">print</span><span class="op">(</span><span class="string">&#34;runtime:&nbsp;bad&nbsp;syncSema&nbsp;size&nbsp;-&nbsp;sync=&#34;</span><span class="op">,</span>&nbsp;<span class="ident">sz</span><span class="op">,</span>&nbsp;<span class="string">&#34;&nbsp;runtime=&#34;</span><span class="op">,</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Sizeof</span><span class="op">(</span><span class="ident">syncSema</span><span class="op">{</span><span class="op">}</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="string">&#34;\n&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gothrow</span><span class="op">(</span><span class="string">&#34;bad&nbsp;syncSema&nbsp;size&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">275</span><span class="op">}</span>
+</div>
+</body>
+</html>

@@ -1,0 +1,82 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2012&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">printer_test</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;bytes&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;fmt&#34;</span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;go/ast&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;go/parser&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;go/printer&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;go/token&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;strings&#34;</span><br>
+<span class="lineno">15</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;testing&#34;</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Dummy&nbsp;test&nbsp;function&nbsp;so&nbsp;that&nbsp;godoc&nbsp;does&nbsp;not&nbsp;use&nbsp;the&nbsp;entire&nbsp;file&nbsp;as&nbsp;example.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">Test</span><span class="op">(</span><span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><span class="op">}</span><br>
+<span class="lineno">20</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">parseFunc</span><span class="op">(</span><span class="ident">filename</span><span class="op">,</span>&nbsp;<span class="ident">functionname</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">fun</span>&nbsp;<span class="op">*</span><span class="ident">ast</span><span class="op">.</span><span class="ident">FuncDecl</span><span class="op">,</span>&nbsp;<span class="ident">fset</span>&nbsp;<span class="op">*</span><span class="ident">token</span><span class="op">.</span><span class="ident">FileSet</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fset</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">token</span><span class="op">.</span><span class="ident">NewFileSet</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">file</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">parser</span><span class="op">.</span><span class="ident">ParseFile</span><span class="op">(</span><span class="ident">fset</span><span class="op">,</span>&nbsp;<span class="ident">filename</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="num">0</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">d</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">file</span><span class="op">.</span><span class="ident">Decls</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">f</span><span class="op">,</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">d</span><span class="op">.</span><span class="op">(</span><span class="op">*</span><span class="ident">ast</span><span class="op">.</span><span class="ident">FuncDecl</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">f</span><span class="op">.</span><span class="ident">Name</span><span class="op">.</span><span class="ident">Name</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">functionname</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fun</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">f</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">panic</span><span class="op">(</span><span class="string">&#34;function&nbsp;not&nbsp;found&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">ExampleFprint</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Parse&nbsp;source&nbsp;file&nbsp;and&nbsp;extract&nbsp;the&nbsp;AST&nbsp;without&nbsp;comments&nbsp;for</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;this&nbsp;function,&nbsp;with&nbsp;position&nbsp;information&nbsp;referring&nbsp;to&nbsp;the</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;file&nbsp;set&nbsp;fset.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">funcAST</span><span class="op">,</span>&nbsp;<span class="ident">fset</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">parseFunc</span><span class="op">(</span><span class="string">&#34;example_test.go&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;ExampleFprint&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Print&nbsp;the&nbsp;function&nbsp;body&nbsp;into&nbsp;buffer&nbsp;buf.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;The&nbsp;file&nbsp;set&nbsp;is&nbsp;provided&nbsp;to&nbsp;the&nbsp;printer&nbsp;so&nbsp;that&nbsp;it&nbsp;knows</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;about&nbsp;the&nbsp;original&nbsp;source&nbsp;formatting&nbsp;and&nbsp;can&nbsp;add&nbsp;additional</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;line&nbsp;breaks&nbsp;where&nbsp;they&nbsp;were&nbsp;present&nbsp;in&nbsp;the&nbsp;source.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">buf</span>&nbsp;<span class="ident">bytes</span><span class="op">.</span><span class="ident">Buffer</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">printer</span><span class="op">.</span><span class="ident">Fprint</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">buf</span><span class="op">,</span>&nbsp;<span class="ident">fset</span><span class="op">,</span>&nbsp;<span class="ident">funcAST</span><span class="op">.</span><span class="ident">Body</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Remove&nbsp;braces&nbsp;{}&nbsp;enclosing&nbsp;the&nbsp;function&nbsp;body,&nbsp;unindent,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;and&nbsp;trim&nbsp;leading&nbsp;and&nbsp;trailing&nbsp;white&nbsp;space.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">buf</span><span class="op">.</span><span class="ident">String</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">s</span><span class="op">[</span><span class="num">1</span>&nbsp;<span class="op">:</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">s</span><span class="op">)</span><span class="op">-</span><span class="num">1</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">strings</span><span class="op">.</span><span class="ident">TrimSpace</span><span class="op">(</span><span class="ident">strings</span><span class="op">.</span><span class="ident">Replace</span><span class="op">(</span><span class="ident">s</span><span class="op">,</span>&nbsp;<span class="string">&#34;\n\t&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;\n&#34;</span><span class="op">,</span>&nbsp;<span class="op">-</span><span class="num">1</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Print&nbsp;the&nbsp;cleaned-up&nbsp;body&nbsp;text&nbsp;to&nbsp;stdout.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fmt</span><span class="op">.</span><span class="ident">Println</span><span class="op">(</span><span class="ident">s</span><span class="op">)</span><br>
+<span class="lineno">55</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;output:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;funcAST,&nbsp;fset&nbsp;:=&nbsp;parseFunc(&#34;example_test.go&#34;,&nbsp;&#34;ExampleFprint&#34;)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;var&nbsp;buf&nbsp;bytes.Buffer</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;printer.Fprint(&amp;buf,&nbsp;fset,&nbsp;funcAST.Body)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;s&nbsp;:=&nbsp;buf.String()</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;s&nbsp;=&nbsp;s[1&nbsp;:&nbsp;len(s)-1]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;s&nbsp;=&nbsp;strings.TrimSpace(strings.Replace(s,&nbsp;&#34;\n\t&#34;,&nbsp;&#34;\n&#34;,&nbsp;-1))</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;fmt.Println(s)</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

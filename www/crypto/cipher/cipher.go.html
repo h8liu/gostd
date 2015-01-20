@@ -1,0 +1,68 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2010&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="comment">//&nbsp;Package&nbsp;cipher&nbsp;implements&nbsp;standard&nbsp;block&nbsp;cipher&nbsp;modes&nbsp;that&nbsp;can&nbsp;be&nbsp;wrapped</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;around&nbsp;low-level&nbsp;block&nbsp;cipher&nbsp;implementations.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;See&nbsp;http://csrc.nist.gov/groups/ST/toolkit/BCM/current_modes.html</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;and&nbsp;NIST&nbsp;Special&nbsp;Publication&nbsp;800-38A.</span><br>
+<span class="lineno"></span><span class="keyword">package</span>&nbsp;<span class="ident">cipher</span><br>
+<span class="lineno">10</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;A&nbsp;Block&nbsp;represents&nbsp;an&nbsp;implementation&nbsp;of&nbsp;block&nbsp;cipher</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;using&nbsp;a&nbsp;given&nbsp;key.&nbsp;&nbsp;It&nbsp;provides&nbsp;the&nbsp;capability&nbsp;to&nbsp;encrypt</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;or&nbsp;decrypt&nbsp;individual&nbsp;blocks.&nbsp;&nbsp;The&nbsp;mode&nbsp;implementations</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;extend&nbsp;that&nbsp;capability&nbsp;to&nbsp;streams&nbsp;of&nbsp;blocks.</span><br>
+<span class="lineno">15</span><span class="keyword">type</span>&nbsp;<span class="ident">Block</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;BlockSize&nbsp;returns&nbsp;the&nbsp;cipher&#39;s&nbsp;block&nbsp;size.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">BlockSize</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Encrypt&nbsp;encrypts&nbsp;the&nbsp;first&nbsp;block&nbsp;in&nbsp;src&nbsp;into&nbsp;dst.</span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Dst&nbsp;and&nbsp;src&nbsp;may&nbsp;point&nbsp;at&nbsp;the&nbsp;same&nbsp;memory.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Encrypt</span><span class="op">(</span><span class="ident">dst</span><span class="op">,</span>&nbsp;<span class="ident">src</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Decrypt&nbsp;decrypts&nbsp;the&nbsp;first&nbsp;block&nbsp;in&nbsp;src&nbsp;into&nbsp;dst.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Dst&nbsp;and&nbsp;src&nbsp;may&nbsp;point&nbsp;at&nbsp;the&nbsp;same&nbsp;memory.</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Decrypt</span><span class="op">(</span><span class="ident">dst</span><span class="op">,</span>&nbsp;<span class="ident">src</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;A&nbsp;Stream&nbsp;represents&nbsp;a&nbsp;stream&nbsp;cipher.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">Stream</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;XORKeyStream&nbsp;XORs&nbsp;each&nbsp;byte&nbsp;in&nbsp;the&nbsp;given&nbsp;slice&nbsp;with&nbsp;a&nbsp;byte&nbsp;from&nbsp;the</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;cipher&#39;s&nbsp;key&nbsp;stream.&nbsp;Dst&nbsp;and&nbsp;src&nbsp;may&nbsp;point&nbsp;to&nbsp;the&nbsp;same&nbsp;memory.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">XORKeyStream</span><span class="op">(</span><span class="ident">dst</span><span class="op">,</span>&nbsp;<span class="ident">src</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">35</span><span class="comment">//&nbsp;A&nbsp;BlockMode&nbsp;represents&nbsp;a&nbsp;block&nbsp;cipher&nbsp;running&nbsp;in&nbsp;a&nbsp;block-based&nbsp;mode&nbsp;(CBC,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ECB&nbsp;etc).</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">BlockMode</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;BlockSize&nbsp;returns&nbsp;the&nbsp;mode&#39;s&nbsp;block&nbsp;size.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">BlockSize</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span><br>
+<span class="lineno">40</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;CryptBlocks&nbsp;encrypts&nbsp;or&nbsp;decrypts&nbsp;a&nbsp;number&nbsp;of&nbsp;blocks.&nbsp;The&nbsp;length&nbsp;of</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;src&nbsp;must&nbsp;be&nbsp;a&nbsp;multiple&nbsp;of&nbsp;the&nbsp;block&nbsp;size.&nbsp;Dst&nbsp;and&nbsp;src&nbsp;may&nbsp;point&nbsp;to</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;the&nbsp;same&nbsp;memory.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">CryptBlocks</span><span class="op">(</span><span class="ident">dst</span><span class="op">,</span>&nbsp;<span class="ident">src</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span><br>
+<span class="lineno">45</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Utility&nbsp;routines</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">dup</span><span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">q</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">make</span><span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">p</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">copy</span><span class="op">(</span><span class="ident">q</span><span class="op">,</span>&nbsp;<span class="ident">p</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">q</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

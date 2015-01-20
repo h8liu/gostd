@@ -1,0 +1,547 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2011&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">json</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;bytes&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;math&#34;</span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;reflect&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;testing&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;unicode&#34;</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">15</span><span class="keyword">type</span>&nbsp;<span class="ident">Optionals</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Sr</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="string">`json:&#34;sr&#34;`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">So</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="string">`json:&#34;so,omitempty&#34;`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Sw</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="string">`json:&#34;-&#34;`</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Ir</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="string">`json:&#34;omitempty&#34;`</span>&nbsp;<span class="comment">//&nbsp;actually&nbsp;named&nbsp;omitempty,&nbsp;not&nbsp;an&nbsp;option</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Io</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="string">`json:&#34;io,omitempty&#34;`</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Slr</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">string</span>&nbsp;<span class="string">`json:&#34;slr,random&#34;`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Slo</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">string</span>&nbsp;<span class="string">`json:&#34;slo,omitempty&#34;`</span><br>
+<span class="lineno">25</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Mr</span>&nbsp;<span class="keyword">map</span><span class="op">[</span><span class="builtintype">string</span><span class="op">]</span><span class="keyword">interface</span><span class="op">{</span><span class="op">}</span>&nbsp;<span class="string">`json:&#34;mr&#34;`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Mo</span>&nbsp;<span class="keyword">map</span><span class="op">[</span><span class="builtintype">string</span><span class="op">]</span><span class="keyword">interface</span><span class="op">{</span><span class="op">}</span>&nbsp;<span class="string">`json:&#34;,omitempty&#34;`</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Fr</span>&nbsp;<span class="builtintype">float64</span>&nbsp;<span class="string">`json:&#34;fr&#34;`</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Fo</span>&nbsp;<span class="builtintype">float64</span>&nbsp;<span class="string">`json:&#34;fo,omitempty&#34;`</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Br</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="string">`json:&#34;br&#34;`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Bo</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="string">`json:&#34;bo,omitempty&#34;`</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Ur</span>&nbsp;<span class="builtintype">uint</span>&nbsp;<span class="string">`json:&#34;ur&#34;`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Uo</span>&nbsp;<span class="builtintype">uint</span>&nbsp;<span class="string">`json:&#34;uo,omitempty&#34;`</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Str</span>&nbsp;<span class="keyword">struct</span><span class="op">{</span><span class="op">}</span>&nbsp;<span class="string">`json:&#34;str&#34;`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Sto</span>&nbsp;<span class="keyword">struct</span><span class="op">{</span><span class="op">}</span>&nbsp;<span class="string">`json:&#34;sto,omitempty&#34;`</span><br>
+<span class="lineno">40</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">optionalsExpected</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">`{<br>
+<span class="lineno"></span>&nbsp;&#34;sr&#34;:&nbsp;&#34;&#34;,<br>
+<span class="lineno"></span>&nbsp;&#34;omitempty&#34;:&nbsp;0,<br>
+<span class="lineno">45</span>&nbsp;&#34;slr&#34;:&nbsp;null,<br>
+<span class="lineno"></span>&nbsp;&#34;mr&#34;:&nbsp;{},<br>
+<span class="lineno"></span>&nbsp;&#34;fr&#34;:&nbsp;0,<br>
+<span class="lineno"></span>&nbsp;&#34;br&#34;:&nbsp;false,<br>
+<span class="lineno"></span>&nbsp;&#34;ur&#34;:&nbsp;0,<br>
+<span class="lineno">50</span>&nbsp;&#34;str&#34;:&nbsp;{},<br>
+<span class="lineno"></span>&nbsp;&#34;sto&#34;:&nbsp;{}<br>
+<span class="lineno"></span>}`</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">TestOmitEmpty</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">o</span>&nbsp;<span class="ident">Optionals</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">o</span><span class="op">.</span><span class="ident">Sw</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">&#34;something&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">o</span><span class="op">.</span><span class="ident">Mr</span>&nbsp;<span class="op">=</span>&nbsp;<span class="keyword">map</span><span class="op">[</span><span class="builtintype">string</span><span class="op">]</span><span class="keyword">interface</span><span class="op">{</span><span class="op">}</span><span class="op">{</span><span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">o</span><span class="op">.</span><span class="ident">Mo</span>&nbsp;<span class="op">=</span>&nbsp;<span class="keyword">map</span><span class="op">[</span><span class="builtintype">string</span><span class="op">]</span><span class="keyword">interface</span><span class="op">{</span><span class="op">}</span><span class="op">{</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">got</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">MarshalIndent</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">o</span><span class="op">,</span>&nbsp;<span class="string">&#34;&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;&nbsp;&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatal</span><span class="op">(</span><span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">got</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtintype">string</span><span class="op">(</span><span class="ident">got</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">got</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">optionalsExpected</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Errorf</span><span class="op">(</span><span class="string">&#34;&nbsp;got:&nbsp;%s\nwant:&nbsp;%s\n&#34;</span><span class="op">,</span>&nbsp;<span class="ident">got</span><span class="op">,</span>&nbsp;<span class="ident">optionalsExpected</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">StringTag</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">BoolStr</span>&nbsp;<span class="builtintype">bool</span>&nbsp;&nbsp;&nbsp;<span class="string">`json:&#34;,string&#34;`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">IntStr</span>&nbsp;&nbsp;<span class="ident">int64</span>&nbsp;&nbsp;<span class="string">`json:&#34;,string&#34;`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">StrStr</span>&nbsp;&nbsp;<span class="builtintype">string</span>&nbsp;<span class="string">`json:&#34;,string&#34;`</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">75</span><span class="keyword">var</span>&nbsp;<span class="ident">stringTagExpected</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">`{<br>
+<span class="lineno"></span>&nbsp;&#34;BoolStr&#34;:&nbsp;&#34;true&#34;,<br>
+<span class="lineno"></span>&nbsp;&#34;IntStr&#34;:&nbsp;&#34;42&#34;,<br>
+<span class="lineno"></span>&nbsp;&#34;StrStr&#34;:&nbsp;&#34;\&#34;xzbit\&#34;&#34;<br>
+<span class="lineno"></span>}`</span><br>
+<span class="lineno">80</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">TestStringTag</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">s</span>&nbsp;<span class="ident">StringTag</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">BoolStr</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">IntStr</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">42</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">StrStr</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">&#34;xzbit&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">got</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">MarshalIndent</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">s</span><span class="op">,</span>&nbsp;<span class="string">&#34;&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;&nbsp;&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatal</span><span class="op">(</span><span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">got</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtintype">string</span><span class="op">(</span><span class="ident">got</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">got</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">stringTagExpected</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;&nbsp;got:&nbsp;%s\nwant:&nbsp;%s\n&#34;</span><span class="op">,</span>&nbsp;<span class="ident">got</span><span class="op">,</span>&nbsp;<span class="ident">stringTagExpected</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Verify&nbsp;that&nbsp;it&nbsp;round-trips.</span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">s2</span>&nbsp;<span class="ident">StringTag</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">NewDecoder</span><span class="op">(</span><span class="ident">bytes</span><span class="op">.</span><span class="ident">NewReader</span><span class="op">(</span><span class="ident">got</span><span class="op">)</span><span class="op">)</span><span class="op">.</span><span class="ident">Decode</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">s2</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;Decode:&nbsp;%v&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">100</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">reflect</span><span class="op">.</span><span class="ident">DeepEqual</span><span class="op">(</span><span class="ident">s</span><span class="op">,</span>&nbsp;<span class="ident">s2</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;decode&nbsp;didn&#39;t&nbsp;match.\nsource:&nbsp;%#v\nEncoded&nbsp;as:\n%s\ndecode:&nbsp;%#v&#34;</span><span class="op">,</span>&nbsp;<span class="ident">s</span><span class="op">,</span>&nbsp;<span class="builtintype">string</span><span class="op">(</span><span class="ident">got</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">s2</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">105</span><span class="comment">//&nbsp;byte&nbsp;slices&nbsp;are&nbsp;special&nbsp;even&nbsp;if&nbsp;they&#39;re&nbsp;renamed&nbsp;types.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">renamedByte</span>&nbsp;<span class="builtintype">byte</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">renamedByteSlice</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">renamedRenamedByteSlice</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="ident">renamedByte</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">110</span><span class="keyword">func</span>&nbsp;<span class="ident">TestEncodeRenamedByteSlice</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">renamedByteSlice</span><span class="op">(</span><span class="string">&#34;abc&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">result</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">Marshal</span><span class="op">(</span><span class="ident">s</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatal</span><span class="op">(</span><span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno">115</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">expect</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="string">`&#34;YWJj&#34;`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtintype">string</span><span class="op">(</span><span class="ident">result</span><span class="op">)</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">expect</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Errorf</span><span class="op">(</span><span class="string">&#34;&nbsp;got&nbsp;%s&nbsp;want&nbsp;%s&#34;</span><span class="op">,</span>&nbsp;<span class="ident">result</span><span class="op">,</span>&nbsp;<span class="ident">expect</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">120</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">renamedRenamedByteSlice</span><span class="op">(</span><span class="string">&#34;abc&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">result</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">Marshal</span><span class="op">(</span><span class="ident">r</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatal</span><span class="op">(</span><span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">125</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtintype">string</span><span class="op">(</span><span class="ident">result</span><span class="op">)</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">expect</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Errorf</span><span class="op">(</span><span class="string">&#34;&nbsp;got&nbsp;%s&nbsp;want&nbsp;%s&#34;</span><span class="op">,</span>&nbsp;<span class="ident">result</span><span class="op">,</span>&nbsp;<span class="ident">expect</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">130</span><span class="keyword">var</span>&nbsp;<span class="ident">unsupportedValues</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="keyword">interface</span><span class="op">{</span><span class="op">}</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">math</span><span class="op">.</span><span class="ident">NaN</span><span class="op">(</span><span class="op">)</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">math</span><span class="op">.</span><span class="ident">Inf</span><span class="op">(</span><span class="op">-</span><span class="num">1</span><span class="op">)</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">math</span><span class="op">.</span><span class="ident">Inf</span><span class="op">(</span><span class="num">1</span><span class="op">)</span><span class="op">,</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">135</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">TestUnsupportedValues</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">v</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">unsupportedValues</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">Marshal</span><span class="op">(</span><span class="ident">v</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">err</span><span class="op">.</span><span class="op">(</span><span class="op">*</span><span class="ident">UnsupportedValueError</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="op">!</span><span class="ident">ok</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">140</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Errorf</span><span class="op">(</span><span class="string">&#34;for&nbsp;%v,&nbsp;got&nbsp;%T&nbsp;want&nbsp;UnsupportedValueError&#34;</span><span class="op">,</span>&nbsp;<span class="ident">v</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Errorf</span><span class="op">(</span><span class="string">&#34;for&nbsp;%v,&nbsp;expected&nbsp;error&#34;</span><span class="op">,</span>&nbsp;<span class="ident">v</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">145</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Ref&nbsp;has&nbsp;Marshaler&nbsp;and&nbsp;Unmarshaler&nbsp;methods&nbsp;with&nbsp;pointer&nbsp;receiver.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">Ref</span>&nbsp;<span class="builtintype">int</span><br>
+<span class="lineno">150</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="op">*</span><span class="ident">Ref</span><span class="op">)</span>&nbsp;<span class="ident">MarshalJSON</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">(</span><span class="string">`&#34;ref&#34;`</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">155</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">r</span>&nbsp;<span class="op">*</span><span class="ident">Ref</span><span class="op">)</span>&nbsp;<span class="ident">UnmarshalJSON</span><span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">r</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">12</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">160</span><span class="comment">//&nbsp;Val&nbsp;has&nbsp;Marshaler&nbsp;methods&nbsp;with&nbsp;value&nbsp;receiver.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">Val</span>&nbsp;<span class="builtintype">int</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">Val</span><span class="op">)</span>&nbsp;<span class="ident">MarshalJSON</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">(</span><span class="string">`&#34;val&#34;`</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno">165</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;RefText&nbsp;has&nbsp;Marshaler&nbsp;and&nbsp;Unmarshaler&nbsp;methods&nbsp;with&nbsp;pointer&nbsp;receiver.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">RefText</span>&nbsp;<span class="builtintype">int</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">170</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="op">*</span><span class="ident">RefText</span><span class="op">)</span>&nbsp;<span class="ident">MarshalText</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">(</span><span class="string">`&#34;ref&#34;`</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">r</span>&nbsp;<span class="op">*</span><span class="ident">RefText</span><span class="op">)</span>&nbsp;<span class="ident">UnmarshalText</span><span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">175</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">r</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">13</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ValText&nbsp;has&nbsp;Marshaler&nbsp;methods&nbsp;with&nbsp;value&nbsp;receiver.</span><br>
+<span class="lineno">180</span><span class="keyword">type</span>&nbsp;<span class="ident">ValText</span>&nbsp;<span class="builtintype">int</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">ValText</span><span class="op">)</span>&nbsp;<span class="ident">MarshalText</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">(</span><span class="string">`&#34;val&#34;`</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">185</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">TestRefValMarshal</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">s</span>&nbsp;<span class="op">=</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">R0</span>&nbsp;<span class="ident">Ref</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">R1</span>&nbsp;<span class="op">*</span><span class="ident">Ref</span><br>
+<span class="lineno">190</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">R2</span>&nbsp;<span class="ident">RefText</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">R3</span>&nbsp;<span class="op">*</span><span class="ident">RefText</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">V0</span>&nbsp;<span class="ident">Val</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">V1</span>&nbsp;<span class="op">*</span><span class="ident">Val</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">V2</span>&nbsp;<span class="ident">ValText</span><br>
+<span class="lineno">195</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">V3</span>&nbsp;<span class="op">*</span><span class="ident">ValText</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">R0</span><span class="op">:</span>&nbsp;<span class="num">12</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">R1</span><span class="op">:</span>&nbsp;<span class="builtinfunc">new</span><span class="op">(</span><span class="ident">Ref</span><span class="op">)</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">R2</span><span class="op">:</span>&nbsp;<span class="num">14</span><span class="op">,</span><br>
+<span class="lineno">200</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">R3</span><span class="op">:</span>&nbsp;<span class="builtinfunc">new</span><span class="op">(</span><span class="ident">RefText</span><span class="op">)</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">V0</span><span class="op">:</span>&nbsp;<span class="num">13</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">V1</span><span class="op">:</span>&nbsp;<span class="builtinfunc">new</span><span class="op">(</span><span class="ident">Val</span><span class="op">)</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">V2</span><span class="op">:</span>&nbsp;<span class="num">15</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">V3</span><span class="op">:</span>&nbsp;<span class="builtinfunc">new</span><span class="op">(</span><span class="ident">ValText</span><span class="op">)</span><span class="op">,</span><br>
+<span class="lineno">205</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">const</span>&nbsp;<span class="ident">want</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">`{&#34;R0&#34;:&#34;ref&#34;,&#34;R1&#34;:&#34;ref&#34;,&#34;R2&#34;:&#34;\&#34;ref\&#34;&#34;,&#34;R3&#34;:&#34;\&#34;ref\&#34;&#34;,&#34;V0&#34;:&#34;val&#34;,&#34;V1&#34;:&#34;val&#34;,&#34;V2&#34;:&#34;\&#34;val\&#34;&#34;,&#34;V3&#34;:&#34;\&#34;val\&#34;&#34;}`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">Marshal</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">s</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;Marshal:&nbsp;%v&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno">210</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">got</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtintype">string</span><span class="op">(</span><span class="ident">b</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">got</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">want</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Errorf</span><span class="op">(</span><span class="string">&#34;got&nbsp;%q,&nbsp;want&nbsp;%q&#34;</span><span class="op">,</span>&nbsp;<span class="ident">got</span><span class="op">,</span>&nbsp;<span class="ident">want</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">215</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;C&nbsp;implements&nbsp;Marshaler&nbsp;and&nbsp;returns&nbsp;unescaped&nbsp;JSON.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">C</span>&nbsp;<span class="builtintype">int</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">C</span><span class="op">)</span>&nbsp;<span class="ident">MarshalJSON</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">220</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">(</span><span class="string">`&#34;&lt;&amp;&gt;&#34;`</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;CText&nbsp;implements&nbsp;Marshaler&nbsp;and&nbsp;returns&nbsp;unescaped&nbsp;text.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">CText</span>&nbsp;<span class="builtintype">int</span><br>
+<span class="lineno">225</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">CText</span><span class="op">)</span>&nbsp;<span class="ident">MarshalText</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">(</span><span class="string">`&#34;&lt;&amp;&gt;&#34;`</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">230</span><span class="keyword">func</span>&nbsp;<span class="ident">TestMarshalerEscaping</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="ident">C</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">want</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="string">`&#34;\u003c\u0026\u003e&#34;`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">Marshal</span><span class="op">(</span><span class="ident">c</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">235</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;Marshal(c):&nbsp;%v&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">got</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtintype">string</span><span class="op">(</span><span class="ident">b</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">got</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">want</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Errorf</span><span class="op">(</span><span class="string">&#34;Marshal(c)&nbsp;=&nbsp;%#q,&nbsp;want&nbsp;%#q&#34;</span><span class="op">,</span>&nbsp;<span class="ident">got</span><span class="op">,</span>&nbsp;<span class="ident">want</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">240</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">ct</span>&nbsp;<span class="ident">CText</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">want</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">`&#34;\&#34;\u003c\u0026\u003e\&#34;&#34;`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">Marshal</span><span class="op">(</span><span class="ident">ct</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">245</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;Marshal(ct):&nbsp;%v&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">got</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtintype">string</span><span class="op">(</span><span class="ident">b</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">got</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">want</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Errorf</span><span class="op">(</span><span class="string">&#34;Marshal(ct)&nbsp;=&nbsp;%#q,&nbsp;want&nbsp;%#q&#34;</span><span class="op">,</span>&nbsp;<span class="ident">got</span><span class="op">,</span>&nbsp;<span class="ident">want</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">250</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">IntType</span>&nbsp;<span class="builtintype">int</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">MyStruct</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">255</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">IntType</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">TestAnonymousNonstruct</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="ident">IntType</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">11</span><br>
+<span class="lineno">260</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">a</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">MyStruct</span><span class="op">{</span><span class="ident">i</span><span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">const</span>&nbsp;<span class="ident">want</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">`{&#34;IntType&#34;:11}`</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">Marshal</span><span class="op">(</span><span class="ident">a</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">265</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;Marshal:&nbsp;%v&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">got</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtintype">string</span><span class="op">(</span><span class="ident">b</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">got</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">want</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Errorf</span><span class="op">(</span><span class="string">&#34;got&nbsp;%q,&nbsp;want&nbsp;%q&#34;</span><span class="op">,</span>&nbsp;<span class="ident">got</span><span class="op">,</span>&nbsp;<span class="ident">want</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">270</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">BugA</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">S</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">275</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">BugB</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">BugA</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">S</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">280</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">BugC</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">S</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">285</span><span class="comment">//&nbsp;Legal&nbsp;Go:&nbsp;We&nbsp;never&nbsp;use&nbsp;the&nbsp;repeated&nbsp;embedded&nbsp;field&nbsp;(S).</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">BugX</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">A</span>&nbsp;<span class="builtintype">int</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">BugA</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">BugB</span><br>
+<span class="lineno">290</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Issue&nbsp;5245.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">TestEmbeddedBug</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">BugB</span><span class="op">{</span><br>
+<span class="lineno">295</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">BugA</span><span class="op">{</span><span class="string">&#34;A&#34;</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;B&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">Marshal</span><span class="op">(</span><span class="ident">v</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">300</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatal</span><span class="op">(</span><span class="string">&#34;Marshal:&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">want</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="string">`{&#34;S&#34;:&#34;B&#34;}`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">got</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtintype">string</span><span class="op">(</span><span class="ident">b</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">got</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">want</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">305</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;Marshal:&nbsp;got&nbsp;%s&nbsp;want&nbsp;%s&#34;</span><span class="op">,</span>&nbsp;<span class="ident">got</span><span class="op">,</span>&nbsp;<span class="ident">want</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Now&nbsp;check&nbsp;that&nbsp;the&nbsp;duplicate&nbsp;field,&nbsp;S,&nbsp;does&nbsp;not&nbsp;appear.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">x</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">BugX</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">A</span><span class="op">:</span>&nbsp;<span class="num">23</span><span class="op">,</span><br>
+<span class="lineno">310</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">Marshal</span><span class="op">(</span><span class="ident">x</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatal</span><span class="op">(</span><span class="string">&#34;Marshal:&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">315</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">want</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">`{&#34;A&#34;:23}`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">got</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtintype">string</span><span class="op">(</span><span class="ident">b</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">got</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">want</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;Marshal:&nbsp;got&nbsp;%s&nbsp;want&nbsp;%s&#34;</span><span class="op">,</span>&nbsp;<span class="ident">got</span><span class="op">,</span>&nbsp;<span class="ident">want</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">320</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">BugD</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span>&nbsp;<span class="comment">//&nbsp;Same&nbsp;as&nbsp;BugA&nbsp;after&nbsp;tagging.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">XXX</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="string">`json:&#34;S&#34;`</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">325</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;BugD&#39;s&nbsp;tagged&nbsp;S&nbsp;field&nbsp;should&nbsp;dominate&nbsp;BugA&#39;s.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">BugY</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">BugA</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">BugD</span><br>
+<span class="lineno">330</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Test&nbsp;that&nbsp;a&nbsp;field&nbsp;with&nbsp;a&nbsp;tag&nbsp;dominates&nbsp;untagged&nbsp;fields.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">TestTaggedFieldDominates</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">BugY</span><span class="op">{</span><br>
+<span class="lineno">335</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">BugA</span><span class="op">{</span><span class="string">&#34;BugA&#34;</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">BugD</span><span class="op">{</span><span class="string">&#34;BugD&#34;</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">Marshal</span><span class="op">(</span><span class="ident">v</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">340</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatal</span><span class="op">(</span><span class="string">&#34;Marshal:&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">want</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="string">`{&#34;S&#34;:&#34;BugD&#34;}`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">got</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtintype">string</span><span class="op">(</span><span class="ident">b</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">got</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">want</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">345</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;Marshal:&nbsp;got&nbsp;%s&nbsp;want&nbsp;%s&#34;</span><span class="op">,</span>&nbsp;<span class="ident">got</span><span class="op">,</span>&nbsp;<span class="ident">want</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;There&nbsp;are&nbsp;no&nbsp;tags&nbsp;here,&nbsp;so&nbsp;S&nbsp;should&nbsp;not&nbsp;appear.</span><br>
+<span class="lineno">350</span><span class="keyword">type</span>&nbsp;<span class="ident">BugZ</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">BugA</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">BugC</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">BugY</span>&nbsp;<span class="comment">//&nbsp;Contains&nbsp;a&nbsp;tagged&nbsp;S&nbsp;field&nbsp;through&nbsp;BugD;&nbsp;should&nbsp;not&nbsp;dominate.</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">355</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">TestDuplicatedFieldDisappears</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">BugZ</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">BugA</span><span class="op">{</span><span class="string">&#34;BugA&#34;</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">BugC</span><span class="op">{</span><span class="string">&#34;BugC&#34;</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno">360</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">BugY</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">BugA</span><span class="op">{</span><span class="string">&#34;nested&nbsp;BugA&#34;</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">BugD</span><span class="op">{</span><span class="string">&#34;nested&nbsp;BugD&#34;</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">365</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">Marshal</span><span class="op">(</span><span class="ident">v</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatal</span><span class="op">(</span><span class="string">&#34;Marshal:&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">want</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="string">`{}`</span><br>
+<span class="lineno">370</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">got</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtintype">string</span><span class="op">(</span><span class="ident">b</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">got</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">want</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;Marshal:&nbsp;got&nbsp;%s&nbsp;want&nbsp;%s&#34;</span><span class="op">,</span>&nbsp;<span class="ident">got</span><span class="op">,</span>&nbsp;<span class="ident">want</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">375</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">TestStringBytes</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Test&nbsp;that&nbsp;encodeState.stringBytes&nbsp;and&nbsp;encodeState.string&nbsp;use&nbsp;the&nbsp;same&nbsp;encoding.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">es</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">&amp;</span><span class="ident">encodeState</span><span class="op">{</span><span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">r</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">rune</span><br>
+<span class="lineno">380</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="string">&#39;\u0000&#39;</span><span class="op">;</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">unicode</span><span class="op">.</span><span class="ident">MaxRune</span><span class="op">;</span>&nbsp;<span class="ident">i</span><span class="op">++</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">append</span><span class="op">(</span><span class="ident">r</span><span class="op">,</span>&nbsp;<span class="ident">i</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtintype">string</span><span class="op">(</span><span class="ident">r</span><span class="op">)</span>&nbsp;<span class="op">+</span>&nbsp;<span class="string">&#34;\xff\xff\xffhello&#34;</span>&nbsp;<span class="comment">//&nbsp;some&nbsp;invalid&nbsp;UTF-8&nbsp;too</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">es</span><span class="op">.</span><span class="builtintype">string</span><span class="op">(</span><span class="ident">s</span><span class="op">)</span><br>
+<span class="lineno">385</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatal</span><span class="op">(</span><span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">esBytes</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">&amp;</span><span class="ident">encodeState</span><span class="op">{</span><span class="op">}</span><br>
+<span class="lineno">390</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">esBytes</span><span class="op">.</span><span class="ident">stringBytes</span><span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">(</span><span class="ident">s</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatal</span><span class="op">(</span><span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">395</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">enc</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">es</span><span class="op">.</span><span class="ident">Buffer</span><span class="op">.</span><span class="ident">String</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">encBytes</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">esBytes</span><span class="op">.</span><span class="ident">Buffer</span><span class="op">.</span><span class="ident">String</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">enc</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">encBytes</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">i</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">enc</span><span class="op">)</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">encBytes</span><span class="op">)</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">enc</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">encBytes</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">400</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">i</span><span class="op">++</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">enc</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">enc</span><span class="op">[</span><span class="ident">i</span><span class="op">:</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">encBytes</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">encBytes</span><span class="op">[</span><span class="ident">i</span><span class="op">:</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">i</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno">405</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">enc</span><span class="op">)</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">encBytes</span><span class="op">)</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">enc</span><span class="op">[</span><span class="builtinfunc">len</span><span class="op">(</span><span class="ident">enc</span><span class="op">)</span><span class="op">-</span><span class="ident">i</span><span class="op">-</span><span class="num">1</span><span class="op">]</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">encBytes</span><span class="op">[</span><span class="builtinfunc">len</span><span class="op">(</span><span class="ident">encBytes</span><span class="op">)</span><span class="op">-</span><span class="ident">i</span><span class="op">-</span><span class="num">1</span><span class="op">]</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">i</span><span class="op">++</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">enc</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">enc</span><span class="op">[</span><span class="op">:</span><span class="builtinfunc">len</span><span class="op">(</span><span class="ident">enc</span><span class="op">)</span><span class="op">-</span><span class="ident">i</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">encBytes</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">encBytes</span><span class="op">[</span><span class="op">:</span><span class="builtinfunc">len</span><span class="op">(</span><span class="ident">encBytes</span><span class="op">)</span><span class="op">-</span><span class="ident">i</span><span class="op">]</span><br>
+<span class="lineno">410</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">enc</span><span class="op">)</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">20</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">enc</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">enc</span><span class="op">[</span><span class="op">:</span><span class="num">20</span><span class="op">]</span>&nbsp;<span class="op">+</span>&nbsp;<span class="string">&#34;...&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">encBytes</span><span class="op">)</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">20</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">415</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">encBytes</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">encBytes</span><span class="op">[</span><span class="op">:</span><span class="num">20</span><span class="op">]</span>&nbsp;<span class="op">+</span>&nbsp;<span class="string">&#34;...&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Errorf</span><span class="op">(</span><span class="string">&#34;encodings&nbsp;differ&nbsp;at&nbsp;%#q&nbsp;vs&nbsp;%#q&#34;</span><span class="op">,</span>&nbsp;<span class="ident">enc</span><span class="op">,</span>&nbsp;<span class="ident">encBytes</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">420</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">TestIssue6458</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">type</span>&nbsp;<span class="ident">Foo</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">M</span>&nbsp;<span class="ident">RawMessage</span><br>
+<span class="lineno">425</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">x</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">Foo</span><span class="op">{</span><span class="ident">RawMessage</span><span class="op">(</span><span class="string">`&#34;foo&#34;`</span><span class="op">)</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">Marshal</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">x</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">430</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatal</span><span class="op">(</span><span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">want</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="string">`{&#34;M&#34;:&#34;foo&#34;}`</span><span class="op">;</span>&nbsp;<span class="builtintype">string</span><span class="op">(</span><span class="ident">b</span><span class="op">)</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">want</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Errorf</span><span class="op">(</span><span class="string">&#34;Marshal(&amp;x)&nbsp;=&nbsp;%#q;&nbsp;want&nbsp;%#q&#34;</span><span class="op">,</span>&nbsp;<span class="ident">b</span><span class="op">,</span>&nbsp;<span class="ident">want</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">435</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">Marshal</span><span class="op">(</span><span class="ident">x</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatal</span><span class="op">(</span><span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">440</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">want</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="string">`{&#34;M&#34;:&#34;ImZvbyI=&#34;}`</span><span class="op">;</span>&nbsp;<span class="builtintype">string</span><span class="op">(</span><span class="ident">b</span><span class="op">)</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">want</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Errorf</span><span class="op">(</span><span class="string">&#34;Marshal(x)&nbsp;=&nbsp;%#q;&nbsp;want&nbsp;%#q&#34;</span><span class="op">,</span>&nbsp;<span class="ident">b</span><span class="op">,</span>&nbsp;<span class="ident">want</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">445</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">TestHTMLEscape</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">b</span><span class="op">,</span>&nbsp;<span class="ident">want</span>&nbsp;<span class="ident">bytes</span><span class="op">.</span><span class="ident">Buffer</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">m</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="string">`{&#34;M&#34;:&#34;&lt;html&gt;foo&nbsp;&amp;`</span>&nbsp;<span class="op">+</span>&nbsp;<span class="string">&#34;\xe2\x80\xa8&nbsp;\xe2\x80\xa9&#34;</span>&nbsp;<span class="op">+</span>&nbsp;<span class="string">`&lt;/html&gt;&#34;}`</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">want</span><span class="op">.</span><span class="ident">Write</span><span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">(</span><span class="string">`{&#34;M&#34;:&#34;\u003chtml\u003efoo&nbsp;\u0026\u2028&nbsp;\u2029\u003c/html\u003e&#34;}`</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno">450</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">HTMLEscape</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">b</span><span class="op">,</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">(</span><span class="ident">m</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">bytes</span><span class="op">.</span><span class="ident">Equal</span><span class="op">(</span><span class="ident">b</span><span class="op">.</span><span class="ident">Bytes</span><span class="op">(</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">want</span><span class="op">.</span><span class="ident">Bytes</span><span class="op">(</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Errorf</span><span class="op">(</span><span class="string">&#34;HTMLEscape(&amp;b,&nbsp;[]byte(m))&nbsp;=&nbsp;%s;&nbsp;want&nbsp;%s&#34;</span><span class="op">,</span>&nbsp;<span class="ident">b</span><span class="op">.</span><span class="ident">Bytes</span><span class="op">(</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">want</span><span class="op">.</span><span class="ident">Bytes</span><span class="op">(</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">455</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;golang.org/issue/8582</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">TestEncodePointerString</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">type</span>&nbsp;<span class="ident">stringPointer</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">N</span>&nbsp;<span class="op">*</span><span class="ident">int64</span>&nbsp;<span class="string">`json:&#34;n,string&#34;`</span><br>
+<span class="lineno">460</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="ident">int64</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">42</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">Marshal</span><span class="op">(</span><span class="ident">stringPointer</span><span class="op">{</span><span class="ident">N</span><span class="op">:</span>&nbsp;<span class="op">&amp;</span><span class="ident">n</span><span class="op">}</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;Marshal:&nbsp;%v&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno">465</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">got</span><span class="op">,</span>&nbsp;<span class="ident">want</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtintype">string</span><span class="op">(</span><span class="ident">b</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="string">`{&#34;n&#34;:&#34;42&#34;}`</span><span class="op">;</span>&nbsp;<span class="ident">got</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">want</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Errorf</span><span class="op">(</span><span class="string">&#34;Marshal&nbsp;=&nbsp;%s,&nbsp;want&nbsp;%s&#34;</span><span class="op">,</span>&nbsp;<span class="ident">got</span><span class="op">,</span>&nbsp;<span class="ident">want</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">back</span>&nbsp;<span class="ident">stringPointer</span><br>
+<span class="lineno">470</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">Unmarshal</span><span class="op">(</span><span class="ident">b</span><span class="op">,</span>&nbsp;<span class="op">&amp;</span><span class="ident">back</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;Unmarshal:&nbsp;%v&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">back</span><span class="op">.</span><span class="ident">N</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">475</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;Unmarshalled&nbsp;nil&nbsp;N&nbsp;field&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">*</span><span class="ident">back</span><span class="op">.</span><span class="ident">N</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">42</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;*N&nbsp;=&nbsp;%d;&nbsp;want&nbsp;42&#34;</span><span class="op">,</span>&nbsp;<span class="op">*</span><span class="ident">back</span><span class="op">.</span><span class="ident">N</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">480</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">encodeStringTests</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">in</span>&nbsp;&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">out</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno">485</span><span class="op">}</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;\x00&#34;</span><span class="op">,</span>&nbsp;<span class="string">`&#34;\u0000&#34;`</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;\x01&#34;</span><span class="op">,</span>&nbsp;<span class="string">`&#34;\u0001&#34;`</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;\x02&#34;</span><span class="op">,</span>&nbsp;<span class="string">`&#34;\u0002&#34;`</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;\x03&#34;</span><span class="op">,</span>&nbsp;<span class="string">`&#34;\u0003&#34;`</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno">490</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;\x04&#34;</span><span class="op">,</span>&nbsp;<span class="string">`&#34;\u0004&#34;`</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;\x05&#34;</span><span class="op">,</span>&nbsp;<span class="string">`&#34;\u0005&#34;`</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;\x06&#34;</span><span class="op">,</span>&nbsp;<span class="string">`&#34;\u0006&#34;`</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;\x07&#34;</span><span class="op">,</span>&nbsp;<span class="string">`&#34;\u0007&#34;`</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;\x08&#34;</span><span class="op">,</span>&nbsp;<span class="string">`&#34;\u0008&#34;`</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno">495</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;\x09&#34;</span><span class="op">,</span>&nbsp;<span class="string">`&#34;\t&#34;`</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;\x0a&#34;</span><span class="op">,</span>&nbsp;<span class="string">`&#34;\n&#34;`</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;\x0b&#34;</span><span class="op">,</span>&nbsp;<span class="string">`&#34;\u000b&#34;`</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;\x0c&#34;</span><span class="op">,</span>&nbsp;<span class="string">`&#34;\u000c&#34;`</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;\x0d&#34;</span><span class="op">,</span>&nbsp;<span class="string">`&#34;\r&#34;`</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno">500</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;\x0e&#34;</span><span class="op">,</span>&nbsp;<span class="string">`&#34;\u000e&#34;`</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;\x0f&#34;</span><span class="op">,</span>&nbsp;<span class="string">`&#34;\u000f&#34;`</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;\x10&#34;</span><span class="op">,</span>&nbsp;<span class="string">`&#34;\u0010&#34;`</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;\x11&#34;</span><span class="op">,</span>&nbsp;<span class="string">`&#34;\u0011&#34;`</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;\x12&#34;</span><span class="op">,</span>&nbsp;<span class="string">`&#34;\u0012&#34;`</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno">505</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;\x13&#34;</span><span class="op">,</span>&nbsp;<span class="string">`&#34;\u0013&#34;`</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;\x14&#34;</span><span class="op">,</span>&nbsp;<span class="string">`&#34;\u0014&#34;`</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;\x15&#34;</span><span class="op">,</span>&nbsp;<span class="string">`&#34;\u0015&#34;`</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;\x16&#34;</span><span class="op">,</span>&nbsp;<span class="string">`&#34;\u0016&#34;`</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;\x17&#34;</span><span class="op">,</span>&nbsp;<span class="string">`&#34;\u0017&#34;`</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno">510</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;\x18&#34;</span><span class="op">,</span>&nbsp;<span class="string">`&#34;\u0018&#34;`</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;\x19&#34;</span><span class="op">,</span>&nbsp;<span class="string">`&#34;\u0019&#34;`</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;\x1a&#34;</span><span class="op">,</span>&nbsp;<span class="string">`&#34;\u001a&#34;`</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;\x1b&#34;</span><span class="op">,</span>&nbsp;<span class="string">`&#34;\u001b&#34;`</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;\x1c&#34;</span><span class="op">,</span>&nbsp;<span class="string">`&#34;\u001c&#34;`</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno">515</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;\x1d&#34;</span><span class="op">,</span>&nbsp;<span class="string">`&#34;\u001d&#34;`</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;\x1e&#34;</span><span class="op">,</span>&nbsp;<span class="string">`&#34;\u001e&#34;`</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">{</span><span class="string">&#34;\x1f&#34;</span><span class="op">,</span>&nbsp;<span class="string">`&#34;\u001f&#34;`</span><span class="op">}</span><span class="op">,</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">520</span><span class="keyword">func</span>&nbsp;<span class="ident">TestEncodeString</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">testing</span><span class="op">.</span><span class="ident">T</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">tt</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">encodeStringTests</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">Marshal</span><span class="op">(</span><span class="ident">tt</span><span class="op">.</span><span class="ident">in</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Errorf</span><span class="op">(</span><span class="string">&#34;Marshal(%q):&nbsp;%v&#34;</span><span class="op">,</span>&nbsp;<span class="ident">tt</span><span class="op">.</span><span class="ident">in</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno">525</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">continue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">out</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtintype">string</span><span class="op">(</span><span class="ident">b</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">out</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">tt</span><span class="op">.</span><span class="ident">out</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">.</span><span class="ident">Errorf</span><span class="op">(</span><span class="string">&#34;Marshal(%q)&nbsp;=&nbsp;%#q,&nbsp;want&nbsp;%#q&#34;</span><span class="op">,</span>&nbsp;<span class="ident">tt</span><span class="op">.</span><span class="ident">in</span><span class="op">,</span>&nbsp;<span class="ident">out</span><span class="op">,</span>&nbsp;<span class="ident">tt</span><span class="op">.</span><span class="ident">out</span><span class="op">)</span><br>
+<span class="lineno">530</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

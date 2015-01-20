@@ -1,0 +1,150 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2012&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">os</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="string">&#34;time&#34;</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;FindProcess&nbsp;looks&nbsp;for&nbsp;a&nbsp;running&nbsp;process&nbsp;by&nbsp;its&nbsp;pid.</span><br>
+<span class="lineno">10</span><span class="comment">//&nbsp;The&nbsp;Process&nbsp;it&nbsp;returns&nbsp;can&nbsp;be&nbsp;used&nbsp;to&nbsp;obtain&nbsp;information</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;about&nbsp;the&nbsp;underlying&nbsp;operating&nbsp;system&nbsp;process.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">FindProcess</span><span class="op">(</span><span class="ident">pid</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">*</span><span class="ident">Process</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">findProcess</span><span class="op">(</span><span class="ident">pid</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">15</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;StartProcess&nbsp;starts&nbsp;a&nbsp;new&nbsp;process&nbsp;with&nbsp;the&nbsp;program,&nbsp;arguments&nbsp;and&nbsp;attributes</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;specified&nbsp;by&nbsp;name,&nbsp;argv&nbsp;and&nbsp;attr.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;StartProcess&nbsp;is&nbsp;a&nbsp;low-level&nbsp;interface.&nbsp;The&nbsp;os/exec&nbsp;package&nbsp;provides</span><br>
+<span class="lineno">20</span><span class="comment">//&nbsp;higher-level&nbsp;interfaces.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;If&nbsp;there&nbsp;is&nbsp;an&nbsp;error,&nbsp;it&nbsp;will&nbsp;be&nbsp;of&nbsp;type&nbsp;*PathError.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">StartProcess</span><span class="op">(</span><span class="ident">name</span>&nbsp;<span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">argv</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">attr</span>&nbsp;<span class="op">*</span><span class="ident">ProcAttr</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="op">*</span><span class="ident">Process</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">startProcess</span><span class="op">(</span><span class="ident">name</span><span class="op">,</span>&nbsp;<span class="ident">argv</span><span class="op">,</span>&nbsp;<span class="ident">attr</span><span class="op">)</span><br>
+<span class="lineno">25</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Release&nbsp;releases&nbsp;any&nbsp;resources&nbsp;associated&nbsp;with&nbsp;the&nbsp;Process&nbsp;p,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;rendering&nbsp;it&nbsp;unusable&nbsp;in&nbsp;the&nbsp;future.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Release&nbsp;only&nbsp;needs&nbsp;to&nbsp;be&nbsp;called&nbsp;if&nbsp;Wait&nbsp;is&nbsp;not.</span><br>
+<span class="lineno">30</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">*</span><span class="ident">Process</span><span class="op">)</span>&nbsp;<span class="ident">Release</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">p</span><span class="op">.</span><span class="ident">release</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Kill&nbsp;causes&nbsp;the&nbsp;Process&nbsp;to&nbsp;exit&nbsp;immediately.</span><br>
+<span class="lineno">35</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">*</span><span class="ident">Process</span><span class="op">)</span>&nbsp;<span class="ident">Kill</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">p</span><span class="op">.</span><span class="ident">kill</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Wait&nbsp;waits&nbsp;for&nbsp;the&nbsp;Process&nbsp;to&nbsp;exit,&nbsp;and&nbsp;then&nbsp;returns&nbsp;a</span><br>
+<span class="lineno">40</span><span class="comment">//&nbsp;ProcessState&nbsp;describing&nbsp;its&nbsp;status&nbsp;and&nbsp;an&nbsp;error,&nbsp;if&nbsp;any.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Wait&nbsp;releases&nbsp;any&nbsp;resources&nbsp;associated&nbsp;with&nbsp;the&nbsp;Process.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;On&nbsp;most&nbsp;operating&nbsp;systems,&nbsp;the&nbsp;Process&nbsp;must&nbsp;be&nbsp;a&nbsp;child</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;of&nbsp;the&nbsp;current&nbsp;process&nbsp;or&nbsp;an&nbsp;error&nbsp;will&nbsp;be&nbsp;returned.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">*</span><span class="ident">Process</span><span class="op">)</span>&nbsp;<span class="ident">Wait</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="op">*</span><span class="ident">ProcessState</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">p</span><span class="op">.</span><span class="ident">wait</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Signal&nbsp;sends&nbsp;a&nbsp;signal&nbsp;to&nbsp;the&nbsp;Process.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Sending&nbsp;Interrupt&nbsp;on&nbsp;Windows&nbsp;is&nbsp;not&nbsp;implemented.</span><br>
+<span class="lineno">50</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">*</span><span class="ident">Process</span><span class="op">)</span>&nbsp;<span class="ident">Signal</span><span class="op">(</span><span class="ident">sig</span>&nbsp;<span class="ident">Signal</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">p</span><span class="op">.</span><span class="ident">signal</span><span class="op">(</span><span class="ident">sig</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;UserTime&nbsp;returns&nbsp;the&nbsp;user&nbsp;CPU&nbsp;time&nbsp;of&nbsp;the&nbsp;exited&nbsp;process&nbsp;and&nbsp;its&nbsp;children.</span><br>
+<span class="lineno">55</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">*</span><span class="ident">ProcessState</span><span class="op">)</span>&nbsp;<span class="ident">UserTime</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="ident">time</span><span class="op">.</span><span class="ident">Duration</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">p</span><span class="op">.</span><span class="ident">userTime</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;SystemTime&nbsp;returns&nbsp;the&nbsp;system&nbsp;CPU&nbsp;time&nbsp;of&nbsp;the&nbsp;exited&nbsp;process&nbsp;and&nbsp;its&nbsp;children.</span><br>
+<span class="lineno">60</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">*</span><span class="ident">ProcessState</span><span class="op">)</span>&nbsp;<span class="ident">SystemTime</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="ident">time</span><span class="op">.</span><span class="ident">Duration</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">p</span><span class="op">.</span><span class="ident">systemTime</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Exited&nbsp;reports&nbsp;whether&nbsp;the&nbsp;program&nbsp;has&nbsp;exited.</span><br>
+<span class="lineno">65</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">*</span><span class="ident">ProcessState</span><span class="op">)</span>&nbsp;<span class="ident">Exited</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">p</span><span class="op">.</span><span class="ident">exited</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Success&nbsp;reports&nbsp;whether&nbsp;the&nbsp;program&nbsp;exited&nbsp;successfully,</span><br>
+<span class="lineno">70</span><span class="comment">//&nbsp;such&nbsp;as&nbsp;with&nbsp;exit&nbsp;status&nbsp;0&nbsp;on&nbsp;Unix.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">*</span><span class="ident">ProcessState</span><span class="op">)</span>&nbsp;<span class="ident">Success</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">p</span><span class="op">.</span><span class="ident">success</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">75</span><span class="comment">//&nbsp;Sys&nbsp;returns&nbsp;system-dependent&nbsp;exit&nbsp;information&nbsp;about</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;the&nbsp;process.&nbsp;&nbsp;Convert&nbsp;it&nbsp;to&nbsp;the&nbsp;appropriate&nbsp;underlying</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;type,&nbsp;such&nbsp;as&nbsp;syscall.WaitStatus&nbsp;on&nbsp;Unix,&nbsp;to&nbsp;access&nbsp;its&nbsp;contents.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">*</span><span class="ident">ProcessState</span><span class="op">)</span>&nbsp;<span class="ident">Sys</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="keyword">interface</span><span class="op">{</span><span class="op">}</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">p</span><span class="op">.</span><span class="ident">sys</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">80</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;SysUsage&nbsp;returns&nbsp;system-dependent&nbsp;resource&nbsp;usage&nbsp;information&nbsp;about</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;the&nbsp;exited&nbsp;process.&nbsp;&nbsp;Convert&nbsp;it&nbsp;to&nbsp;the&nbsp;appropriate&nbsp;underlying</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;type,&nbsp;such&nbsp;as&nbsp;*syscall.Rusage&nbsp;on&nbsp;Unix,&nbsp;to&nbsp;access&nbsp;its&nbsp;contents.</span><br>
+<span class="lineno">85</span><span class="comment">//&nbsp;(On&nbsp;Unix,&nbsp;*syscall.Rusage&nbsp;matches&nbsp;struct&nbsp;rusage&nbsp;as&nbsp;defined&nbsp;in&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;getrusage(2)&nbsp;manual&nbsp;page.)</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">*</span><span class="ident">ProcessState</span><span class="op">)</span>&nbsp;<span class="ident">SysUsage</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="keyword">interface</span><span class="op">{</span><span class="op">}</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">p</span><span class="op">.</span><span class="ident">sysUsage</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">90</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Hostname&nbsp;returns&nbsp;the&nbsp;host&nbsp;name&nbsp;reported&nbsp;by&nbsp;the&nbsp;kernel.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">Hostname</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">name</span>&nbsp;<span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">hostname</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">95</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Readdir&nbsp;reads&nbsp;the&nbsp;contents&nbsp;of&nbsp;the&nbsp;directory&nbsp;associated&nbsp;with&nbsp;file&nbsp;and</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;returns&nbsp;a&nbsp;slice&nbsp;of&nbsp;up&nbsp;to&nbsp;n&nbsp;FileInfo&nbsp;values,&nbsp;as&nbsp;would&nbsp;be&nbsp;returned</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;by&nbsp;Lstat,&nbsp;in&nbsp;directory&nbsp;order.&nbsp;Subsequent&nbsp;calls&nbsp;on&nbsp;the&nbsp;same&nbsp;file&nbsp;will&nbsp;yield</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;further&nbsp;FileInfos.</span><br>
+<span class="lineno">100</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;If&nbsp;n&nbsp;&gt;&nbsp;0,&nbsp;Readdir&nbsp;returns&nbsp;at&nbsp;most&nbsp;n&nbsp;FileInfo&nbsp;structures.&nbsp;In&nbsp;this&nbsp;case,&nbsp;if</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Readdir&nbsp;returns&nbsp;an&nbsp;empty&nbsp;slice,&nbsp;it&nbsp;will&nbsp;return&nbsp;a&nbsp;non-nil&nbsp;error</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;explaining&nbsp;why.&nbsp;At&nbsp;the&nbsp;end&nbsp;of&nbsp;a&nbsp;directory,&nbsp;the&nbsp;error&nbsp;is&nbsp;io.EOF.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">105</span><span class="comment">//&nbsp;If&nbsp;n&nbsp;&lt;=&nbsp;0,&nbsp;Readdir&nbsp;returns&nbsp;all&nbsp;the&nbsp;FileInfo&nbsp;from&nbsp;the&nbsp;directory&nbsp;in</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;a&nbsp;single&nbsp;slice.&nbsp;In&nbsp;this&nbsp;case,&nbsp;if&nbsp;Readdir&nbsp;succeeds&nbsp;(reads&nbsp;all</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;the&nbsp;way&nbsp;to&nbsp;the&nbsp;end&nbsp;of&nbsp;the&nbsp;directory),&nbsp;it&nbsp;returns&nbsp;the&nbsp;slice&nbsp;and&nbsp;a</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;nil&nbsp;error.&nbsp;If&nbsp;it&nbsp;encounters&nbsp;an&nbsp;error&nbsp;before&nbsp;the&nbsp;end&nbsp;of&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;directory,&nbsp;Readdir&nbsp;returns&nbsp;the&nbsp;FileInfo&nbsp;read&nbsp;until&nbsp;that&nbsp;point</span><br>
+<span class="lineno">110</span><span class="comment">//&nbsp;and&nbsp;a&nbsp;non-nil&nbsp;error.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">f</span>&nbsp;<span class="op">*</span><span class="ident">File</span><span class="op">)</span>&nbsp;<span class="ident">Readdir</span><span class="op">(</span><span class="ident">n</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">fi</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="ident">FileInfo</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">f</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">ErrInvalid</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">115</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">f</span><span class="op">.</span><span class="ident">readdir</span><span class="op">(</span><span class="ident">n</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Readdirnames&nbsp;reads&nbsp;and&nbsp;returns&nbsp;a&nbsp;slice&nbsp;of&nbsp;names&nbsp;from&nbsp;the&nbsp;directory&nbsp;f.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">120</span><span class="comment">//&nbsp;If&nbsp;n&nbsp;&gt;&nbsp;0,&nbsp;Readdirnames&nbsp;returns&nbsp;at&nbsp;most&nbsp;n&nbsp;names.&nbsp;In&nbsp;this&nbsp;case,&nbsp;if</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Readdirnames&nbsp;returns&nbsp;an&nbsp;empty&nbsp;slice,&nbsp;it&nbsp;will&nbsp;return&nbsp;a&nbsp;non-nil&nbsp;error</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;explaining&nbsp;why.&nbsp;At&nbsp;the&nbsp;end&nbsp;of&nbsp;a&nbsp;directory,&nbsp;the&nbsp;error&nbsp;is&nbsp;io.EOF.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;If&nbsp;n&nbsp;&lt;=&nbsp;0,&nbsp;Readdirnames&nbsp;returns&nbsp;all&nbsp;the&nbsp;names&nbsp;from&nbsp;the&nbsp;directory&nbsp;in</span><br>
+<span class="lineno">125</span><span class="comment">//&nbsp;a&nbsp;single&nbsp;slice.&nbsp;In&nbsp;this&nbsp;case,&nbsp;if&nbsp;Readdirnames&nbsp;succeeds&nbsp;(reads&nbsp;all</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;the&nbsp;way&nbsp;to&nbsp;the&nbsp;end&nbsp;of&nbsp;the&nbsp;directory),&nbsp;it&nbsp;returns&nbsp;the&nbsp;slice&nbsp;and&nbsp;a</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;nil&nbsp;error.&nbsp;If&nbsp;it&nbsp;encounters&nbsp;an&nbsp;error&nbsp;before&nbsp;the&nbsp;end&nbsp;of&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;directory,&nbsp;Readdirnames&nbsp;returns&nbsp;the&nbsp;names&nbsp;read&nbsp;until&nbsp;that&nbsp;point&nbsp;and</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;a&nbsp;non-nil&nbsp;error.</span><br>
+<span class="lineno">130</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">f</span>&nbsp;<span class="op">*</span><span class="ident">File</span><span class="op">)</span>&nbsp;<span class="ident">Readdirnames</span><span class="op">(</span><span class="ident">n</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">names</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">f</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><span class="op">,</span>&nbsp;<span class="ident">ErrInvalid</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">f</span><span class="op">.</span><span class="ident">readdirnames</span><span class="op">(</span><span class="ident">n</span><span class="op">)</span><br>
+<span class="lineno">135</span><span class="op">}</span>
+</div>
+</body>
+</html>

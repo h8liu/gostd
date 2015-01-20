@@ -1,0 +1,520 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2014&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">runtime</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="string">&#34;unsafe&#34;</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">indexError</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtintype">error</span><span class="op">(</span><span class="ident">errorString</span><span class="op">(</span><span class="string">&#34;index&nbsp;out&nbsp;of&nbsp;range&#34;</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno">10</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">panicindex</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">panic</span><span class="op">(</span><span class="ident">indexError</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">15</span><span class="keyword">var</span>&nbsp;<span class="ident">sliceError</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtintype">error</span><span class="op">(</span><span class="ident">errorString</span><span class="op">(</span><span class="string">&#34;slice&nbsp;bounds&nbsp;out&nbsp;of&nbsp;range&#34;</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">panicslice</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">panic</span><span class="op">(</span><span class="ident">sliceError</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">20</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">divideError</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtintype">error</span><span class="op">(</span><span class="ident">errorString</span><span class="op">(</span><span class="string">&#34;integer&nbsp;divide&nbsp;by&nbsp;zero&#34;</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">panicdivide</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">panic</span><span class="op">(</span><span class="ident">divideError</span><span class="op">)</span><br>
+<span class="lineno">25</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">overflowError</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtintype">error</span><span class="op">(</span><span class="ident">errorString</span><span class="op">(</span><span class="string">&#34;integer&nbsp;overflow&#34;</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">panicoverflow</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">panic</span><span class="op">(</span><span class="ident">overflowError</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">floatError</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtintype">error</span><span class="op">(</span><span class="ident">errorString</span><span class="op">(</span><span class="string">&#34;floating&nbsp;point&nbsp;error&#34;</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">35</span><span class="keyword">func</span>&nbsp;<span class="ident">panicfloat</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">panic</span><span class="op">(</span><span class="ident">floatError</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">memoryError</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtintype">error</span><span class="op">(</span><span class="ident">errorString</span><span class="op">(</span><span class="string">&#34;invalid&nbsp;memory&nbsp;address&nbsp;or&nbsp;nil&nbsp;pointer&nbsp;dereference&#34;</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno">40</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">panicmem</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">panic</span><span class="op">(</span><span class="ident">memoryError</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">45</span><span class="keyword">func</span>&nbsp;<span class="ident">throwreturn</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gothrow</span><span class="op">(</span><span class="string">&#34;no&nbsp;return&nbsp;at&nbsp;end&nbsp;of&nbsp;a&nbsp;typed&nbsp;function&nbsp;-&nbsp;compiler&nbsp;is&nbsp;broken&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">throwinit</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gothrow</span><span class="op">(</span><span class="string">&#34;recursive&nbsp;call&nbsp;during&nbsp;initialization&nbsp;-&nbsp;linker&nbsp;skew&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Create&nbsp;a&nbsp;new&nbsp;deferred&nbsp;function&nbsp;fn&nbsp;with&nbsp;siz&nbsp;bytes&nbsp;of&nbsp;arguments.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;compiler&nbsp;turns&nbsp;a&nbsp;defer&nbsp;statement&nbsp;into&nbsp;a&nbsp;call&nbsp;to&nbsp;this.</span><br>
+<span class="lineno">55</span><span class="comment">//go:nosplit</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">deferproc</span><span class="op">(</span><span class="ident">siz</span>&nbsp;<span class="builtintype">int32</span><span class="op">,</span>&nbsp;<span class="ident">fn</span>&nbsp;<span class="op">*</span><span class="ident">funcval</span><span class="op">)</span>&nbsp;<span class="op">{</span>&nbsp;<span class="comment">//&nbsp;arguments&nbsp;of&nbsp;fn&nbsp;follow&nbsp;fn</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;the&nbsp;arguments&nbsp;of&nbsp;fn&nbsp;are&nbsp;in&nbsp;a&nbsp;perilous&nbsp;state.&nbsp;&nbsp;The&nbsp;stack&nbsp;map</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;for&nbsp;deferproc&nbsp;does&nbsp;not&nbsp;describe&nbsp;them.&nbsp;&nbsp;So&nbsp;we&nbsp;can&#39;t&nbsp;let&nbsp;garbage</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;collection&nbsp;or&nbsp;stack&nbsp;copying&nbsp;trigger&nbsp;until&nbsp;we&#39;ve&nbsp;copied&nbsp;them&nbsp;out</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;to&nbsp;somewhere&nbsp;safe.&nbsp;&nbsp;deferproc_m&nbsp;does&nbsp;that.&nbsp;&nbsp;Until&nbsp;deferproc_m,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;we&nbsp;can&nbsp;only&nbsp;call&nbsp;nosplit&nbsp;routines.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">argp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">(</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">fn</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">argp</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Sizeof</span><span class="op">(</span><span class="ident">fn</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">GOARCH</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#34;arm&#34;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">argp</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="ident">ptrSize</span>&nbsp;<span class="comment">//&nbsp;skip&nbsp;caller&#39;s&nbsp;saved&nbsp;link&nbsp;register</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">acquirem</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mp</span><span class="op">.</span><span class="ident">scalararg</span><span class="op">[</span><span class="num">0</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">(</span><span class="ident">siz</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mp</span><span class="op">.</span><span class="ident">ptrarg</span><span class="op">[</span><span class="num">0</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="ident">fn</span><span class="op">)</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mp</span><span class="op">.</span><span class="ident">scalararg</span><span class="op">[</span><span class="num">1</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">argp</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mp</span><span class="op">.</span><span class="ident">scalararg</span><span class="op">[</span><span class="num">2</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">getcallerpc</span><span class="op">(</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">siz</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">mp</span><span class="op">.</span><span class="ident">curg</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">getg</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;go&nbsp;code&nbsp;on&nbsp;the&nbsp;m&nbsp;stack&nbsp;can&#39;t&nbsp;defer</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gothrow</span><span class="op">(</span><span class="string">&#34;defer&nbsp;on&nbsp;m&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">onM</span><span class="op">(</span><span class="ident">deferproc_m</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">releasem</span><span class="op">(</span><span class="ident">mp</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;deferproc&nbsp;returns&nbsp;0&nbsp;normally.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;a&nbsp;deferred&nbsp;func&nbsp;that&nbsp;stops&nbsp;a&nbsp;panic</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;makes&nbsp;the&nbsp;deferproc&nbsp;return&nbsp;1.</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;the&nbsp;code&nbsp;the&nbsp;compiler&nbsp;generates&nbsp;always</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;checks&nbsp;the&nbsp;return&nbsp;value&nbsp;and&nbsp;jumps&nbsp;to&nbsp;the</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;end&nbsp;of&nbsp;the&nbsp;function&nbsp;if&nbsp;deferproc&nbsp;returns&nbsp;!=&nbsp;0.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">return0</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;No&nbsp;code&nbsp;can&nbsp;go&nbsp;here&nbsp;-&nbsp;the&nbsp;C&nbsp;return&nbsp;register&nbsp;has</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;been&nbsp;set&nbsp;and&nbsp;must&nbsp;not&nbsp;be&nbsp;clobbered.</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Small&nbsp;malloc&nbsp;size&nbsp;classes&nbsp;&gt;=&nbsp;16&nbsp;are&nbsp;the&nbsp;multiples&nbsp;of&nbsp;16:&nbsp;16,&nbsp;32,&nbsp;48,&nbsp;64,&nbsp;80,&nbsp;96,&nbsp;112,&nbsp;128,&nbsp;144,&nbsp;...</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Each&nbsp;P&nbsp;holds&nbsp;a&nbsp;pool&nbsp;for&nbsp;defers&nbsp;with&nbsp;small&nbsp;arg&nbsp;sizes.</span><br>
+<span class="lineno">95</span><span class="comment">//&nbsp;Assign&nbsp;defer&nbsp;allocations&nbsp;to&nbsp;pools&nbsp;by&nbsp;rounding&nbsp;to&nbsp;16,&nbsp;to&nbsp;match&nbsp;malloc&nbsp;size&nbsp;classes.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">deferHeaderSize</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Sizeof</span><span class="op">(</span><span class="ident">_defer</span><span class="op">{</span><span class="op">}</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">minDeferAlloc</span>&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="op">(</span><span class="ident">deferHeaderSize</span>&nbsp;<span class="op">+</span>&nbsp;<span class="num">15</span><span class="op">)</span>&nbsp;<span class="op">&amp;^</span>&nbsp;<span class="num">15</span><br>
+<span class="lineno">100</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">minDeferArgs</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="ident">minDeferAlloc</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">deferHeaderSize</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;defer&nbsp;size&nbsp;class&nbsp;for&nbsp;arg&nbsp;size&nbsp;sz</span><br>
+<span class="lineno"></span><span class="comment">//go:nosplit</span><br>
+<span class="lineno">105</span><span class="keyword">func</span>&nbsp;<span class="ident">deferclass</span><span class="op">(</span><span class="ident">siz</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">)</span>&nbsp;<span class="builtintype">uintptr</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">siz</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">minDeferArgs</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="op">(</span><span class="ident">siz</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">minDeferArgs</span>&nbsp;<span class="op">+</span>&nbsp;<span class="num">15</span><span class="op">)</span>&nbsp;<span class="op">/</span>&nbsp;<span class="num">16</span><br>
+<span class="lineno">110</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;total&nbsp;size&nbsp;of&nbsp;memory&nbsp;block&nbsp;for&nbsp;defer&nbsp;with&nbsp;arg&nbsp;size&nbsp;sz</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">totaldefersize</span><span class="op">(</span><span class="ident">siz</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">)</span>&nbsp;<span class="builtintype">uintptr</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">siz</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">minDeferArgs</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">115</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">minDeferAlloc</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">deferHeaderSize</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">siz</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">120</span><span class="comment">//&nbsp;Ensure&nbsp;that&nbsp;defer&nbsp;arg&nbsp;sizes&nbsp;that&nbsp;map&nbsp;to&nbsp;the&nbsp;same&nbsp;defer&nbsp;size&nbsp;class</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;also&nbsp;map&nbsp;to&nbsp;the&nbsp;same&nbsp;malloc&nbsp;size&nbsp;class.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">testdefersizes</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">m</span>&nbsp;<span class="op">[</span><span class="builtinfunc">len</span><span class="op">(</span><span class="ident">p</span><span class="op">{</span><span class="op">}</span><span class="op">.</span><span class="ident">deferpool</span><span class="op">)</span><span class="op">]</span><span class="builtintype">int32</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">125</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">m</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">m</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">-</span><span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">(</span><span class="num">0</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="op">;</span>&nbsp;<span class="ident">i</span><span class="op">++</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">defersc</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">deferclass</span><span class="op">(</span><span class="ident">i</span><span class="op">)</span><br>
+<span class="lineno">130</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">defersc</span>&nbsp;<span class="op">&gt;=</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">(</span><span class="builtinfunc">len</span><span class="op">(</span><span class="ident">m</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">break</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">siz</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">goroundupsize</span><span class="op">(</span><span class="ident">totaldefersize</span><span class="op">(</span><span class="ident">i</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">m</span><span class="op">[</span><span class="ident">defersc</span><span class="op">]</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">135</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">m</span><span class="op">[</span><span class="ident">defersc</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtintype">int32</span><span class="op">(</span><span class="ident">siz</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">continue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">m</span><span class="op">[</span><span class="ident">defersc</span><span class="op">]</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="builtintype">int32</span><span class="op">(</span><span class="ident">siz</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">print</span><span class="op">(</span><span class="string">&#34;bad&nbsp;defer&nbsp;size&nbsp;class:&nbsp;i=&#34;</span><span class="op">,</span>&nbsp;<span class="ident">i</span><span class="op">,</span>&nbsp;<span class="string">&#34;&nbsp;siz=&#34;</span><span class="op">,</span>&nbsp;<span class="ident">siz</span><span class="op">,</span>&nbsp;<span class="string">&#34;&nbsp;defersc=&#34;</span><span class="op">,</span>&nbsp;<span class="ident">defersc</span><span class="op">,</span>&nbsp;<span class="string">&#34;\n&#34;</span><span class="op">)</span><br>
+<span class="lineno">140</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gothrow</span><span class="op">(</span><span class="string">&#34;bad&nbsp;defer&nbsp;size&nbsp;class&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">145</span><span class="comment">//&nbsp;The&nbsp;arguments&nbsp;associated&nbsp;with&nbsp;a&nbsp;deferred&nbsp;call&nbsp;are&nbsp;stored</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;immediately&nbsp;after&nbsp;the&nbsp;_defer&nbsp;header&nbsp;in&nbsp;memory.</span><br>
+<span class="lineno"></span><span class="comment">//go:nosplit</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">deferArgs</span><span class="op">(</span><span class="ident">d</span>&nbsp;<span class="op">*</span><span class="ident">_defer</span><span class="op">)</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">add</span><span class="op">(</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="ident">d</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Sizeof</span><span class="op">(</span><span class="op">*</span><span class="ident">d</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno">150</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">deferType</span>&nbsp;<span class="op">*</span><span class="ident">_type</span>&nbsp;<span class="comment">//&nbsp;type&nbsp;of&nbsp;_defer&nbsp;struct</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">init</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">155</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="keyword">interface</span><span class="op">{</span><span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">x</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">(</span><span class="op">*</span><span class="ident">_defer</span><span class="op">)</span><span class="op">(</span><span class="ident">nil</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">deferType</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">(</span><span class="op">*</span><span class="op">(</span><span class="op">*</span><span class="op">*</span><span class="ident">ptrtype</span><span class="op">)</span><span class="op">(</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">x</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><span class="op">.</span><span class="ident">elem</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">160</span><span class="comment">//&nbsp;Allocate&nbsp;a&nbsp;Defer,&nbsp;usually&nbsp;using&nbsp;per-P&nbsp;pool.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Each&nbsp;defer&nbsp;must&nbsp;be&nbsp;released&nbsp;with&nbsp;freedefer.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Note:&nbsp;runs&nbsp;on&nbsp;M&nbsp;stack</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">newdefer</span><span class="op">(</span><span class="ident">siz</span>&nbsp;<span class="builtintype">int32</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">_defer</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">d</span>&nbsp;<span class="op">*</span><span class="ident">_defer</span><br>
+<span class="lineno">165</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sc</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">deferclass</span><span class="op">(</span><span class="builtintype">uintptr</span><span class="op">(</span><span class="ident">siz</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">acquirem</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">sc</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">(</span><span class="builtinfunc">len</span><span class="op">(</span><span class="ident">p</span><span class="op">{</span><span class="op">}</span><span class="op">.</span><span class="ident">deferpool</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">mp</span><span class="op">.</span><span class="ident">p</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">pp</span><span class="op">.</span><span class="ident">deferpool</span><span class="op">[</span><span class="ident">sc</span><span class="op">]</span><br>
+<span class="lineno">170</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">d</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pp</span><span class="op">.</span><span class="ident">deferpool</span><span class="op">[</span><span class="ident">sc</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">d</span><span class="op">.</span><span class="ident">link</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">d</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">175</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Allocate&nbsp;new&nbsp;defer+args.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">total</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">goroundupsize</span><span class="op">(</span><span class="ident">totaldefersize</span><span class="op">(</span><span class="builtintype">uintptr</span><span class="op">(</span><span class="ident">siz</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">(</span><span class="op">*</span><span class="ident">_defer</span><span class="op">)</span><span class="op">(</span><span class="ident">mallocgc</span><span class="op">(</span><span class="ident">total</span><span class="op">,</span>&nbsp;<span class="ident">deferType</span><span class="op">,</span>&nbsp;<span class="num">0</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span><span class="op">.</span><span class="ident">siz</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">siz</span><br>
+<span class="lineno">180</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">mp</span><span class="op">.</span><span class="ident">curg</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span><span class="op">.</span><span class="ident">link</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">gp</span><span class="op">.</span><span class="ident">_defer</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gp</span><span class="op">.</span><span class="ident">_defer</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">d</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">releasem</span><span class="op">(</span><span class="ident">mp</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">d</span><br>
+<span class="lineno">185</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Free&nbsp;the&nbsp;given&nbsp;defer.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;defer&nbsp;cannot&nbsp;be&nbsp;used&nbsp;after&nbsp;this&nbsp;call.</span><br>
+<span class="lineno"></span><span class="comment">//go:nosplit</span><br>
+<span class="lineno">190</span><span class="keyword">func</span>&nbsp;<span class="ident">freedefer</span><span class="op">(</span><span class="ident">d</span>&nbsp;<span class="op">*</span><span class="ident">_defer</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">d</span><span class="op">.</span><span class="ident">_panic</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">freedeferpanic</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">d</span><span class="op">.</span><span class="ident">fn</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">195</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">freedeferfn</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sc</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">deferclass</span><span class="op">(</span><span class="builtintype">uintptr</span><span class="op">(</span><span class="ident">d</span><span class="op">.</span><span class="ident">siz</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">sc</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">(</span><span class="builtinfunc">len</span><span class="op">(</span><span class="ident">p</span><span class="op">{</span><span class="op">}</span><span class="op">.</span><span class="ident">deferpool</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">acquirem</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">200</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">mp</span><span class="op">.</span><span class="ident">p</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">d</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">_defer</span><span class="op">{</span><span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span><span class="op">.</span><span class="ident">link</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">pp</span><span class="op">.</span><span class="ident">deferpool</span><span class="op">[</span><span class="ident">sc</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pp</span><span class="op">.</span><span class="ident">deferpool</span><span class="op">[</span><span class="ident">sc</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">d</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">releasem</span><span class="op">(</span><span class="ident">mp</span><span class="op">)</span><br>
+<span class="lineno">205</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Separate&nbsp;function&nbsp;so&nbsp;that&nbsp;it&nbsp;can&nbsp;split&nbsp;stack.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Windows&nbsp;otherwise&nbsp;runs&nbsp;out&nbsp;of&nbsp;stack&nbsp;space.</span><br>
+<span class="lineno">210</span><span class="keyword">func</span>&nbsp;<span class="ident">freedeferpanic</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;_panic&nbsp;must&nbsp;be&nbsp;cleared&nbsp;before&nbsp;d&nbsp;is&nbsp;unlinked&nbsp;from&nbsp;gp.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gothrow</span><span class="op">(</span><span class="string">&#34;freedefer&nbsp;with&nbsp;d._panic&nbsp;!=&nbsp;nil&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">215</span><span class="keyword">func</span>&nbsp;<span class="ident">freedeferfn</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;fn&nbsp;must&nbsp;be&nbsp;cleared&nbsp;before&nbsp;d&nbsp;is&nbsp;unlinked&nbsp;from&nbsp;gp.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gothrow</span><span class="op">(</span><span class="string">&#34;freedefer&nbsp;with&nbsp;d.fn&nbsp;!=&nbsp;nil&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">220</span><span class="comment">//&nbsp;Run&nbsp;a&nbsp;deferred&nbsp;function&nbsp;if&nbsp;there&nbsp;is&nbsp;one.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;compiler&nbsp;inserts&nbsp;a&nbsp;call&nbsp;to&nbsp;this&nbsp;at&nbsp;the&nbsp;end&nbsp;of&nbsp;any</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;function&nbsp;which&nbsp;calls&nbsp;defer.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;If&nbsp;there&nbsp;is&nbsp;a&nbsp;deferred&nbsp;function,&nbsp;this&nbsp;will&nbsp;call&nbsp;runtime·jmpdefer,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;which&nbsp;will&nbsp;jump&nbsp;to&nbsp;the&nbsp;deferred&nbsp;function&nbsp;such&nbsp;that&nbsp;it&nbsp;appears</span><br>
+<span class="lineno">225</span><span class="comment">//&nbsp;to&nbsp;have&nbsp;been&nbsp;called&nbsp;by&nbsp;the&nbsp;caller&nbsp;of&nbsp;deferreturn&nbsp;at&nbsp;the&nbsp;point</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;just&nbsp;before&nbsp;deferreturn&nbsp;was&nbsp;called.&nbsp;&nbsp;The&nbsp;effect&nbsp;is&nbsp;that&nbsp;deferreturn</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;is&nbsp;called&nbsp;again&nbsp;and&nbsp;again&nbsp;until&nbsp;there&nbsp;are&nbsp;no&nbsp;more&nbsp;deferred&nbsp;functions.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Cannot&nbsp;split&nbsp;the&nbsp;stack&nbsp;because&nbsp;we&nbsp;reuse&nbsp;the&nbsp;caller&#39;s&nbsp;frame&nbsp;to</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;call&nbsp;the&nbsp;deferred&nbsp;function.</span><br>
+<span class="lineno">230</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;single&nbsp;argument&nbsp;isn&#39;t&nbsp;actually&nbsp;used&nbsp;-&nbsp;it&nbsp;just&nbsp;has&nbsp;its&nbsp;address</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;taken&nbsp;so&nbsp;it&nbsp;can&nbsp;be&nbsp;matched&nbsp;against&nbsp;pending&nbsp;defers.</span><br>
+<span class="lineno"></span><span class="comment">//go:nosplit</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">deferreturn</span><span class="op">(</span><span class="ident">arg0</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">235</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">getg</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">gp</span><span class="op">.</span><span class="ident">_defer</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">d</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">240</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">argp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">(</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">arg0</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">d</span><span class="op">.</span><span class="ident">argp</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">argp</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">245</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Moving&nbsp;arguments&nbsp;around.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Do&nbsp;not&nbsp;allow&nbsp;preemption&nbsp;here,&nbsp;because&nbsp;the&nbsp;garbage&nbsp;collector</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;won&#39;t&nbsp;know&nbsp;the&nbsp;form&nbsp;of&nbsp;the&nbsp;arguments&nbsp;until&nbsp;the&nbsp;jmpdefer&nbsp;can</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;flip&nbsp;the&nbsp;PC&nbsp;over&nbsp;to&nbsp;fn.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">acquirem</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">250</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">memmove</span><span class="op">(</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="ident">argp</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">deferArgs</span><span class="op">(</span><span class="ident">d</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">(</span><span class="ident">d</span><span class="op">.</span><span class="ident">siz</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fn</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">d</span><span class="op">.</span><span class="ident">fn</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span><span class="op">.</span><span class="ident">fn</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gp</span><span class="op">.</span><span class="ident">_defer</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">d</span><span class="op">.</span><span class="ident">link</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">freedefer</span><span class="op">(</span><span class="ident">d</span><span class="op">)</span><br>
+<span class="lineno">255</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">releasem</span><span class="op">(</span><span class="ident">mp</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">jmpdefer</span><span class="op">(</span><span class="ident">fn</span><span class="op">,</span>&nbsp;<span class="ident">argp</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Goexit&nbsp;terminates&nbsp;the&nbsp;goroutine&nbsp;that&nbsp;calls&nbsp;it.&nbsp;&nbsp;No&nbsp;other&nbsp;goroutine&nbsp;is&nbsp;affected.</span><br>
+<span class="lineno">260</span><span class="comment">//&nbsp;Goexit&nbsp;runs&nbsp;all&nbsp;deferred&nbsp;calls&nbsp;before&nbsp;terminating&nbsp;the&nbsp;goroutine.&nbsp;&nbsp;Because&nbsp;Goexit</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;is&nbsp;not&nbsp;panic,&nbsp;however,&nbsp;any&nbsp;recover&nbsp;calls&nbsp;in&nbsp;those&nbsp;deferred&nbsp;functions&nbsp;will&nbsp;return&nbsp;nil.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Calling&nbsp;Goexit&nbsp;from&nbsp;the&nbsp;main&nbsp;goroutine&nbsp;terminates&nbsp;that&nbsp;goroutine</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;without&nbsp;func&nbsp;main&nbsp;returning.&nbsp;Since&nbsp;func&nbsp;main&nbsp;has&nbsp;not&nbsp;returned,</span><br>
+<span class="lineno">265</span><span class="comment">//&nbsp;the&nbsp;program&nbsp;continues&nbsp;execution&nbsp;of&nbsp;other&nbsp;goroutines.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;If&nbsp;all&nbsp;other&nbsp;goroutines&nbsp;exit,&nbsp;the&nbsp;program&nbsp;crashes.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">Goexit</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Run&nbsp;all&nbsp;deferred&nbsp;functions&nbsp;for&nbsp;the&nbsp;current&nbsp;goroutine.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;This&nbsp;code&nbsp;is&nbsp;similar&nbsp;to&nbsp;gopanic,&nbsp;see&nbsp;that&nbsp;implementation</span><br>
+<span class="lineno">270</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;for&nbsp;detailed&nbsp;comments.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">getg</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">gp</span><span class="op">.</span><span class="ident">_defer</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">d</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">275</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">break</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">d</span><span class="op">.</span><span class="ident">started</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">d</span><span class="op">.</span><span class="ident">_panic</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span><span class="op">.</span><span class="ident">_panic</span><span class="op">.</span><span class="ident">aborted</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno">280</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span><span class="op">.</span><span class="ident">_panic</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span><span class="op">.</span><span class="ident">fn</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gp</span><span class="op">.</span><span class="ident">_defer</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">d</span><span class="op">.</span><span class="ident">link</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">freedefer</span><span class="op">(</span><span class="ident">d</span><span class="op">)</span><br>
+<span class="lineno">285</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">continue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span><span class="op">.</span><span class="ident">started</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">reflectcall</span><span class="op">(</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="ident">d</span><span class="op">.</span><span class="ident">fn</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">deferArgs</span><span class="op">(</span><span class="ident">d</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="builtintype">uint32</span><span class="op">(</span><span class="ident">d</span><span class="op">.</span><span class="ident">siz</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="builtintype">uint32</span><span class="op">(</span><span class="ident">d</span><span class="op">.</span><span class="ident">siz</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">gp</span><span class="op">.</span><span class="ident">_defer</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">d</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">290</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gothrow</span><span class="op">(</span><span class="string">&#34;bad&nbsp;defer&nbsp;entry&nbsp;in&nbsp;Goexit&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span><span class="op">.</span><span class="ident">_panic</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span><span class="op">.</span><span class="ident">fn</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gp</span><span class="op">.</span><span class="ident">_defer</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">d</span><span class="op">.</span><span class="ident">link</span><br>
+<span class="lineno">295</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">freedefer</span><span class="op">(</span><span class="ident">d</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Note:&nbsp;we&nbsp;ignore&nbsp;recovers&nbsp;here&nbsp;because&nbsp;Goexit&nbsp;isn&#39;t&nbsp;a&nbsp;panic</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">goexit</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">300</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">canpanic</span><span class="op">(</span><span class="op">*</span><span class="ident">g</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Print&nbsp;all&nbsp;currently&nbsp;active&nbsp;panics.&nbsp;&nbsp;Used&nbsp;when&nbsp;crashing.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">printpanics</span><span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">*</span><span class="ident">_panic</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">305</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">p</span><span class="op">.</span><span class="ident">link</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">printpanics</span><span class="op">(</span><span class="ident">p</span><span class="op">.</span><span class="ident">link</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">print</span><span class="op">(</span><span class="string">&#34;\t&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">print</span><span class="op">(</span><span class="string">&#34;panic:&nbsp;&#34;</span><span class="op">)</span><br>
+<span class="lineno">310</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">printany</span><span class="op">(</span><span class="ident">p</span><span class="op">.</span><span class="ident">arg</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">p</span><span class="op">.</span><span class="ident">recovered</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">print</span><span class="op">(</span><span class="string">&#34;&nbsp;[recovered]&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">print</span><span class="op">(</span><span class="string">&#34;\n&#34;</span><span class="op">)</span><br>
+<span class="lineno">315</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;implementation&nbsp;of&nbsp;the&nbsp;predeclared&nbsp;function&nbsp;panic.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">gopanic</span><span class="op">(</span><span class="ident">e</span>&nbsp;<span class="keyword">interface</span><span class="op">{</span><span class="op">}</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">getg</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">320</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">gp</span><span class="op">.</span><span class="ident">m</span><span class="op">.</span><span class="ident">curg</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">gp</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gothrow</span><span class="op">(</span><span class="string">&#34;panic&nbsp;on&nbsp;m&nbsp;stack&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;m.softfloat&nbsp;is&nbsp;set&nbsp;during&nbsp;software&nbsp;floating&nbsp;point.</span><br>
+<span class="lineno">325</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;It&nbsp;increments&nbsp;m.locks&nbsp;to&nbsp;avoid&nbsp;preemption.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;We&nbsp;moved&nbsp;the&nbsp;memory&nbsp;loads&nbsp;out,&nbsp;so&nbsp;there&nbsp;shouldn&#39;t&nbsp;be</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;any&nbsp;reason&nbsp;for&nbsp;it&nbsp;to&nbsp;panic&nbsp;anymore.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">gp</span><span class="op">.</span><span class="ident">m</span><span class="op">.</span><span class="ident">softfloat</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gp</span><span class="op">.</span><span class="ident">m</span><span class="op">.</span><span class="ident">locks</span><span class="op">--</span><br>
+<span class="lineno">330</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gp</span><span class="op">.</span><span class="ident">m</span><span class="op">.</span><span class="ident">softfloat</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gothrow</span><span class="op">(</span><span class="string">&#34;panic&nbsp;during&nbsp;softfloat&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">gp</span><span class="op">.</span><span class="ident">m</span><span class="op">.</span><span class="ident">mallocing</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">print</span><span class="op">(</span><span class="string">&#34;panic:&nbsp;&#34;</span><span class="op">)</span><br>
+<span class="lineno">335</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">printany</span><span class="op">(</span><span class="ident">e</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">print</span><span class="op">(</span><span class="string">&#34;\n&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gothrow</span><span class="op">(</span><span class="string">&#34;panic&nbsp;during&nbsp;malloc&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">gp</span><span class="op">.</span><span class="ident">m</span><span class="op">.</span><span class="ident">gcing</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">340</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">print</span><span class="op">(</span><span class="string">&#34;panic:&nbsp;&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">printany</span><span class="op">(</span><span class="ident">e</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">print</span><span class="op">(</span><span class="string">&#34;\n&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gothrow</span><span class="op">(</span><span class="string">&#34;panic&nbsp;during&nbsp;gc&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">345</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">gp</span><span class="op">.</span><span class="ident">m</span><span class="op">.</span><span class="ident">locks</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">print</span><span class="op">(</span><span class="string">&#34;panic:&nbsp;&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">printany</span><span class="op">(</span><span class="ident">e</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">print</span><span class="op">(</span><span class="string">&#34;\n&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gothrow</span><span class="op">(</span><span class="string">&#34;panic&nbsp;holding&nbsp;locks&#34;</span><span class="op">)</span><br>
+<span class="lineno">350</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">p</span>&nbsp;<span class="ident">_panic</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">.</span><span class="ident">arg</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">e</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">.</span><span class="ident">link</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">gp</span><span class="op">.</span><span class="ident">_panic</span><br>
+<span class="lineno">355</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gp</span><span class="op">.</span><span class="ident">_panic</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">(</span><span class="op">*</span><span class="ident">_panic</span><span class="op">)</span><span class="op">(</span><span class="ident">noescape</span><span class="op">(</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">p</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">gp</span><span class="op">.</span><span class="ident">_defer</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">d</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">360</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">break</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;If&nbsp;defer&nbsp;was&nbsp;started&nbsp;by&nbsp;earlier&nbsp;panic&nbsp;or&nbsp;Goexit&nbsp;(and,&nbsp;since&nbsp;we&#39;re&nbsp;back&nbsp;here,&nbsp;that&nbsp;triggered&nbsp;a&nbsp;new&nbsp;panic),</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;take&nbsp;defer&nbsp;off&nbsp;list.&nbsp;The&nbsp;earlier&nbsp;panic&nbsp;or&nbsp;Goexit&nbsp;will&nbsp;not&nbsp;continue&nbsp;running.</span><br>
+<span class="lineno">365</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">d</span><span class="op">.</span><span class="ident">started</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">d</span><span class="op">.</span><span class="ident">_panic</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span><span class="op">.</span><span class="ident">_panic</span><span class="op">.</span><span class="ident">aborted</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span><span class="op">.</span><span class="ident">_panic</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno">370</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span><span class="op">.</span><span class="ident">fn</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gp</span><span class="op">.</span><span class="ident">_defer</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">d</span><span class="op">.</span><span class="ident">link</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">freedefer</span><span class="op">(</span><span class="ident">d</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">continue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">375</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Mark&nbsp;defer&nbsp;as&nbsp;started,&nbsp;but&nbsp;keep&nbsp;on&nbsp;list,&nbsp;so&nbsp;that&nbsp;traceback</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;can&nbsp;find&nbsp;and&nbsp;update&nbsp;the&nbsp;defer&#39;s&nbsp;argument&nbsp;frame&nbsp;if&nbsp;stack&nbsp;growth</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;or&nbsp;a&nbsp;garbage&nbsp;collection&nbsp;hapens&nbsp;before&nbsp;reflectcall&nbsp;starts&nbsp;executing&nbsp;d.fn.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span><span class="op">.</span><span class="ident">started</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno">380</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Record&nbsp;the&nbsp;panic&nbsp;that&nbsp;is&nbsp;running&nbsp;the&nbsp;defer.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;If&nbsp;there&nbsp;is&nbsp;a&nbsp;new&nbsp;panic&nbsp;during&nbsp;the&nbsp;deferred&nbsp;call,&nbsp;that&nbsp;panic</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;will&nbsp;find&nbsp;d&nbsp;in&nbsp;the&nbsp;list&nbsp;and&nbsp;will&nbsp;mark&nbsp;d._panic&nbsp;(this&nbsp;panic)&nbsp;aborted.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span><span class="op">.</span><span class="ident">_panic</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">(</span><span class="op">*</span><span class="ident">_panic</span><span class="op">)</span><span class="op">(</span><span class="ident">noescape</span><span class="op">(</span><span class="op">(</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">)</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">p</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno">385</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">.</span><span class="ident">argp</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="ident">getargp</span><span class="op">(</span><span class="num">0</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">reflectcall</span><span class="op">(</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="ident">d</span><span class="op">.</span><span class="ident">fn</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">deferArgs</span><span class="op">(</span><span class="ident">d</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="builtintype">uint32</span><span class="op">(</span><span class="ident">d</span><span class="op">.</span><span class="ident">siz</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="builtintype">uint32</span><span class="op">(</span><span class="ident">d</span><span class="op">.</span><span class="ident">siz</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">.</span><span class="ident">argp</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">390</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;reflectcall&nbsp;did&nbsp;not&nbsp;panic.&nbsp;Remove&nbsp;d.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">gp</span><span class="op">.</span><span class="ident">_defer</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">d</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gothrow</span><span class="op">(</span><span class="string">&#34;bad&nbsp;defer&nbsp;entry&nbsp;in&nbsp;panic&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span><span class="op">.</span><span class="ident">_panic</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno">395</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">d</span><span class="op">.</span><span class="ident">fn</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gp</span><span class="op">.</span><span class="ident">_defer</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">d</span><span class="op">.</span><span class="ident">link</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;trigger&nbsp;shrinkage&nbsp;to&nbsp;test&nbsp;stack&nbsp;copy.&nbsp;&nbsp;See&nbsp;stack_test.go:TestStackPanic</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//GC()</span><br>
+<span class="lineno">400</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pc</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">d</span><span class="op">.</span><span class="ident">pc</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">argp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="ident">d</span><span class="op">.</span><span class="ident">argp</span><span class="op">)</span>&nbsp;<span class="comment">//&nbsp;must&nbsp;be&nbsp;pointer&nbsp;so&nbsp;it&nbsp;gets&nbsp;adjusted&nbsp;during&nbsp;stack&nbsp;copy</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">freedefer</span><span class="op">(</span><span class="ident">d</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">p</span><span class="op">.</span><span class="ident">recovered</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">405</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gp</span><span class="op">.</span><span class="ident">_panic</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">p</span><span class="op">.</span><span class="ident">link</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Aborted&nbsp;panics&nbsp;are&nbsp;marked&nbsp;but&nbsp;remain&nbsp;on&nbsp;the&nbsp;g.panic&nbsp;list.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Remove&nbsp;them&nbsp;from&nbsp;the&nbsp;list.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">gp</span><span class="op">.</span><span class="ident">_panic</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">gp</span><span class="op">.</span><span class="ident">_panic</span><span class="op">.</span><span class="ident">aborted</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gp</span><span class="op">.</span><span class="ident">_panic</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">gp</span><span class="op">.</span><span class="ident">_panic</span><span class="op">.</span><span class="ident">link</span><br>
+<span class="lineno">410</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">gp</span><span class="op">.</span><span class="ident">_panic</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span>&nbsp;<span class="comment">//&nbsp;must&nbsp;be&nbsp;done&nbsp;with&nbsp;signal</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gp</span><span class="op">.</span><span class="ident">sig</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Pass&nbsp;information&nbsp;about&nbsp;recovering&nbsp;frame&nbsp;to&nbsp;recovery.</span><br>
+<span class="lineno">415</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gp</span><span class="op">.</span><span class="ident">sigcode0</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">(</span><span class="ident">argp</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gp</span><span class="op">.</span><span class="ident">sigcode1</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">pc</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mcall</span><span class="op">(</span><span class="ident">recovery_m</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gothrow</span><span class="op">(</span><span class="string">&#34;recovery&nbsp;failed&#34;</span><span class="op">)</span>&nbsp;<span class="comment">//&nbsp;mcall&nbsp;should&nbsp;not&nbsp;return</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">420</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;ran&nbsp;out&nbsp;of&nbsp;deferred&nbsp;calls&nbsp;-&nbsp;old-school&nbsp;panic&nbsp;now</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">startpanic</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">printpanics</span><span class="op">(</span><span class="ident">gp</span><span class="op">.</span><span class="ident">_panic</span><span class="op">)</span><br>
+<span class="lineno">425</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dopanic</span><span class="op">(</span><span class="num">0</span><span class="op">)</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;should&nbsp;not&nbsp;return</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="op">(</span><span class="op">*</span><span class="builtintype">int</span><span class="op">)</span><span class="op">(</span><span class="ident">nil</span><span class="op">)</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="comment">//&nbsp;not&nbsp;reached</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;getargp&nbsp;returns&nbsp;the&nbsp;location&nbsp;where&nbsp;the&nbsp;caller</span><br>
+<span class="lineno">430</span><span class="comment">//&nbsp;writes&nbsp;outgoing&nbsp;function&nbsp;call&nbsp;arguments.</span><br>
+<span class="lineno"></span><span class="comment">//go:nosplit</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">getargp</span><span class="op">(</span><span class="ident">x</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">uintptr</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;x&nbsp;is&nbsp;an&nbsp;argument&nbsp;mainly&nbsp;so&nbsp;that&nbsp;we&nbsp;can&nbsp;return&nbsp;its&nbsp;address.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;However,&nbsp;we&nbsp;need&nbsp;to&nbsp;make&nbsp;the&nbsp;function&nbsp;complex&nbsp;enough</span><br>
+<span class="lineno">435</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;that&nbsp;it&nbsp;won&#39;t&nbsp;be&nbsp;inlined.&nbsp;We&nbsp;always&nbsp;pass&nbsp;x&nbsp;=&nbsp;0,&nbsp;so&nbsp;this&nbsp;code</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;does&nbsp;nothing&nbsp;other&nbsp;than&nbsp;keep&nbsp;the&nbsp;compiler&nbsp;from&nbsp;thinking</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;the&nbsp;function&nbsp;is&nbsp;simple&nbsp;enough&nbsp;to&nbsp;inline.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">getcallersp</span><span class="op">(</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">x</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">*</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno">440</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">(</span><span class="ident">noescape</span><span class="op">(</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">x</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;implementation&nbsp;of&nbsp;the&nbsp;predeclared&nbsp;function&nbsp;recover.</span><br>
+<span class="lineno">445</span><span class="comment">//&nbsp;Cannot&nbsp;split&nbsp;the&nbsp;stack&nbsp;because&nbsp;it&nbsp;needs&nbsp;to&nbsp;reliably</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;find&nbsp;the&nbsp;stack&nbsp;segment&nbsp;of&nbsp;its&nbsp;caller.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;TODO(rsc):&nbsp;Once&nbsp;we&nbsp;commit&nbsp;to&nbsp;CopyStackAlways,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;this&nbsp;doesn&#39;t&nbsp;need&nbsp;to&nbsp;be&nbsp;nosplit.</span><br>
+<span class="lineno">450</span><span class="comment">//go:nosplit</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">gorecover</span><span class="op">(</span><span class="ident">argp</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">)</span>&nbsp;<span class="keyword">interface</span><span class="op">{</span><span class="op">}</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Must&nbsp;be&nbsp;in&nbsp;a&nbsp;function&nbsp;running&nbsp;as&nbsp;part&nbsp;of&nbsp;a&nbsp;deferred&nbsp;call&nbsp;during&nbsp;the&nbsp;panic.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Must&nbsp;be&nbsp;called&nbsp;from&nbsp;the&nbsp;topmost&nbsp;function&nbsp;of&nbsp;the&nbsp;call</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;(the&nbsp;function&nbsp;used&nbsp;in&nbsp;the&nbsp;defer&nbsp;statement).</span><br>
+<span class="lineno">455</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;p.argp&nbsp;is&nbsp;the&nbsp;argument&nbsp;pointer&nbsp;of&nbsp;that&nbsp;topmost&nbsp;deferred&nbsp;function&nbsp;call.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Compare&nbsp;against&nbsp;argp&nbsp;reported&nbsp;by&nbsp;caller.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;If&nbsp;they&nbsp;match,&nbsp;the&nbsp;caller&nbsp;is&nbsp;the&nbsp;one&nbsp;who&nbsp;can&nbsp;recover.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">getg</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">gp</span><span class="op">.</span><span class="ident">_panic</span><br>
+<span class="lineno">460</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">p</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="op">!</span><span class="ident">p</span><span class="op">.</span><span class="ident">recovered</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">argp</span>&nbsp;<span class="op">==</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">(</span><span class="ident">p</span><span class="op">.</span><span class="ident">argp</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">.</span><span class="ident">recovered</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">p</span><span class="op">.</span><span class="ident">arg</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno">465</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//go:nosplit</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">startpanic</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">onM_signalok</span><span class="op">(</span><span class="ident">startpanic_m</span><span class="op">)</span><br>
+<span class="lineno">470</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//go:nosplit</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">dopanic</span><span class="op">(</span><span class="ident">unused</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">getg</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">475</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">acquirem</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mp</span><span class="op">.</span><span class="ident">ptrarg</span><span class="op">[</span><span class="num">0</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="ident">gp</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mp</span><span class="op">.</span><span class="ident">scalararg</span><span class="op">[</span><span class="num">0</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">getcallerpc</span><span class="op">(</span><span class="op">(</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">)</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">unused</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mp</span><span class="op">.</span><span class="ident">scalararg</span><span class="op">[</span><span class="num">1</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">getcallersp</span><span class="op">(</span><span class="op">(</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">)</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">unused</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">onM_signalok</span><span class="op">(</span><span class="ident">dopanic_m</span><span class="op">)</span>&nbsp;<span class="comment">//&nbsp;should&nbsp;never&nbsp;return</span><br>
+<span class="lineno">480</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="op">(</span><span class="op">*</span><span class="builtintype">int</span><span class="op">)</span><span class="op">(</span><span class="ident">nil</span><span class="op">)</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//go:nosplit</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">throw</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">485</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">getg</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">gp</span><span class="op">.</span><span class="ident">m</span><span class="op">.</span><span class="ident">throwing</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gp</span><span class="op">.</span><span class="ident">m</span><span class="op">.</span><span class="ident">throwing</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">startpanic</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">490</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">print</span><span class="op">(</span><span class="string">&#34;fatal&nbsp;error:&nbsp;&#34;</span><span class="op">,</span>&nbsp;<span class="ident">gostringnocopy</span><span class="op">(</span><span class="ident">s</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="string">&#34;\n&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dopanic</span><span class="op">(</span><span class="num">0</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="op">(</span><span class="op">*</span><span class="builtintype">int</span><span class="op">)</span><span class="op">(</span><span class="ident">nil</span><span class="op">)</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="comment">//&nbsp;not&nbsp;reached</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">495</span><span class="comment">//go:nosplit</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">gothrow</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">getg</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">gp</span><span class="op">.</span><span class="ident">m</span><span class="op">.</span><span class="ident">throwing</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gp</span><span class="op">.</span><span class="ident">m</span><span class="op">.</span><span class="ident">throwing</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno">500</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">startpanic</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">print</span><span class="op">(</span><span class="string">&#34;fatal&nbsp;error:&nbsp;&#34;</span><span class="op">,</span>&nbsp;<span class="ident">s</span><span class="op">,</span>&nbsp;<span class="string">&#34;\n&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dopanic</span><span class="op">(</span><span class="num">0</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="op">(</span><span class="op">*</span><span class="builtintype">int</span><span class="op">)</span><span class="op">(</span><span class="ident">nil</span><span class="op">)</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="comment">//&nbsp;not&nbsp;reached</span><br>
+<span class="lineno">505</span><span class="op">}</span>
+</div>
+</body>
+</html>

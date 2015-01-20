@@ -1,0 +1,224 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2010&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="comment">//&nbsp;Package&nbsp;pprof&nbsp;serves&nbsp;via&nbsp;its&nbsp;HTTP&nbsp;server&nbsp;runtime&nbsp;profiling&nbsp;data</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;in&nbsp;the&nbsp;format&nbsp;expected&nbsp;by&nbsp;the&nbsp;pprof&nbsp;visualization&nbsp;tool.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;For&nbsp;more&nbsp;information&nbsp;about&nbsp;pprof,&nbsp;see</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;http://code.google.com/p/google-perftools/.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">10</span><span class="comment">//&nbsp;The&nbsp;package&nbsp;is&nbsp;typically&nbsp;only&nbsp;imported&nbsp;for&nbsp;the&nbsp;side&nbsp;effect&nbsp;of</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;registering&nbsp;its&nbsp;HTTP&nbsp;handlers.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;handled&nbsp;paths&nbsp;all&nbsp;begin&nbsp;with&nbsp;/debug/pprof/.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;To&nbsp;use&nbsp;pprof,&nbsp;link&nbsp;this&nbsp;package&nbsp;into&nbsp;your&nbsp;program:</span><br>
+<span class="lineno">15</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspimport&nbsp;_&nbsp;&#34;net/http/pprof&#34;</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;If&nbsp;your&nbsp;application&nbsp;is&nbsp;not&nbsp;already&nbsp;running&nbsp;an&nbsp;http&nbsp;server,&nbsp;you</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;need&nbsp;to&nbsp;start&nbsp;one.&nbsp;&nbsp;Add&nbsp;&#34;net/http&#34;&nbsp;and&nbsp;&#34;log&#34;&nbsp;to&nbsp;your&nbsp;imports&nbsp;and</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;the&nbsp;following&nbsp;code&nbsp;to&nbsp;your&nbsp;main&nbsp;function:</span><br>
+<span class="lineno">20</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbspgo&nbsp;func()&nbsp;{</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsplog.Println(http.ListenAndServe(&#34;localhost:6060&#34;,&nbsp;nil))</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp}()</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">25</span><span class="comment">//&nbsp;Then&nbsp;use&nbsp;the&nbsp;pprof&nbsp;tool&nbsp;to&nbsp;look&nbsp;at&nbsp;the&nbsp;heap&nbsp;profile:</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspgo&nbsp;tool&nbsp;pprof&nbsp;http://localhost:6060/debug/pprof/heap</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Or&nbsp;to&nbsp;look&nbsp;at&nbsp;a&nbsp;30-second&nbsp;CPU&nbsp;profile:</span><br>
+<span class="lineno">30</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspgo&nbsp;tool&nbsp;pprof&nbsp;http://localhost:6060/debug/pprof/profile</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Or&nbsp;to&nbsp;look&nbsp;at&nbsp;the&nbsp;goroutine&nbsp;blocking&nbsp;profile:</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">35</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspgo&nbsp;tool&nbsp;pprof&nbsp;http://localhost:6060/debug/pprof/block</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;To&nbsp;view&nbsp;all&nbsp;available&nbsp;profiles,&nbsp;open&nbsp;http://localhost:6060/debug/pprof/</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;in&nbsp;your&nbsp;browser.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">40</span><span class="comment">//&nbsp;For&nbsp;a&nbsp;study&nbsp;of&nbsp;the&nbsp;facility&nbsp;in&nbsp;action,&nbsp;visit</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsphttp://blog.golang.org/2011/06/profiling-go-programs.html</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="keyword">package</span>&nbsp;<span class="ident">pprof</span><br>
+<span class="lineno">45</span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;bufio&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;bytes&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;fmt&#34;</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;html/template&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;io&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;log&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;net/http&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;os&#34;</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;runtime&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;runtime/pprof&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;strconv&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;strings&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;time&#34;</span><br>
+<span class="lineno">60</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">init</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">http</span><span class="op">.</span><span class="ident">Handle</span><span class="op">(</span><span class="string">&#34;/debug/pprof/&#34;</span><span class="op">,</span>&nbsp;<span class="ident">http</span><span class="op">.</span><span class="ident">HandlerFunc</span><span class="op">(</span><span class="ident">Index</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">http</span><span class="op">.</span><span class="ident">Handle</span><span class="op">(</span><span class="string">&#34;/debug/pprof/cmdline&#34;</span><span class="op">,</span>&nbsp;<span class="ident">http</span><span class="op">.</span><span class="ident">HandlerFunc</span><span class="op">(</span><span class="ident">Cmdline</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">http</span><span class="op">.</span><span class="ident">Handle</span><span class="op">(</span><span class="string">&#34;/debug/pprof/profile&#34;</span><span class="op">,</span>&nbsp;<span class="ident">http</span><span class="op">.</span><span class="ident">HandlerFunc</span><span class="op">(</span><span class="ident">Profile</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">http</span><span class="op">.</span><span class="ident">Handle</span><span class="op">(</span><span class="string">&#34;/debug/pprof/symbol&#34;</span><span class="op">,</span>&nbsp;<span class="ident">http</span><span class="op">.</span><span class="ident">HandlerFunc</span><span class="op">(</span><span class="ident">Symbol</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Cmdline&nbsp;responds&nbsp;with&nbsp;the&nbsp;running&nbsp;program&#39;s</span><br>
+<span class="lineno">70</span><span class="comment">//&nbsp;command&nbsp;line,&nbsp;with&nbsp;arguments&nbsp;separated&nbsp;by&nbsp;NUL&nbsp;bytes.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;package&nbsp;initialization&nbsp;registers&nbsp;it&nbsp;as&nbsp;/debug/pprof/cmdline.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">Cmdline</span><span class="op">(</span><span class="ident">w</span>&nbsp;<span class="ident">http</span><span class="op">.</span><span class="ident">ResponseWriter</span><span class="op">,</span>&nbsp;<span class="ident">r</span>&nbsp;<span class="op">*</span><span class="ident">http</span><span class="op">.</span><span class="ident">Request</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">w</span><span class="op">.</span><span class="ident">Header</span><span class="op">(</span><span class="op">)</span><span class="op">.</span><span class="ident">Set</span><span class="op">(</span><span class="string">&#34;Content-Type&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;text/plain;&nbsp;charset=utf-8&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fmt</span><span class="op">.</span><span class="ident">Fprintf</span><span class="op">(</span><span class="ident">w</span><span class="op">,</span>&nbsp;<span class="ident">strings</span><span class="op">.</span><span class="ident">Join</span><span class="op">(</span><span class="ident">os</span><span class="op">.</span><span class="ident">Args</span><span class="op">,</span>&nbsp;<span class="string">&#34;\x00&#34;</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno">75</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Profile&nbsp;responds&nbsp;with&nbsp;the&nbsp;pprof-formatted&nbsp;cpu&nbsp;profile.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;package&nbsp;initialization&nbsp;registers&nbsp;it&nbsp;as&nbsp;/debug/pprof/profile.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">Profile</span><span class="op">(</span><span class="ident">w</span>&nbsp;<span class="ident">http</span><span class="op">.</span><span class="ident">ResponseWriter</span><span class="op">,</span>&nbsp;<span class="ident">r</span>&nbsp;<span class="op">*</span><span class="ident">http</span><span class="op">.</span><span class="ident">Request</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sec</span><span class="op">,</span>&nbsp;<span class="ident">_</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">strconv</span><span class="op">.</span><span class="ident">ParseInt</span><span class="op">(</span><span class="ident">r</span><span class="op">.</span><span class="ident">FormValue</span><span class="op">(</span><span class="string">&#34;seconds&#34;</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="num">10</span><span class="op">,</span>&nbsp;<span class="num">64</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">sec</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sec</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">30</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Set&nbsp;Content&nbsp;Type&nbsp;assuming&nbsp;StartCPUProfile&nbsp;will&nbsp;work,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;because&nbsp;if&nbsp;it&nbsp;does&nbsp;it&nbsp;starts&nbsp;writing.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">w</span><span class="op">.</span><span class="ident">Header</span><span class="op">(</span><span class="op">)</span><span class="op">.</span><span class="ident">Set</span><span class="op">(</span><span class="string">&#34;Content-Type&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;application/octet-stream&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">pprof</span><span class="op">.</span><span class="ident">StartCPUProfile</span><span class="op">(</span><span class="ident">w</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;StartCPUProfile&nbsp;failed,&nbsp;so&nbsp;no&nbsp;writes&nbsp;yet.</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Can&nbsp;change&nbsp;header&nbsp;back&nbsp;to&nbsp;text&nbsp;content</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;and&nbsp;send&nbsp;error&nbsp;code.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">w</span><span class="op">.</span><span class="ident">Header</span><span class="op">(</span><span class="op">)</span><span class="op">.</span><span class="ident">Set</span><span class="op">(</span><span class="string">&#34;Content-Type&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;text/plain;&nbsp;charset=utf-8&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">w</span><span class="op">.</span><span class="ident">WriteHeader</span><span class="op">(</span><span class="ident">http</span><span class="op">.</span><span class="ident">StatusInternalServerError</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fmt</span><span class="op">.</span><span class="ident">Fprintf</span><span class="op">(</span><span class="ident">w</span><span class="op">,</span>&nbsp;<span class="string">&#34;Could&nbsp;not&nbsp;enable&nbsp;CPU&nbsp;profiling:&nbsp;%s\n&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">time</span><span class="op">.</span><span class="ident">Sleep</span><span class="op">(</span><span class="ident">time</span><span class="op">.</span><span class="ident">Duration</span><span class="op">(</span><span class="ident">sec</span><span class="op">)</span>&nbsp;<span class="op">*</span>&nbsp;<span class="ident">time</span><span class="op">.</span><span class="ident">Second</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pprof</span><span class="op">.</span><span class="ident">StopCPUProfile</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">100</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Symbol&nbsp;looks&nbsp;up&nbsp;the&nbsp;program&nbsp;counters&nbsp;listed&nbsp;in&nbsp;the&nbsp;request,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;responding&nbsp;with&nbsp;a&nbsp;table&nbsp;mapping&nbsp;program&nbsp;counters&nbsp;to&nbsp;function&nbsp;names.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;package&nbsp;initialization&nbsp;registers&nbsp;it&nbsp;as&nbsp;/debug/pprof/symbol.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">Symbol</span><span class="op">(</span><span class="ident">w</span>&nbsp;<span class="ident">http</span><span class="op">.</span><span class="ident">ResponseWriter</span><span class="op">,</span>&nbsp;<span class="ident">r</span>&nbsp;<span class="op">*</span><span class="ident">http</span><span class="op">.</span><span class="ident">Request</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">w</span><span class="op">.</span><span class="ident">Header</span><span class="op">(</span><span class="op">)</span><span class="op">.</span><span class="ident">Set</span><span class="op">(</span><span class="string">&#34;Content-Type&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;text/plain;&nbsp;charset=utf-8&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;We&nbsp;have&nbsp;to&nbsp;read&nbsp;the&nbsp;whole&nbsp;POST&nbsp;body&nbsp;before</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;writing&nbsp;any&nbsp;output.&nbsp;&nbsp;Buffer&nbsp;the&nbsp;output&nbsp;here.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">buf</span>&nbsp;<span class="ident">bytes</span><span class="op">.</span><span class="ident">Buffer</span><br>
+<span class="lineno">110</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;We&nbsp;don&#39;t&nbsp;know&nbsp;how&nbsp;many&nbsp;symbols&nbsp;we&nbsp;have,&nbsp;but&nbsp;we</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;do&nbsp;have&nbsp;symbol&nbsp;information.&nbsp;&nbsp;Pprof&nbsp;only&nbsp;cares&nbsp;whether</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;this&nbsp;number&nbsp;is&nbsp;0&nbsp;(no&nbsp;symbols&nbsp;available)&nbsp;or&nbsp;&gt;&nbsp;0.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fmt</span><span class="op">.</span><span class="ident">Fprintf</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">buf</span><span class="op">,</span>&nbsp;<span class="string">&#34;num_symbols:&nbsp;1\n&#34;</span><span class="op">)</span><br>
+<span class="lineno">115</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">b</span>&nbsp;<span class="op">*</span><span class="ident">bufio</span><span class="op">.</span><span class="ident">Reader</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">Method</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#34;POST&#34;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">bufio</span><span class="op">.</span><span class="ident">NewReader</span><span class="op">(</span><span class="ident">r</span><span class="op">.</span><span class="ident">Body</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">120</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">bufio</span><span class="op">.</span><span class="ident">NewReader</span><span class="op">(</span><span class="ident">strings</span><span class="op">.</span><span class="ident">NewReader</span><span class="op">(</span><span class="ident">r</span><span class="op">.</span><span class="ident">URL</span><span class="op">.</span><span class="ident">RawQuery</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">word</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">b</span><span class="op">.</span><span class="ident">ReadSlice</span><span class="op">(</span><span class="string">&#39;+&#39;</span><span class="op">)</span><br>
+<span class="lineno">125</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">word</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">word</span><span class="op">[</span><span class="num">0</span>&nbsp;<span class="op">:</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">word</span><span class="op">)</span><span class="op">-</span><span class="num">1</span><span class="op">]</span>&nbsp;<span class="comment">//&nbsp;trim&nbsp;+</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pc</span><span class="op">,</span>&nbsp;<span class="ident">_</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">strconv</span><span class="op">.</span><span class="ident">ParseUint</span><span class="op">(</span><span class="builtintype">string</span><span class="op">(</span><span class="ident">word</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="num">64</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">pc</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">130</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">f</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">runtime</span><span class="op">.</span><span class="ident">FuncForPC</span><span class="op">(</span><span class="builtintype">uintptr</span><span class="op">(</span><span class="ident">pc</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">f</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fmt</span><span class="op">.</span><span class="ident">Fprintf</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">buf</span><span class="op">,</span>&nbsp;<span class="string">&#34;%#x&nbsp;%s\n&#34;</span><span class="op">,</span>&nbsp;<span class="ident">pc</span><span class="op">,</span>&nbsp;<span class="ident">f</span><span class="op">.</span><span class="ident">Name</span><span class="op">(</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">135</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Wait&nbsp;until&nbsp;here&nbsp;to&nbsp;check&nbsp;for&nbsp;err;&nbsp;the&nbsp;last</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;symbol&nbsp;will&nbsp;have&nbsp;an&nbsp;err&nbsp;because&nbsp;it&nbsp;doesn&#39;t&nbsp;end&nbsp;in&nbsp;+.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">EOF</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">140</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fmt</span><span class="op">.</span><span class="ident">Fprintf</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">buf</span><span class="op">,</span>&nbsp;<span class="string">&#34;reading&nbsp;request:&nbsp;%v\n&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">break</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">145</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">w</span><span class="op">.</span><span class="ident">Write</span><span class="op">(</span><span class="ident">buf</span><span class="op">.</span><span class="ident">Bytes</span><span class="op">(</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Handler&nbsp;returns&nbsp;an&nbsp;HTTP&nbsp;handler&nbsp;that&nbsp;serves&nbsp;the&nbsp;named&nbsp;profile.</span><br>
+<span class="lineno">150</span><span class="keyword">func</span>&nbsp;<span class="ident">Handler</span><span class="op">(</span><span class="ident">name</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="ident">http</span><span class="op">.</span><span class="ident">Handler</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">handler</span><span class="op">(</span><span class="ident">name</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">handler</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno">155</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">name</span>&nbsp;<span class="ident">handler</span><span class="op">)</span>&nbsp;<span class="ident">ServeHTTP</span><span class="op">(</span><span class="ident">w</span>&nbsp;<span class="ident">http</span><span class="op">.</span><span class="ident">ResponseWriter</span><span class="op">,</span>&nbsp;<span class="ident">r</span>&nbsp;<span class="op">*</span><span class="ident">http</span><span class="op">.</span><span class="ident">Request</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">w</span><span class="op">.</span><span class="ident">Header</span><span class="op">(</span><span class="op">)</span><span class="op">.</span><span class="ident">Set</span><span class="op">(</span><span class="string">&#34;Content-Type&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;text/plain;&nbsp;charset=utf-8&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">debug</span><span class="op">,</span>&nbsp;<span class="ident">_</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">strconv</span><span class="op">.</span><span class="ident">Atoi</span><span class="op">(</span><span class="ident">r</span><span class="op">.</span><span class="ident">FormValue</span><span class="op">(</span><span class="string">&#34;debug&#34;</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">pprof</span><span class="op">.</span><span class="ident">Lookup</span><span class="op">(</span><span class="builtintype">string</span><span class="op">(</span><span class="ident">name</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno">160</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">p</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">w</span><span class="op">.</span><span class="ident">WriteHeader</span><span class="op">(</span><span class="num">404</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fmt</span><span class="op">.</span><span class="ident">Fprintf</span><span class="op">(</span><span class="ident">w</span><span class="op">,</span>&nbsp;<span class="string">&#34;Unknown&nbsp;profile:&nbsp;%s\n&#34;</span><span class="op">,</span>&nbsp;<span class="ident">name</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">165</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gc</span><span class="op">,</span>&nbsp;<span class="ident">_</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">strconv</span><span class="op">.</span><span class="ident">Atoi</span><span class="op">(</span><span class="ident">r</span><span class="op">.</span><span class="ident">FormValue</span><span class="op">(</span><span class="string">&#34;gc&#34;</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">name</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#34;heap&#34;</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">gc</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">runtime</span><span class="op">.</span><span class="ident">GC</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">.</span><span class="ident">WriteTo</span><span class="op">(</span><span class="ident">w</span><span class="op">,</span>&nbsp;<span class="ident">debug</span><span class="op">)</span><br>
+<span class="lineno">170</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Index&nbsp;responds&nbsp;with&nbsp;the&nbsp;pprof-formatted&nbsp;profile&nbsp;named&nbsp;by&nbsp;the&nbsp;request.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;For&nbsp;example,&nbsp;&#34;/debug/pprof/heap&#34;&nbsp;serves&nbsp;the&nbsp;&#34;heap&#34;&nbsp;profile.</span><br>
+<span class="lineno">175</span><span class="comment">//&nbsp;Index&nbsp;responds&nbsp;to&nbsp;a&nbsp;request&nbsp;for&nbsp;&#34;/debug/pprof/&#34;&nbsp;with&nbsp;an&nbsp;HTML&nbsp;page</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;listing&nbsp;the&nbsp;available&nbsp;profiles.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">Index</span><span class="op">(</span><span class="ident">w</span>&nbsp;<span class="ident">http</span><span class="op">.</span><span class="ident">ResponseWriter</span><span class="op">,</span>&nbsp;<span class="ident">r</span>&nbsp;<span class="op">*</span><span class="ident">http</span><span class="op">.</span><span class="ident">Request</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">strings</span><span class="op">.</span><span class="ident">HasPrefix</span><span class="op">(</span><span class="ident">r</span><span class="op">.</span><span class="ident">URL</span><span class="op">.</span><span class="ident">Path</span><span class="op">,</span>&nbsp;<span class="string">&#34;/debug/pprof/&#34;</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">name</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">strings</span><span class="op">.</span><span class="ident">TrimPrefix</span><span class="op">(</span><span class="ident">r</span><span class="op">.</span><span class="ident">URL</span><span class="op">.</span><span class="ident">Path</span><span class="op">,</span>&nbsp;<span class="string">&#34;/debug/pprof/&#34;</span><span class="op">)</span><br>
+<span class="lineno">180</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">name</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="string">&#34;&#34;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">handler</span><span class="op">(</span><span class="ident">name</span><span class="op">)</span><span class="op">.</span><span class="ident">ServeHTTP</span><span class="op">(</span><span class="ident">w</span><span class="op">,</span>&nbsp;<span class="ident">r</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">185</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">profiles</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">pprof</span><span class="op">.</span><span class="ident">Profiles</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">indexTmpl</span><span class="op">.</span><span class="ident">Execute</span><span class="op">(</span><span class="ident">w</span><span class="op">,</span>&nbsp;<span class="ident">profiles</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">log</span><span class="op">.</span><span class="ident">Print</span><span class="op">(</span><span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">190</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">indexTmpl</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">template</span><span class="op">.</span><span class="ident">Must</span><span class="op">(</span><span class="ident">template</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="string">&#34;index&#34;</span><span class="op">)</span><span class="op">.</span><span class="ident">Parse</span><span class="op">(</span><span class="string">`&lt;html&gt;<br>
+<span class="lineno"></span>&lt;head&gt;<br>
+<span class="lineno"></span>&lt;title&gt;/debug/pprof/&lt;/title&gt;<br>
+<span class="lineno">195</span>&lt;/head&gt;<br>
+<span class="lineno"></span>/debug/pprof/&lt;br&gt;<br>
+<span class="lineno"></span>&lt;br&gt;<br>
+<span class="lineno"></span>&lt;body&gt;<br>
+<span class="lineno"></span>profiles:&lt;br&gt;<br>
+<span class="lineno">200</span>&lt;table&gt;<br>
+<span class="lineno"></span>{{range&nbsp;.}}<br>
+<span class="lineno"></span>&lt;tr&gt;&lt;td&nbsp;align=right&gt;{{.Count}}&lt;td&gt;&lt;a&nbsp;href=&#34;/debug/pprof/{{.Name}}?debug=1&#34;&gt;{{.Name}}&lt;/a&gt;<br>
+<span class="lineno"></span>{{end}}<br>
+<span class="lineno"></span>&lt;/table&gt;<br>
+<span class="lineno">205</span>&lt;br&gt;<br>
+<span class="lineno"></span>&lt;a&nbsp;href=&#34;/debug/pprof/goroutine?debug=2&#34;&gt;full&nbsp;goroutine&nbsp;stack&nbsp;dump&lt;/a&gt;&lt;br&gt;<br>
+<span class="lineno"></span>&lt;/body&gt;<br>
+<span class="lineno"></span>&lt;/html&gt;<br>
+<span class="lineno"></span>`</span><span class="op">)</span><span class="op">)</span>
+</div>
+</body>
+</html>

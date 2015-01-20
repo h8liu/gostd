@@ -1,0 +1,127 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2010&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="comment">//&nbsp;This&nbsp;file&nbsp;implements&nbsp;binary&nbsp;search.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">package</span>&nbsp;<span class="ident">sort</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Search&nbsp;uses&nbsp;binary&nbsp;search&nbsp;to&nbsp;find&nbsp;and&nbsp;return&nbsp;the&nbsp;smallest&nbsp;index&nbsp;i</span><br>
+<span class="lineno">10</span><span class="comment">//&nbsp;in&nbsp;[0,&nbsp;n)&nbsp;at&nbsp;which&nbsp;f(i)&nbsp;is&nbsp;true,&nbsp;assuming&nbsp;that&nbsp;on&nbsp;the&nbsp;range&nbsp;[0,&nbsp;n),</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;f(i)&nbsp;==&nbsp;true&nbsp;implies&nbsp;f(i+1)&nbsp;==&nbsp;true.&nbsp;&nbsp;That&nbsp;is,&nbsp;Search&nbsp;requires&nbsp;that</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;f&nbsp;is&nbsp;false&nbsp;for&nbsp;some&nbsp;(possibly&nbsp;empty)&nbsp;prefix&nbsp;of&nbsp;the&nbsp;input&nbsp;range&nbsp;[0,&nbsp;n)</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;and&nbsp;then&nbsp;true&nbsp;for&nbsp;the&nbsp;(possibly&nbsp;empty)&nbsp;remainder;&nbsp;Search&nbsp;returns</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;the&nbsp;first&nbsp;true&nbsp;index.&nbsp;&nbsp;If&nbsp;there&nbsp;is&nbsp;no&nbsp;such&nbsp;index,&nbsp;Search&nbsp;returns&nbsp;n.</span><br>
+<span class="lineno">15</span><span class="comment">//&nbsp;(Note&nbsp;that&nbsp;the&nbsp;&#34;not&nbsp;found&#34;&nbsp;return&nbsp;value&nbsp;is&nbsp;not&nbsp;-1&nbsp;as&nbsp;in,&nbsp;for&nbsp;instance,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;strings.Index).</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Search&nbsp;calls&nbsp;f(i)&nbsp;only&nbsp;for&nbsp;i&nbsp;in&nbsp;the&nbsp;range&nbsp;[0,&nbsp;n).</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;A&nbsp;common&nbsp;use&nbsp;of&nbsp;Search&nbsp;is&nbsp;to&nbsp;find&nbsp;the&nbsp;index&nbsp;i&nbsp;for&nbsp;a&nbsp;value&nbsp;x&nbsp;in</span><br>
+<span class="lineno">20</span><span class="comment">//&nbsp;a&nbsp;sorted,&nbsp;indexable&nbsp;data&nbsp;structure&nbsp;such&nbsp;as&nbsp;an&nbsp;array&nbsp;or&nbsp;slice.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;In&nbsp;this&nbsp;case,&nbsp;the&nbsp;argument&nbsp;f,&nbsp;typically&nbsp;a&nbsp;closure,&nbsp;captures&nbsp;the&nbsp;value</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;to&nbsp;be&nbsp;searched&nbsp;for,&nbsp;and&nbsp;how&nbsp;the&nbsp;data&nbsp;structure&nbsp;is&nbsp;indexed&nbsp;and</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ordered.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">25</span><span class="comment">//&nbsp;For&nbsp;instance,&nbsp;given&nbsp;a&nbsp;slice&nbsp;data&nbsp;sorted&nbsp;in&nbsp;ascending&nbsp;order,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;the&nbsp;call&nbsp;Search(len(data),&nbsp;func(i&nbsp;int)&nbsp;bool&nbsp;{&nbsp;return&nbsp;data[i]&nbsp;&gt;=&nbsp;23&nbsp;})</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;returns&nbsp;the&nbsp;smallest&nbsp;index&nbsp;i&nbsp;such&nbsp;that&nbsp;data[i]&nbsp;&gt;=&nbsp;23.&nbsp;&nbsp;If&nbsp;the&nbsp;caller</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;wants&nbsp;to&nbsp;find&nbsp;whether&nbsp;23&nbsp;is&nbsp;in&nbsp;the&nbsp;slice,&nbsp;it&nbsp;must&nbsp;test&nbsp;data[i]&nbsp;==&nbsp;23</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;separately.</span><br>
+<span class="lineno">30</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Searching&nbsp;data&nbsp;sorted&nbsp;in&nbsp;descending&nbsp;order&nbsp;would&nbsp;use&nbsp;the&nbsp;&lt;=</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;operator&nbsp;instead&nbsp;of&nbsp;the&nbsp;&gt;=&nbsp;operator.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;To&nbsp;complete&nbsp;the&nbsp;example&nbsp;above,&nbsp;the&nbsp;following&nbsp;code&nbsp;tries&nbsp;to&nbsp;find&nbsp;the&nbsp;value</span><br>
+<span class="lineno">35</span><span class="comment">//&nbsp;x&nbsp;in&nbsp;an&nbsp;integer&nbsp;slice&nbsp;data&nbsp;sorted&nbsp;in&nbsp;ascending&nbsp;order:</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspx&nbsp;:=&nbsp;23</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspi&nbsp;:=&nbsp;sort.Search(len(data),&nbsp;func(i&nbsp;int)&nbsp;bool&nbsp;{&nbsp;return&nbsp;data[i]&nbsp;&gt;=&nbsp;x&nbsp;})</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspif&nbsp;i&nbsp;&lt;&nbsp;len(data)&nbsp;&amp;&amp;&nbsp;data[i]&nbsp;==&nbsp;x&nbsp;{</span><br>
+<span class="lineno">40</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp//&nbsp;x&nbsp;is&nbsp;present&nbsp;at&nbsp;data[i]</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp}&nbsp;else&nbsp;{</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp//&nbsp;x&nbsp;is&nbsp;not&nbsp;present&nbsp;in&nbsp;data,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp//&nbsp;but&nbsp;i&nbsp;is&nbsp;the&nbsp;index&nbsp;where&nbsp;it&nbsp;would&nbsp;be&nbsp;inserted.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp}</span><br>
+<span class="lineno">45</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;As&nbsp;a&nbsp;more&nbsp;whimsical&nbsp;example,&nbsp;this&nbsp;program&nbsp;guesses&nbsp;your&nbsp;number:</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspfunc&nbsp;GuessingGame()&nbsp;{</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspvar&nbsp;s&nbsp;string</span><br>
+<span class="lineno">50</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspfmt.Printf(&#34;Pick&nbsp;an&nbsp;integer&nbsp;from&nbsp;0&nbsp;to&nbsp;100.\n&#34;)</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspanswer&nbsp;:=&nbsp;sort.Search(100,&nbsp;func(i&nbsp;int)&nbsp;bool&nbsp;{</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspfmt.Printf(&#34;Is&nbsp;your&nbsp;number&nbsp;&lt;=&nbsp;%d?&nbsp;&#34;,&nbsp;i)</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspfmt.Scanf(&#34;%s&#34;,&nbsp;&amp;s)</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspreturn&nbsp;s&nbsp;!=&nbsp;&#34;&#34;&nbsp;&amp;&amp;&nbsp;s[0]&nbsp;==&nbsp;&#39;y&#39;</span><br>
+<span class="lineno">55</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp})</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspfmt.Printf(&#34;Your&nbsp;number&nbsp;is&nbsp;%d.\n&#34;,&nbsp;answer)</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp}</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">Search</span><span class="op">(</span><span class="ident">n</span>&nbsp;<span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">f</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Define&nbsp;f(-1)&nbsp;==&nbsp;false&nbsp;and&nbsp;f(n)&nbsp;==&nbsp;true.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Invariant:&nbsp;f(i-1)&nbsp;==&nbsp;false,&nbsp;f(j)&nbsp;==&nbsp;true.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">i</span><span class="op">,</span>&nbsp;<span class="ident">j</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">n</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">j</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">h</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">+</span>&nbsp;<span class="op">(</span><span class="ident">j</span><span class="op">-</span><span class="ident">i</span><span class="op">)</span><span class="op">/</span><span class="num">2</span>&nbsp;<span class="comment">//&nbsp;avoid&nbsp;overflow&nbsp;when&nbsp;computing&nbsp;h</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;i&nbsp;≤&nbsp;h&nbsp;&lt;&nbsp;j</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">f</span><span class="op">(</span><span class="ident">h</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">i</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">h</span>&nbsp;<span class="op">+</span>&nbsp;<span class="num">1</span>&nbsp;<span class="comment">//&nbsp;preserves&nbsp;f(i-1)&nbsp;==&nbsp;false</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">j</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">h</span>&nbsp;<span class="comment">//&nbsp;preserves&nbsp;f(j)&nbsp;==&nbsp;true</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;i&nbsp;==&nbsp;j,&nbsp;f(i-1)&nbsp;==&nbsp;false,&nbsp;and&nbsp;f(j)&nbsp;(=&nbsp;f(i))&nbsp;==&nbsp;true&nbsp;&nbsp;=&gt;&nbsp;&nbsp;answer&nbsp;is&nbsp;i.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">i</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">75</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Convenience&nbsp;wrappers&nbsp;for&nbsp;common&nbsp;cases.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;SearchInts&nbsp;searches&nbsp;for&nbsp;x&nbsp;in&nbsp;a&nbsp;sorted&nbsp;slice&nbsp;of&nbsp;ints&nbsp;and&nbsp;returns&nbsp;the&nbsp;index</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;as&nbsp;specified&nbsp;by&nbsp;Search.&nbsp;The&nbsp;return&nbsp;value&nbsp;is&nbsp;the&nbsp;index&nbsp;to&nbsp;insert&nbsp;x&nbsp;if&nbsp;x&nbsp;is</span><br>
+<span class="lineno">80</span><span class="comment">//&nbsp;not&nbsp;present&nbsp;(it&nbsp;could&nbsp;be&nbsp;len(a)).</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;slice&nbsp;must&nbsp;be&nbsp;sorted&nbsp;in&nbsp;ascending&nbsp;order.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">SearchInts</span><span class="op">(</span><span class="ident">a</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">Search</span><span class="op">(</span><span class="builtinfunc">len</span><span class="op">(</span><span class="ident">a</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="ident">i</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="ident">a</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span>&nbsp;<span class="op">&gt;=</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">}</span><span class="op">)</span><br>
+<span class="lineno">85</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;SearchFloat64s&nbsp;searches&nbsp;for&nbsp;x&nbsp;in&nbsp;a&nbsp;sorted&nbsp;slice&nbsp;of&nbsp;float64s&nbsp;and&nbsp;returns&nbsp;the&nbsp;index</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;as&nbsp;specified&nbsp;by&nbsp;Search.&nbsp;&nbsp;The&nbsp;return&nbsp;value&nbsp;is&nbsp;the&nbsp;index&nbsp;to&nbsp;insert&nbsp;x&nbsp;if&nbsp;x&nbsp;is&nbsp;not</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;present&nbsp;(it&nbsp;could&nbsp;be&nbsp;len(a)).</span><br>
+<span class="lineno">90</span><span class="comment">//&nbsp;The&nbsp;slice&nbsp;must&nbsp;be&nbsp;sorted&nbsp;in&nbsp;ascending&nbsp;order.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">SearchFloat64s</span><span class="op">(</span><span class="ident">a</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">float64</span><span class="op">,</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="builtintype">float64</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">Search</span><span class="op">(</span><span class="builtinfunc">len</span><span class="op">(</span><span class="ident">a</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="ident">i</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="ident">a</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span>&nbsp;<span class="op">&gt;=</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">}</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">95</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;SearchStrings&nbsp;searches&nbsp;for&nbsp;x&nbsp;in&nbsp;a&nbsp;sorted&nbsp;slice&nbsp;of&nbsp;strings&nbsp;and&nbsp;returns&nbsp;the&nbsp;index</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;as&nbsp;specified&nbsp;by&nbsp;Search.&nbsp;&nbsp;The&nbsp;return&nbsp;value&nbsp;is&nbsp;the&nbsp;index&nbsp;to&nbsp;insert&nbsp;x&nbsp;if&nbsp;x&nbsp;is&nbsp;not</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;present&nbsp;(it&nbsp;could&nbsp;be&nbsp;len(a)).</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;slice&nbsp;must&nbsp;be&nbsp;sorted&nbsp;in&nbsp;ascending&nbsp;order.</span><br>
+<span class="lineno">100</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">SearchStrings</span><span class="op">(</span><span class="ident">a</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">Search</span><span class="op">(</span><span class="builtinfunc">len</span><span class="op">(</span><span class="ident">a</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="ident">i</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="ident">a</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span>&nbsp;<span class="op">&gt;=</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">}</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">105</span><span class="comment">//&nbsp;Search&nbsp;returns&nbsp;the&nbsp;result&nbsp;of&nbsp;applying&nbsp;SearchInts&nbsp;to&nbsp;the&nbsp;receiver&nbsp;and&nbsp;x.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">p</span>&nbsp;<span class="ident">IntSlice</span><span class="op">)</span>&nbsp;<span class="ident">Search</span><span class="op">(</span><span class="ident">x</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="ident">SearchInts</span><span class="op">(</span><span class="ident">p</span><span class="op">,</span>&nbsp;<span class="ident">x</span><span class="op">)</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Search&nbsp;returns&nbsp;the&nbsp;result&nbsp;of&nbsp;applying&nbsp;SearchFloat64s&nbsp;to&nbsp;the&nbsp;receiver&nbsp;and&nbsp;x.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">p</span>&nbsp;<span class="ident">Float64Slice</span><span class="op">)</span>&nbsp;<span class="ident">Search</span><span class="op">(</span><span class="ident">x</span>&nbsp;<span class="builtintype">float64</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="ident">SearchFloat64s</span><span class="op">(</span><span class="ident">p</span><span class="op">,</span>&nbsp;<span class="ident">x</span><span class="op">)</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno">110</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Search&nbsp;returns&nbsp;the&nbsp;result&nbsp;of&nbsp;applying&nbsp;SearchStrings&nbsp;to&nbsp;the&nbsp;receiver&nbsp;and&nbsp;x.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">p</span>&nbsp;<span class="ident">StringSlice</span><span class="op">)</span>&nbsp;<span class="ident">Search</span><span class="op">(</span><span class="ident">x</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="builtintype">int</span>&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="ident">SearchStrings</span><span class="op">(</span><span class="ident">p</span><span class="op">,</span>&nbsp;<span class="ident">x</span><span class="op">)</span>&nbsp;<span class="op">}</span>
+</div>
+</body>
+</html>

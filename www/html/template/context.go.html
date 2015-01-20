@@ -1,0 +1,354 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2011&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">template</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;fmt&#34;</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno">10</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;context&nbsp;describes&nbsp;the&nbsp;state&nbsp;an&nbsp;HTML&nbsp;parser&nbsp;must&nbsp;be&nbsp;in&nbsp;when&nbsp;it&nbsp;reaches&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;portion&nbsp;of&nbsp;HTML&nbsp;produced&nbsp;by&nbsp;evaluating&nbsp;a&nbsp;particular&nbsp;template&nbsp;node.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;zero&nbsp;value&nbsp;of&nbsp;type&nbsp;context&nbsp;is&nbsp;the&nbsp;start&nbsp;context&nbsp;for&nbsp;a&nbsp;template&nbsp;that</span><br>
+<span class="lineno">15</span><span class="comment">//&nbsp;produces&nbsp;an&nbsp;HTML&nbsp;fragment&nbsp;as&nbsp;defined&nbsp;at</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;http://www.w3.org/TR/html5/syntax.html#the-end</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;where&nbsp;the&nbsp;context&nbsp;element&nbsp;is&nbsp;null.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">context</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">state</span>&nbsp;&nbsp;&nbsp;<span class="ident">state</span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">delim</span>&nbsp;&nbsp;&nbsp;<span class="ident">delim</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">urlPart</span>&nbsp;<span class="ident">urlPart</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">jsCtx</span>&nbsp;&nbsp;&nbsp;<span class="ident">jsCtx</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">attr</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">attr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">element</span>&nbsp;<span class="ident">element</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">*</span><span class="ident">Error</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="ident">context</span><span class="op">)</span>&nbsp;<span class="ident">String</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">fmt</span><span class="op">.</span><span class="ident">Sprintf</span><span class="op">(</span><span class="string">&#34;{%v&nbsp;%v&nbsp;%v&nbsp;%v&nbsp;%v&nbsp;%v&nbsp;%v}&#34;</span><span class="op">,</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">state</span><span class="op">,</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">delim</span><span class="op">,</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">urlPart</span><span class="op">,</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">jsCtx</span><span class="op">,</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">attr</span><span class="op">,</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">element</span><span class="op">,</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno">30</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;eq&nbsp;reports&nbsp;whether&nbsp;two&nbsp;contexts&nbsp;are&nbsp;equal.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="ident">context</span><span class="op">)</span>&nbsp;<span class="ident">eq</span><span class="op">(</span><span class="ident">d</span>&nbsp;<span class="ident">context</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">state</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">d</span><span class="op">.</span><span class="ident">state</span>&nbsp;<span class="op">&amp;&amp;</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">delim</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">d</span><span class="op">.</span><span class="ident">delim</span>&nbsp;<span class="op">&amp;&amp;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">urlPart</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">d</span><span class="op">.</span><span class="ident">urlPart</span>&nbsp;<span class="op">&amp;&amp;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">jsCtx</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">d</span><span class="op">.</span><span class="ident">jsCtx</span>&nbsp;<span class="op">&amp;&amp;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">attr</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">d</span><span class="op">.</span><span class="ident">attr</span>&nbsp;<span class="op">&amp;&amp;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">element</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">d</span><span class="op">.</span><span class="ident">element</span>&nbsp;<span class="op">&amp;&amp;</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span><span class="op">.</span><span class="ident">err</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">d</span><span class="op">.</span><span class="ident">err</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;mangle&nbsp;produces&nbsp;an&nbsp;identifier&nbsp;that&nbsp;includes&nbsp;a&nbsp;suffix&nbsp;that&nbsp;distinguishes&nbsp;it</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;from&nbsp;template&nbsp;names&nbsp;mangled&nbsp;with&nbsp;different&nbsp;contexts.</span><br>
+<span class="lineno">45</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="ident">context</span><span class="op">)</span>&nbsp;<span class="ident">mangle</span><span class="op">(</span><span class="ident">templateName</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;The&nbsp;mangled&nbsp;name&nbsp;for&nbsp;the&nbsp;default&nbsp;context&nbsp;is&nbsp;the&nbsp;input&nbsp;templateName.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">state</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">stateText</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">templateName</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">templateName</span>&nbsp;<span class="op">+</span>&nbsp;<span class="string">&#34;$htmltemplate_&#34;</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">state</span><span class="op">.</span><span class="ident">String</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">delim</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="string">&#34;_&#34;</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">delim</span><span class="op">.</span><span class="ident">String</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">urlPart</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="string">&#34;_&#34;</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">urlPart</span><span class="op">.</span><span class="ident">String</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">jsCtx</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="string">&#34;_&#34;</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">jsCtx</span><span class="op">.</span><span class="ident">String</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">attr</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="string">&#34;_&#34;</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">attr</span><span class="op">.</span><span class="ident">String</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">element</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="string">&#34;_&#34;</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">element</span><span class="op">.</span><span class="ident">String</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">s</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;state&nbsp;describes&nbsp;a&nbsp;high-level&nbsp;HTML&nbsp;parser&nbsp;state.</span><br>
+<span class="lineno">70</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;It&nbsp;bounds&nbsp;the&nbsp;top&nbsp;of&nbsp;the&nbsp;element&nbsp;stack,&nbsp;and&nbsp;by&nbsp;extension&nbsp;the&nbsp;HTML&nbsp;insertion</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;mode,&nbsp;but&nbsp;also&nbsp;contains&nbsp;state&nbsp;that&nbsp;does&nbsp;not&nbsp;correspond&nbsp;to&nbsp;anything&nbsp;in&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;HTML5&nbsp;parsing&nbsp;algorithm&nbsp;because&nbsp;a&nbsp;single&nbsp;token&nbsp;production&nbsp;in&nbsp;the&nbsp;HTML</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;grammar&nbsp;may&nbsp;contain&nbsp;embedded&nbsp;actions&nbsp;in&nbsp;a&nbsp;template.&nbsp;For&nbsp;instance,&nbsp;the&nbsp;quoted</span><br>
+<span class="lineno">75</span><span class="comment">//&nbsp;HTML&nbsp;attribute&nbsp;produced&nbsp;by</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;div&nbsp;title=&#34;Hello&nbsp;{{.World}}&#34;&gt;</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;is&nbsp;a&nbsp;single&nbsp;token&nbsp;in&nbsp;HTML&#39;s&nbsp;grammar&nbsp;but&nbsp;in&nbsp;a&nbsp;template&nbsp;spans&nbsp;several&nbsp;nodes.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">state</span>&nbsp;<span class="builtintype">uint8</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">80</span><span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;stateText&nbsp;is&nbsp;parsed&nbsp;character&nbsp;data.&nbsp;An&nbsp;HTML&nbsp;parser&nbsp;is&nbsp;in</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;this&nbsp;state&nbsp;when&nbsp;its&nbsp;parse&nbsp;position&nbsp;is&nbsp;outside&nbsp;an&nbsp;HTML&nbsp;tag,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;directive,&nbsp;comment,&nbsp;and&nbsp;special&nbsp;element&nbsp;body.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateText</span>&nbsp;<span class="ident">state</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">iota</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;stateTag&nbsp;occurs&nbsp;before&nbsp;an&nbsp;HTML&nbsp;attribute&nbsp;or&nbsp;the&nbsp;end&nbsp;of&nbsp;a&nbsp;tag.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateTag</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;stateAttrName&nbsp;occurs&nbsp;inside&nbsp;an&nbsp;attribute&nbsp;name.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;It&nbsp;occurs&nbsp;between&nbsp;the&nbsp;^&#39;s&nbsp;in&nbsp;`&nbsp;^name^&nbsp;=&nbsp;value`.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateAttrName</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;stateAfterName&nbsp;occurs&nbsp;after&nbsp;an&nbsp;attr&nbsp;name&nbsp;has&nbsp;ended&nbsp;but&nbsp;before&nbsp;any</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;equals&nbsp;sign.&nbsp;It&nbsp;occurs&nbsp;between&nbsp;the&nbsp;^&#39;s&nbsp;in&nbsp;`&nbsp;name^&nbsp;^=&nbsp;value`.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateAfterName</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;stateBeforeValue&nbsp;occurs&nbsp;after&nbsp;the&nbsp;equals&nbsp;sign&nbsp;but&nbsp;before&nbsp;the&nbsp;value.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;It&nbsp;occurs&nbsp;between&nbsp;the&nbsp;^&#39;s&nbsp;in&nbsp;`&nbsp;name&nbsp;=^&nbsp;^value`.</span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateBeforeValue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;stateHTMLCmt&nbsp;occurs&nbsp;inside&nbsp;an&nbsp;&lt;!--&nbsp;HTML&nbsp;comment&nbsp;--&gt;.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateHTMLCmt</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;stateRCDATA&nbsp;occurs&nbsp;inside&nbsp;an&nbsp;RCDATA&nbsp;element&nbsp;(&lt;textarea&gt;&nbsp;or&nbsp;&lt;title&gt;)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;as&nbsp;described&nbsp;at&nbsp;http://www.w3.org/TR/html5/syntax.html#elements-0</span><br>
+<span class="lineno">100</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateRCDATA</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;stateAttr&nbsp;occurs&nbsp;inside&nbsp;an&nbsp;HTML&nbsp;attribute&nbsp;whose&nbsp;content&nbsp;is&nbsp;text.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateAttr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;stateURL&nbsp;occurs&nbsp;inside&nbsp;an&nbsp;HTML&nbsp;attribute&nbsp;whose&nbsp;content&nbsp;is&nbsp;a&nbsp;URL.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateURL</span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;stateJS&nbsp;occurs&nbsp;inside&nbsp;an&nbsp;event&nbsp;handler&nbsp;or&nbsp;script&nbsp;element.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateJS</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;stateJSDqStr&nbsp;occurs&nbsp;inside&nbsp;a&nbsp;JavaScript&nbsp;double&nbsp;quoted&nbsp;string.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateJSDqStr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;stateJSSqStr&nbsp;occurs&nbsp;inside&nbsp;a&nbsp;JavaScript&nbsp;single&nbsp;quoted&nbsp;string.</span><br>
+<span class="lineno">110</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateJSSqStr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;stateJSRegexp&nbsp;occurs&nbsp;inside&nbsp;a&nbsp;JavaScript&nbsp;regexp&nbsp;literal.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateJSRegexp</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;stateJSBlockCmt&nbsp;occurs&nbsp;inside&nbsp;a&nbsp;JavaScript&nbsp;/*&nbsp;block&nbsp;comment&nbsp;*/.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateJSBlockCmt</span><br>
+<span class="lineno">115</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;stateJSLineCmt&nbsp;occurs&nbsp;inside&nbsp;a&nbsp;JavaScript&nbsp;//&nbsp;line&nbsp;comment.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateJSLineCmt</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;stateCSS&nbsp;occurs&nbsp;inside&nbsp;a&nbsp;&lt;style&gt;&nbsp;element&nbsp;or&nbsp;style&nbsp;attribute.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateCSS</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;stateCSSDqStr&nbsp;occurs&nbsp;inside&nbsp;a&nbsp;CSS&nbsp;double&nbsp;quoted&nbsp;string.</span><br>
+<span class="lineno">120</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateCSSDqStr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;stateCSSSqStr&nbsp;occurs&nbsp;inside&nbsp;a&nbsp;CSS&nbsp;single&nbsp;quoted&nbsp;string.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateCSSSqStr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;stateCSSDqURL&nbsp;occurs&nbsp;inside&nbsp;a&nbsp;CSS&nbsp;double&nbsp;quoted&nbsp;url(&#34;...&#34;).</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateCSSDqURL</span><br>
+<span class="lineno">125</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;stateCSSSqURL&nbsp;occurs&nbsp;inside&nbsp;a&nbsp;CSS&nbsp;single&nbsp;quoted&nbsp;url(&#39;...&#39;).</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateCSSSqURL</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;stateCSSURL&nbsp;occurs&nbsp;inside&nbsp;a&nbsp;CSS&nbsp;unquoted&nbsp;url(...).</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateCSSURL</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;stateCSSBlockCmt&nbsp;occurs&nbsp;inside&nbsp;a&nbsp;CSS&nbsp;/*&nbsp;block&nbsp;comment&nbsp;*/.</span><br>
+<span class="lineno">130</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateCSSBlockCmt</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;stateCSSLineCmt&nbsp;occurs&nbsp;inside&nbsp;a&nbsp;CSS&nbsp;//&nbsp;line&nbsp;comment.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateCSSLineCmt</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;stateError&nbsp;is&nbsp;an&nbsp;infectious&nbsp;error&nbsp;state&nbsp;outside&nbsp;any&nbsp;valid</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;HTML/CSS/JS&nbsp;construct.</span><br>
+<span class="lineno">135</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateError</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">stateNames</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">[</span><span class="op">...</span><span class="op">]</span><span class="builtintype">string</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateText</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;stateText&#34;</span><span class="op">,</span><br>
+<span class="lineno">140</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateTag</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;stateTag&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateAttrName</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;stateAttrName&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateAfterName</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;<span class="string">&#34;stateAfterName&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateBeforeValue</span><span class="op">:</span>&nbsp;<span class="string">&#34;stateBeforeValue&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateHTMLCmt</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;stateHTMLCmt&#34;</span><span class="op">,</span><br>
+<span class="lineno">145</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateRCDATA</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;stateRCDATA&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateAttr</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;stateAttr&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateURL</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;stateURL&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateJS</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;stateJS&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateJSDqStr</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;stateJSDqStr&#34;</span><span class="op">,</span><br>
+<span class="lineno">150</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateJSSqStr</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;stateJSSqStr&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateJSRegexp</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;stateJSRegexp&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateJSBlockCmt</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">&#34;stateJSBlockCmt&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateJSLineCmt</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;<span class="string">&#34;stateJSLineCmt&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateCSS</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;stateCSS&#34;</span><span class="op">,</span><br>
+<span class="lineno">155</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateCSSDqStr</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;stateCSSDqStr&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateCSSSqStr</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;stateCSSSqStr&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateCSSDqURL</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;stateCSSDqURL&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateCSSSqURL</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;stateCSSSqURL&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateCSSURL</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;stateCSSURL&#34;</span><span class="op">,</span><br>
+<span class="lineno">160</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateCSSBlockCmt</span><span class="op">:</span>&nbsp;<span class="string">&#34;stateCSSBlockCmt&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateCSSLineCmt</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">&#34;stateCSSLineCmt&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stateError</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;stateError&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">165</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">s</span>&nbsp;<span class="ident">state</span><span class="op">)</span>&nbsp;<span class="ident">String</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtintype">int</span><span class="op">(</span><span class="ident">s</span><span class="op">)</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">stateNames</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">stateNames</span><span class="op">[</span><span class="ident">s</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">fmt</span><span class="op">.</span><span class="ident">Sprintf</span><span class="op">(</span><span class="string">&#34;illegal&nbsp;state&nbsp;%d&#34;</span><span class="op">,</span>&nbsp;<span class="builtintype">int</span><span class="op">(</span><span class="ident">s</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno">170</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;isComment&nbsp;is&nbsp;true&nbsp;for&nbsp;any&nbsp;state&nbsp;that&nbsp;contains&nbsp;content&nbsp;meant&nbsp;for&nbsp;template</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;authors&nbsp;&amp;&nbsp;maintainers,&nbsp;not&nbsp;for&nbsp;end-users&nbsp;or&nbsp;machines.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">isComment</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="ident">state</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">175</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="ident">s</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">stateHTMLCmt</span><span class="op">,</span>&nbsp;<span class="ident">stateJSBlockCmt</span><span class="op">,</span>&nbsp;<span class="ident">stateJSLineCmt</span><span class="op">,</span>&nbsp;<span class="ident">stateCSSBlockCmt</span><span class="op">,</span>&nbsp;<span class="ident">stateCSSLineCmt</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno">180</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;isInTag&nbsp;return&nbsp;whether&nbsp;s&nbsp;occurs&nbsp;solely&nbsp;inside&nbsp;an&nbsp;HTML&nbsp;tag.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">isInTag</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="ident">state</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="ident">s</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">185</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">stateTag</span><span class="op">,</span>&nbsp;<span class="ident">stateAttrName</span><span class="op">,</span>&nbsp;<span class="ident">stateAfterName</span><span class="op">,</span>&nbsp;<span class="ident">stateBeforeValue</span><span class="op">,</span>&nbsp;<span class="ident">stateAttr</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">190</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;delim&nbsp;is&nbsp;the&nbsp;delimiter&nbsp;that&nbsp;will&nbsp;end&nbsp;the&nbsp;current&nbsp;HTML&nbsp;attribute.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">delim</span>&nbsp;<span class="builtintype">uint8</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno">195</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;delimNone&nbsp;occurs&nbsp;outside&nbsp;any&nbsp;attribute.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">delimNone</span>&nbsp;<span class="ident">delim</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">iota</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;delimDoubleQuote&nbsp;occurs&nbsp;when&nbsp;a&nbsp;double&nbsp;quote&nbsp;(&#34;)&nbsp;closes&nbsp;the&nbsp;attribute.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">delimDoubleQuote</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;delimSingleQuote&nbsp;occurs&nbsp;when&nbsp;a&nbsp;single&nbsp;quote&nbsp;(&#39;)&nbsp;closes&nbsp;the&nbsp;attribute.</span><br>
+<span class="lineno">200</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">delimSingleQuote</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;delimSpaceOrTagEnd&nbsp;occurs&nbsp;when&nbsp;a&nbsp;space&nbsp;or&nbsp;right&nbsp;angle&nbsp;bracket&nbsp;(&gt;)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;closes&nbsp;the&nbsp;attribute.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">delimSpaceOrTagEnd</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno">205</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">delimNames</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">[</span><span class="op">...</span><span class="op">]</span><span class="builtintype">string</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">delimNone</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;delimNone&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">delimDoubleQuote</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;<span class="string">&#34;delimDoubleQuote&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">delimSingleQuote</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;<span class="string">&#34;delimSingleQuote&#34;</span><span class="op">,</span><br>
+<span class="lineno">210</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">delimSpaceOrTagEnd</span><span class="op">:</span>&nbsp;<span class="string">&#34;delimSpaceOrTagEnd&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">d</span>&nbsp;<span class="ident">delim</span><span class="op">)</span>&nbsp;<span class="ident">String</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtintype">int</span><span class="op">(</span><span class="ident">d</span><span class="op">)</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">delimNames</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">215</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">delimNames</span><span class="op">[</span><span class="ident">d</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">fmt</span><span class="op">.</span><span class="ident">Sprintf</span><span class="op">(</span><span class="string">&#34;illegal&nbsp;delim&nbsp;%d&#34;</span><span class="op">,</span>&nbsp;<span class="builtintype">int</span><span class="op">(</span><span class="ident">d</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">220</span><span class="comment">//&nbsp;urlPart&nbsp;identifies&nbsp;a&nbsp;part&nbsp;in&nbsp;an&nbsp;RFC&nbsp;3986&nbsp;hierarchical&nbsp;URL&nbsp;to&nbsp;allow&nbsp;different</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;encoding&nbsp;strategies.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">urlPart</span>&nbsp;<span class="builtintype">uint8</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno">225</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;urlPartNone&nbsp;occurs&nbsp;when&nbsp;not&nbsp;in&nbsp;a&nbsp;URL,&nbsp;or&nbsp;possibly&nbsp;at&nbsp;the&nbsp;start:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;^&nbsp;in&nbsp;&#34;^http://auth/path?k=v#frag&#34;.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">urlPartNone</span>&nbsp;<span class="ident">urlPart</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">iota</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;urlPartPreQuery&nbsp;occurs&nbsp;in&nbsp;the&nbsp;scheme,&nbsp;authority,&nbsp;or&nbsp;path;&nbsp;between&nbsp;the</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;^s&nbsp;in&nbsp;&#34;h^ttp://auth/path^?k=v#frag&#34;.</span><br>
+<span class="lineno">230</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">urlPartPreQuery</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;urlPartQueryOrFrag&nbsp;occurs&nbsp;in&nbsp;the&nbsp;query&nbsp;portion&nbsp;between&nbsp;the&nbsp;^s&nbsp;in</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;&#34;http://auth/path?^k=v#frag^&#34;.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">urlPartQueryOrFrag</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;urlPartUnknown&nbsp;occurs&nbsp;due&nbsp;to&nbsp;joining&nbsp;of&nbsp;contexts&nbsp;both&nbsp;before&nbsp;and</span><br>
+<span class="lineno">235</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;after&nbsp;the&nbsp;query&nbsp;separator.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">urlPartUnknown</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">urlPartNames</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">[</span><span class="op">...</span><span class="op">]</span><span class="builtintype">string</span><span class="op">{</span><br>
+<span class="lineno">240</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">urlPartNone</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;urlPartNone&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">urlPartPreQuery</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;urlPartPreQuery&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">urlPartQueryOrFrag</span><span class="op">:</span>&nbsp;<span class="string">&#34;urlPartQueryOrFrag&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">urlPartUnknown</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;urlPartUnknown&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">245</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">u</span>&nbsp;<span class="ident">urlPart</span><span class="op">)</span>&nbsp;<span class="ident">String</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtintype">int</span><span class="op">(</span><span class="ident">u</span><span class="op">)</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">urlPartNames</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">urlPartNames</span><span class="op">[</span><span class="ident">u</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">250</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">fmt</span><span class="op">.</span><span class="ident">Sprintf</span><span class="op">(</span><span class="string">&#34;illegal&nbsp;urlPart&nbsp;%d&#34;</span><span class="op">,</span>&nbsp;<span class="builtintype">int</span><span class="op">(</span><span class="ident">u</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;jsCtx&nbsp;determines&nbsp;whether&nbsp;a&nbsp;&#39;/&#39;&nbsp;starts&nbsp;a&nbsp;regular&nbsp;expression&nbsp;literal&nbsp;or&nbsp;a</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;division&nbsp;operator.</span><br>
+<span class="lineno">255</span><span class="keyword">type</span>&nbsp;<span class="ident">jsCtx</span>&nbsp;<span class="builtintype">uint8</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;jsCtxRegexp&nbsp;occurs&nbsp;where&nbsp;a&nbsp;&#39;/&#39;&nbsp;would&nbsp;start&nbsp;a&nbsp;regexp&nbsp;literal.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">jsCtxRegexp</span>&nbsp;<span class="ident">jsCtx</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">iota</span><br>
+<span class="lineno">260</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;jsCtxDivOp&nbsp;occurs&nbsp;where&nbsp;a&nbsp;&#39;/&#39;&nbsp;would&nbsp;start&nbsp;a&nbsp;division&nbsp;operator.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">jsCtxDivOp</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;jsCtxUnknown&nbsp;occurs&nbsp;where&nbsp;a&nbsp;&#39;/&#39;&nbsp;is&nbsp;ambiguous&nbsp;due&nbsp;to&nbsp;context&nbsp;joining.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">jsCtxUnknown</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno">265</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="ident">jsCtx</span><span class="op">)</span>&nbsp;<span class="ident">String</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">jsCtxRegexp</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="string">&#34;jsCtxRegexp&#34;</span><br>
+<span class="lineno">270</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">jsCtxDivOp</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="string">&#34;jsCtxDivOp&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">jsCtxUnknown</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="string">&#34;jsCtxUnknown&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">275</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">fmt</span><span class="op">.</span><span class="ident">Sprintf</span><span class="op">(</span><span class="string">&#34;illegal&nbsp;jsCtx&nbsp;%d&#34;</span><span class="op">,</span>&nbsp;<span class="builtintype">int</span><span class="op">(</span><span class="ident">c</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;element&nbsp;identifies&nbsp;the&nbsp;HTML&nbsp;element&nbsp;when&nbsp;inside&nbsp;a&nbsp;start&nbsp;tag&nbsp;or&nbsp;special&nbsp;body.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Certain&nbsp;HTML&nbsp;element&nbsp;(for&nbsp;example&nbsp;&lt;script&gt;&nbsp;and&nbsp;&lt;style&gt;)&nbsp;have&nbsp;bodies&nbsp;that&nbsp;are</span><br>
+<span class="lineno">280</span><span class="comment">//&nbsp;treated&nbsp;differently&nbsp;from&nbsp;stateText&nbsp;so&nbsp;the&nbsp;element&nbsp;type&nbsp;is&nbsp;necessary&nbsp;to</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;transition&nbsp;into&nbsp;the&nbsp;correct&nbsp;context&nbsp;at&nbsp;the&nbsp;end&nbsp;of&nbsp;a&nbsp;tag&nbsp;and&nbsp;to&nbsp;identify&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;end&nbsp;delimiter&nbsp;for&nbsp;the&nbsp;body.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">element</span>&nbsp;<span class="builtintype">uint8</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">285</span><span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;elementNone&nbsp;occurs&nbsp;outside&nbsp;a&nbsp;special&nbsp;tag&nbsp;or&nbsp;special&nbsp;element&nbsp;body.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">elementNone</span>&nbsp;<span class="ident">element</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">iota</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;elementScript&nbsp;corresponds&nbsp;to&nbsp;the&nbsp;raw&nbsp;text&nbsp;&lt;script&gt;&nbsp;element.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">elementScript</span><br>
+<span class="lineno">290</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;elementStyle&nbsp;corresponds&nbsp;to&nbsp;the&nbsp;raw&nbsp;text&nbsp;&lt;style&gt;&nbsp;element.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">elementStyle</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;elementTextarea&nbsp;corresponds&nbsp;to&nbsp;the&nbsp;RCDATA&nbsp;&lt;textarea&gt;&nbsp;element.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">elementTextarea</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;elementTitle&nbsp;corresponds&nbsp;to&nbsp;the&nbsp;RCDATA&nbsp;&lt;title&gt;&nbsp;element.</span><br>
+<span class="lineno">295</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">elementTitle</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">elementNames</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">[</span><span class="op">...</span><span class="op">]</span><span class="builtintype">string</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">elementNone</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;elementNone&#34;</span><span class="op">,</span><br>
+<span class="lineno">300</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">elementScript</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;<span class="string">&#34;elementScript&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">elementStyle</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;elementStyle&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">elementTextarea</span><span class="op">:</span>&nbsp;<span class="string">&#34;elementTextarea&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">elementTitle</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;elementTitle&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">305</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">e</span>&nbsp;<span class="ident">element</span><span class="op">)</span>&nbsp;<span class="ident">String</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtintype">int</span><span class="op">(</span><span class="ident">e</span><span class="op">)</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">elementNames</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">elementNames</span><span class="op">[</span><span class="ident">e</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">310</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">fmt</span><span class="op">.</span><span class="ident">Sprintf</span><span class="op">(</span><span class="string">&#34;illegal&nbsp;element&nbsp;%d&#34;</span><span class="op">,</span>&nbsp;<span class="builtintype">int</span><span class="op">(</span><span class="ident">e</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;attr&nbsp;identifies&nbsp;the&nbsp;most&nbsp;recent&nbsp;HTML&nbsp;attribute&nbsp;when&nbsp;inside&nbsp;a&nbsp;start&nbsp;tag.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">attr</span>&nbsp;<span class="builtintype">uint8</span><br>
+<span class="lineno">315</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;attrNone&nbsp;corresponds&nbsp;to&nbsp;a&nbsp;normal&nbsp;attribute&nbsp;or&nbsp;no&nbsp;attribute.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">attrNone</span>&nbsp;<span class="ident">attr</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">iota</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;attrScript&nbsp;corresponds&nbsp;to&nbsp;an&nbsp;event&nbsp;handler&nbsp;attribute.</span><br>
+<span class="lineno">320</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">attrScript</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;attrStyle&nbsp;corresponds&nbsp;to&nbsp;the&nbsp;style&nbsp;attribute&nbsp;whose&nbsp;value&nbsp;is&nbsp;CSS.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">attrStyle</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;attrURL&nbsp;corresponds&nbsp;to&nbsp;an&nbsp;attribute&nbsp;whose&nbsp;value&nbsp;is&nbsp;a&nbsp;URL.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">attrURL</span><br>
+<span class="lineno">325</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">attrNames</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">[</span><span class="op">...</span><span class="op">]</span><span class="builtintype">string</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">attrNone</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;<span class="string">&#34;attrNone&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">attrScript</span><span class="op">:</span>&nbsp;<span class="string">&#34;attrScript&#34;</span><span class="op">,</span><br>
+<span class="lineno">330</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">attrStyle</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">&#34;attrStyle&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">attrURL</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="string">&#34;attrURL&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">a</span>&nbsp;<span class="ident">attr</span><span class="op">)</span>&nbsp;<span class="ident">String</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">335</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtintype">int</span><span class="op">(</span><span class="ident">a</span><span class="op">)</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">attrNames</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">attrNames</span><span class="op">[</span><span class="ident">a</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">fmt</span><span class="op">.</span><span class="ident">Sprintf</span><span class="op">(</span><span class="string">&#34;illegal&nbsp;attr&nbsp;%d&#34;</span><span class="op">,</span>&nbsp;<span class="builtintype">int</span><span class="op">(</span><span class="ident">a</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

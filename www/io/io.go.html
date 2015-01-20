@@ -1,0 +1,517 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2009&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="comment">//&nbsp;Package&nbsp;io&nbsp;provides&nbsp;basic&nbsp;interfaces&nbsp;to&nbsp;I/O&nbsp;primitives.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Its&nbsp;primary&nbsp;job&nbsp;is&nbsp;to&nbsp;wrap&nbsp;existing&nbsp;implementations&nbsp;of&nbsp;such&nbsp;primitives,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;such&nbsp;as&nbsp;those&nbsp;in&nbsp;package&nbsp;os,&nbsp;into&nbsp;shared&nbsp;public&nbsp;interfaces&nbsp;that</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;abstract&nbsp;the&nbsp;functionality,&nbsp;plus&nbsp;some&nbsp;other&nbsp;related&nbsp;primitives.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">10</span><span class="comment">//&nbsp;Because&nbsp;these&nbsp;interfaces&nbsp;and&nbsp;primitives&nbsp;wrap&nbsp;lower-level&nbsp;operations&nbsp;with</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;various&nbsp;implementations,&nbsp;unless&nbsp;otherwise&nbsp;informed&nbsp;clients&nbsp;should&nbsp;not</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;assume&nbsp;they&nbsp;are&nbsp;safe&nbsp;for&nbsp;parallel&nbsp;execution.</span><br>
+<span class="lineno"></span><span class="keyword">package</span>&nbsp;<span class="ident">io</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">15</span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;errors&#34;</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ErrShortWrite&nbsp;means&nbsp;that&nbsp;a&nbsp;write&nbsp;accepted&nbsp;fewer&nbsp;bytes&nbsp;than&nbsp;requested</span><br>
+<span class="lineno">20</span><span class="comment">//&nbsp;but&nbsp;failed&nbsp;to&nbsp;return&nbsp;an&nbsp;explicit&nbsp;error.</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">ErrShortWrite</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">errors</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="string">&#34;short&nbsp;write&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ErrShortBuffer&nbsp;means&nbsp;that&nbsp;a&nbsp;read&nbsp;required&nbsp;a&nbsp;longer&nbsp;buffer&nbsp;than&nbsp;was&nbsp;provided.</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">ErrShortBuffer</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">errors</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="string">&#34;short&nbsp;buffer&#34;</span><span class="op">)</span><br>
+<span class="lineno">25</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;EOF&nbsp;is&nbsp;the&nbsp;error&nbsp;returned&nbsp;by&nbsp;Read&nbsp;when&nbsp;no&nbsp;more&nbsp;input&nbsp;is&nbsp;available.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Functions&nbsp;should&nbsp;return&nbsp;EOF&nbsp;only&nbsp;to&nbsp;signal&nbsp;a&nbsp;graceful&nbsp;end&nbsp;of&nbsp;input.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;If&nbsp;the&nbsp;EOF&nbsp;occurs&nbsp;unexpectedly&nbsp;in&nbsp;a&nbsp;structured&nbsp;data&nbsp;stream,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;the&nbsp;appropriate&nbsp;error&nbsp;is&nbsp;either&nbsp;ErrUnexpectedEOF&nbsp;or&nbsp;some&nbsp;other&nbsp;error</span><br>
+<span class="lineno">30</span><span class="comment">//&nbsp;giving&nbsp;more&nbsp;detail.</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">EOF</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">errors</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="string">&#34;EOF&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ErrUnexpectedEOF&nbsp;means&nbsp;that&nbsp;EOF&nbsp;was&nbsp;encountered&nbsp;in&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;middle&nbsp;of&nbsp;reading&nbsp;a&nbsp;fixed-size&nbsp;block&nbsp;or&nbsp;data&nbsp;structure.</span><br>
+<span class="lineno">35</span><span class="keyword">var</span>&nbsp;<span class="ident">ErrUnexpectedEOF</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">errors</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="string">&#34;unexpected&nbsp;EOF&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ErrNoProgress&nbsp;is&nbsp;returned&nbsp;by&nbsp;some&nbsp;clients&nbsp;of&nbsp;an&nbsp;io.Reader&nbsp;when</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;many&nbsp;calls&nbsp;to&nbsp;Read&nbsp;have&nbsp;failed&nbsp;to&nbsp;return&nbsp;any&nbsp;data&nbsp;or&nbsp;error,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;usually&nbsp;the&nbsp;sign&nbsp;of&nbsp;a&nbsp;broken&nbsp;io.Reader&nbsp;implementation.</span><br>
+<span class="lineno">40</span><span class="keyword">var</span>&nbsp;<span class="ident">ErrNoProgress</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">errors</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="string">&#34;multiple&nbsp;Read&nbsp;calls&nbsp;return&nbsp;no&nbsp;data&nbsp;or&nbsp;error&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Reader&nbsp;is&nbsp;the&nbsp;interface&nbsp;that&nbsp;wraps&nbsp;the&nbsp;basic&nbsp;Read&nbsp;method.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Read&nbsp;reads&nbsp;up&nbsp;to&nbsp;len(p)&nbsp;bytes&nbsp;into&nbsp;p.&nbsp;&nbsp;It&nbsp;returns&nbsp;the&nbsp;number&nbsp;of&nbsp;bytes</span><br>
+<span class="lineno">45</span><span class="comment">//&nbsp;read&nbsp;(0&nbsp;&lt;=&nbsp;n&nbsp;&lt;=&nbsp;len(p))&nbsp;and&nbsp;any&nbsp;error&nbsp;encountered.&nbsp;&nbsp;Even&nbsp;if&nbsp;Read</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;returns&nbsp;n&nbsp;&lt;&nbsp;len(p),&nbsp;it&nbsp;may&nbsp;use&nbsp;all&nbsp;of&nbsp;p&nbsp;as&nbsp;scratch&nbsp;space&nbsp;during&nbsp;the&nbsp;call.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;If&nbsp;some&nbsp;data&nbsp;is&nbsp;available&nbsp;but&nbsp;not&nbsp;len(p)&nbsp;bytes,&nbsp;Read&nbsp;conventionally</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;returns&nbsp;what&nbsp;is&nbsp;available&nbsp;instead&nbsp;of&nbsp;waiting&nbsp;for&nbsp;more.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">50</span><span class="comment">//&nbsp;When&nbsp;Read&nbsp;encounters&nbsp;an&nbsp;error&nbsp;or&nbsp;end-of-file&nbsp;condition&nbsp;after</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;successfully&nbsp;reading&nbsp;n&nbsp;&gt;&nbsp;0&nbsp;bytes,&nbsp;it&nbsp;returns&nbsp;the&nbsp;number&nbsp;of</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;bytes&nbsp;read.&nbsp;&nbsp;It&nbsp;may&nbsp;return&nbsp;the&nbsp;(non-nil)&nbsp;error&nbsp;from&nbsp;the&nbsp;same&nbsp;call</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;or&nbsp;return&nbsp;the&nbsp;error&nbsp;(and&nbsp;n&nbsp;==&nbsp;0)&nbsp;from&nbsp;a&nbsp;subsequent&nbsp;call.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;An&nbsp;instance&nbsp;of&nbsp;this&nbsp;general&nbsp;case&nbsp;is&nbsp;that&nbsp;a&nbsp;Reader&nbsp;returning</span><br>
+<span class="lineno">55</span><span class="comment">//&nbsp;a&nbsp;non-zero&nbsp;number&nbsp;of&nbsp;bytes&nbsp;at&nbsp;the&nbsp;end&nbsp;of&nbsp;the&nbsp;input&nbsp;stream&nbsp;may</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;return&nbsp;either&nbsp;err&nbsp;==&nbsp;EOF&nbsp;or&nbsp;err&nbsp;==&nbsp;nil.&nbsp;&nbsp;The&nbsp;next&nbsp;Read&nbsp;should</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;return&nbsp;0,&nbsp;EOF&nbsp;regardless.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Callers&nbsp;should&nbsp;always&nbsp;process&nbsp;the&nbsp;n&nbsp;&gt;&nbsp;0&nbsp;bytes&nbsp;returned&nbsp;before</span><br>
+<span class="lineno">60</span><span class="comment">//&nbsp;considering&nbsp;the&nbsp;error&nbsp;err.&nbsp;&nbsp;Doing&nbsp;so&nbsp;correctly&nbsp;handles&nbsp;I/O&nbsp;errors</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;that&nbsp;happen&nbsp;after&nbsp;reading&nbsp;some&nbsp;bytes&nbsp;and&nbsp;also&nbsp;both&nbsp;of&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;allowed&nbsp;EOF&nbsp;behaviors.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Implementations&nbsp;of&nbsp;Read&nbsp;are&nbsp;discouraged&nbsp;from&nbsp;returning&nbsp;a</span><br>
+<span class="lineno">65</span><span class="comment">//&nbsp;zero&nbsp;byte&nbsp;count&nbsp;with&nbsp;a&nbsp;nil&nbsp;error,&nbsp;except&nbsp;when&nbsp;len(p)&nbsp;==&nbsp;0.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Callers&nbsp;should&nbsp;treat&nbsp;a&nbsp;return&nbsp;of&nbsp;0&nbsp;and&nbsp;nil&nbsp;as&nbsp;indicating&nbsp;that</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;nothing&nbsp;happened;&nbsp;in&nbsp;particular&nbsp;it&nbsp;does&nbsp;not&nbsp;indicate&nbsp;EOF.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Implementations&nbsp;must&nbsp;not&nbsp;retain&nbsp;p.</span><br>
+<span class="lineno">70</span><span class="keyword">type</span>&nbsp;<span class="ident">Reader</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Read</span><span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">n</span>&nbsp;<span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Writer&nbsp;is&nbsp;the&nbsp;interface&nbsp;that&nbsp;wraps&nbsp;the&nbsp;basic&nbsp;Write&nbsp;method.</span><br>
+<span class="lineno">75</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Write&nbsp;writes&nbsp;len(p)&nbsp;bytes&nbsp;from&nbsp;p&nbsp;to&nbsp;the&nbsp;underlying&nbsp;data&nbsp;stream.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;It&nbsp;returns&nbsp;the&nbsp;number&nbsp;of&nbsp;bytes&nbsp;written&nbsp;from&nbsp;p&nbsp;(0&nbsp;&lt;=&nbsp;n&nbsp;&lt;=&nbsp;len(p))</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;and&nbsp;any&nbsp;error&nbsp;encountered&nbsp;that&nbsp;caused&nbsp;the&nbsp;write&nbsp;to&nbsp;stop&nbsp;early.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Write&nbsp;must&nbsp;return&nbsp;a&nbsp;non-nil&nbsp;error&nbsp;if&nbsp;it&nbsp;returns&nbsp;n&nbsp;&lt;&nbsp;len(p).</span><br>
+<span class="lineno">80</span><span class="comment">//&nbsp;Write&nbsp;must&nbsp;not&nbsp;modify&nbsp;the&nbsp;slice&nbsp;data,&nbsp;even&nbsp;temporarily.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Implementations&nbsp;must&nbsp;not&nbsp;retain&nbsp;p.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">Writer</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Write</span><span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">n</span>&nbsp;<span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span><br>
+<span class="lineno">85</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Closer&nbsp;is&nbsp;the&nbsp;interface&nbsp;that&nbsp;wraps&nbsp;the&nbsp;basic&nbsp;Close&nbsp;method.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;behavior&nbsp;of&nbsp;Close&nbsp;after&nbsp;the&nbsp;first&nbsp;call&nbsp;is&nbsp;undefined.</span><br>
+<span class="lineno">90</span><span class="comment">//&nbsp;Specific&nbsp;implementations&nbsp;may&nbsp;document&nbsp;their&nbsp;own&nbsp;behavior.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">Closer</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Close</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">95</span><span class="comment">//&nbsp;Seeker&nbsp;is&nbsp;the&nbsp;interface&nbsp;that&nbsp;wraps&nbsp;the&nbsp;basic&nbsp;Seek&nbsp;method.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Seek&nbsp;sets&nbsp;the&nbsp;offset&nbsp;for&nbsp;the&nbsp;next&nbsp;Read&nbsp;or&nbsp;Write&nbsp;to&nbsp;offset,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;interpreted&nbsp;according&nbsp;to&nbsp;whence:&nbsp;0&nbsp;means&nbsp;relative&nbsp;to&nbsp;the&nbsp;origin&nbsp;of</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;the&nbsp;file,&nbsp;1&nbsp;means&nbsp;relative&nbsp;to&nbsp;the&nbsp;current&nbsp;offset,&nbsp;and&nbsp;2&nbsp;means</span><br>
+<span class="lineno">100</span><span class="comment">//&nbsp;relative&nbsp;to&nbsp;the&nbsp;end.&nbsp;&nbsp;Seek&nbsp;returns&nbsp;the&nbsp;new&nbsp;offset&nbsp;and&nbsp;an&nbsp;error,&nbsp;if</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;any.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Seeking&nbsp;to&nbsp;a&nbsp;negative&nbsp;offset&nbsp;is&nbsp;an&nbsp;error.&nbsp;Seeking&nbsp;to&nbsp;any&nbsp;positive</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;offset&nbsp;is&nbsp;legal,&nbsp;but&nbsp;the&nbsp;behavior&nbsp;of&nbsp;subsequent&nbsp;I/O&nbsp;operations&nbsp;on</span><br>
+<span class="lineno">105</span><span class="comment">//&nbsp;the&nbsp;underlying&nbsp;object&nbsp;is&nbsp;implementation-dependent.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">Seeker</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Seek</span><span class="op">(</span><span class="ident">offset</span>&nbsp;<span class="ident">int64</span><span class="op">,</span>&nbsp;<span class="ident">whence</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">int64</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">110</span><span class="comment">//&nbsp;ReadWriter&nbsp;is&nbsp;the&nbsp;interface&nbsp;that&nbsp;groups&nbsp;the&nbsp;basic&nbsp;Read&nbsp;and&nbsp;Write&nbsp;methods.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">ReadWriter</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Reader</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Writer</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">115</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ReadCloser&nbsp;is&nbsp;the&nbsp;interface&nbsp;that&nbsp;groups&nbsp;the&nbsp;basic&nbsp;Read&nbsp;and&nbsp;Close&nbsp;methods.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">ReadCloser</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Reader</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Closer</span><br>
+<span class="lineno">120</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;WriteCloser&nbsp;is&nbsp;the&nbsp;interface&nbsp;that&nbsp;groups&nbsp;the&nbsp;basic&nbsp;Write&nbsp;and&nbsp;Close&nbsp;methods.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">WriteCloser</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Writer</span><br>
+<span class="lineno">125</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Closer</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ReadWriteCloser&nbsp;is&nbsp;the&nbsp;interface&nbsp;that&nbsp;groups&nbsp;the&nbsp;basic&nbsp;Read,&nbsp;Write&nbsp;and&nbsp;Close&nbsp;methods.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">ReadWriteCloser</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">130</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Reader</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Writer</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Closer</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">135</span><span class="comment">//&nbsp;ReadSeeker&nbsp;is&nbsp;the&nbsp;interface&nbsp;that&nbsp;groups&nbsp;the&nbsp;basic&nbsp;Read&nbsp;and&nbsp;Seek&nbsp;methods.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">ReadSeeker</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Reader</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Seeker</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">140</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;WriteSeeker&nbsp;is&nbsp;the&nbsp;interface&nbsp;that&nbsp;groups&nbsp;the&nbsp;basic&nbsp;Write&nbsp;and&nbsp;Seek&nbsp;methods.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">WriteSeeker</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Writer</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Seeker</span><br>
+<span class="lineno">145</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ReadWriteSeeker&nbsp;is&nbsp;the&nbsp;interface&nbsp;that&nbsp;groups&nbsp;the&nbsp;basic&nbsp;Read,&nbsp;Write&nbsp;and&nbsp;Seek&nbsp;methods.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">ReadWriteSeeker</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Reader</span><br>
+<span class="lineno">150</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Writer</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Seeker</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ReaderFrom&nbsp;is&nbsp;the&nbsp;interface&nbsp;that&nbsp;wraps&nbsp;the&nbsp;ReadFrom&nbsp;method.</span><br>
+<span class="lineno">155</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ReadFrom&nbsp;reads&nbsp;data&nbsp;from&nbsp;r&nbsp;until&nbsp;EOF&nbsp;or&nbsp;error.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;return&nbsp;value&nbsp;n&nbsp;is&nbsp;the&nbsp;number&nbsp;of&nbsp;bytes&nbsp;read.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Any&nbsp;error&nbsp;except&nbsp;io.EOF&nbsp;encountered&nbsp;during&nbsp;the&nbsp;read&nbsp;is&nbsp;also&nbsp;returned.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">160</span><span class="comment">//&nbsp;The&nbsp;Copy&nbsp;function&nbsp;uses&nbsp;ReaderFrom&nbsp;if&nbsp;available.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">ReaderFrom</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ReadFrom</span><span class="op">(</span><span class="ident">r</span>&nbsp;<span class="ident">Reader</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">n</span>&nbsp;<span class="ident">int64</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">165</span><span class="comment">//&nbsp;WriterTo&nbsp;is&nbsp;the&nbsp;interface&nbsp;that&nbsp;wraps&nbsp;the&nbsp;WriteTo&nbsp;method.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;WriteTo&nbsp;writes&nbsp;data&nbsp;to&nbsp;w&nbsp;until&nbsp;there&#39;s&nbsp;no&nbsp;more&nbsp;data&nbsp;to&nbsp;write&nbsp;or</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;when&nbsp;an&nbsp;error&nbsp;occurs.&nbsp;The&nbsp;return&nbsp;value&nbsp;n&nbsp;is&nbsp;the&nbsp;number&nbsp;of&nbsp;bytes</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;written.&nbsp;Any&nbsp;error&nbsp;encountered&nbsp;during&nbsp;the&nbsp;write&nbsp;is&nbsp;also&nbsp;returned.</span><br>
+<span class="lineno">170</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;Copy&nbsp;function&nbsp;uses&nbsp;WriterTo&nbsp;if&nbsp;available.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">WriterTo</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">WriteTo</span><span class="op">(</span><span class="ident">w</span>&nbsp;<span class="ident">Writer</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">n</span>&nbsp;<span class="ident">int64</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">175</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ReaderAt&nbsp;is&nbsp;the&nbsp;interface&nbsp;that&nbsp;wraps&nbsp;the&nbsp;basic&nbsp;ReadAt&nbsp;method.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ReadAt&nbsp;reads&nbsp;len(p)&nbsp;bytes&nbsp;into&nbsp;p&nbsp;starting&nbsp;at&nbsp;offset&nbsp;off&nbsp;in&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;underlying&nbsp;input&nbsp;source.&nbsp;&nbsp;It&nbsp;returns&nbsp;the&nbsp;number&nbsp;of&nbsp;bytes</span><br>
+<span class="lineno">180</span><span class="comment">//&nbsp;read&nbsp;(0&nbsp;&lt;=&nbsp;n&nbsp;&lt;=&nbsp;len(p))&nbsp;and&nbsp;any&nbsp;error&nbsp;encountered.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;When&nbsp;ReadAt&nbsp;returns&nbsp;n&nbsp;&lt;&nbsp;len(p),&nbsp;it&nbsp;returns&nbsp;a&nbsp;non-nil&nbsp;error</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;explaining&nbsp;why&nbsp;more&nbsp;bytes&nbsp;were&nbsp;not&nbsp;returned.&nbsp;&nbsp;In&nbsp;this&nbsp;respect,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ReadAt&nbsp;is&nbsp;stricter&nbsp;than&nbsp;Read.</span><br>
+<span class="lineno">185</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Even&nbsp;if&nbsp;ReadAt&nbsp;returns&nbsp;n&nbsp;&lt;&nbsp;len(p),&nbsp;it&nbsp;may&nbsp;use&nbsp;all&nbsp;of&nbsp;p&nbsp;as&nbsp;scratch</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;space&nbsp;during&nbsp;the&nbsp;call.&nbsp;&nbsp;If&nbsp;some&nbsp;data&nbsp;is&nbsp;available&nbsp;but&nbsp;not&nbsp;len(p)&nbsp;bytes,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ReadAt&nbsp;blocks&nbsp;until&nbsp;either&nbsp;all&nbsp;the&nbsp;data&nbsp;is&nbsp;available&nbsp;or&nbsp;an&nbsp;error&nbsp;occurs.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;In&nbsp;this&nbsp;respect&nbsp;ReadAt&nbsp;is&nbsp;different&nbsp;from&nbsp;Read.</span><br>
+<span class="lineno">190</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;If&nbsp;the&nbsp;n&nbsp;=&nbsp;len(p)&nbsp;bytes&nbsp;returned&nbsp;by&nbsp;ReadAt&nbsp;are&nbsp;at&nbsp;the&nbsp;end&nbsp;of&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;input&nbsp;source,&nbsp;ReadAt&nbsp;may&nbsp;return&nbsp;either&nbsp;err&nbsp;==&nbsp;EOF&nbsp;or&nbsp;err&nbsp;==&nbsp;nil.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;If&nbsp;ReadAt&nbsp;is&nbsp;reading&nbsp;from&nbsp;an&nbsp;input&nbsp;source&nbsp;with&nbsp;a&nbsp;seek&nbsp;offset,</span><br>
+<span class="lineno">195</span><span class="comment">//&nbsp;ReadAt&nbsp;should&nbsp;not&nbsp;affect&nbsp;nor&nbsp;be&nbsp;affected&nbsp;by&nbsp;the&nbsp;underlying</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;seek&nbsp;offset.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Clients&nbsp;of&nbsp;ReadAt&nbsp;can&nbsp;execute&nbsp;parallel&nbsp;ReadAt&nbsp;calls&nbsp;on&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;same&nbsp;input&nbsp;source.</span><br>
+<span class="lineno">200</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Implementations&nbsp;must&nbsp;not&nbsp;retain&nbsp;p.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">ReaderAt</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ReadAt</span><span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="ident">off</span>&nbsp;<span class="ident">int64</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">n</span>&nbsp;<span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">205</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;WriterAt&nbsp;is&nbsp;the&nbsp;interface&nbsp;that&nbsp;wraps&nbsp;the&nbsp;basic&nbsp;WriteAt&nbsp;method.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;WriteAt&nbsp;writes&nbsp;len(p)&nbsp;bytes&nbsp;from&nbsp;p&nbsp;to&nbsp;the&nbsp;underlying&nbsp;data&nbsp;stream</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;at&nbsp;offset&nbsp;off.&nbsp;&nbsp;It&nbsp;returns&nbsp;the&nbsp;number&nbsp;of&nbsp;bytes&nbsp;written&nbsp;from&nbsp;p&nbsp;(0&nbsp;&lt;=&nbsp;n&nbsp;&lt;=&nbsp;len(p))</span><br>
+<span class="lineno">210</span><span class="comment">//&nbsp;and&nbsp;any&nbsp;error&nbsp;encountered&nbsp;that&nbsp;caused&nbsp;the&nbsp;write&nbsp;to&nbsp;stop&nbsp;early.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;WriteAt&nbsp;must&nbsp;return&nbsp;a&nbsp;non-nil&nbsp;error&nbsp;if&nbsp;it&nbsp;returns&nbsp;n&nbsp;&lt;&nbsp;len(p).</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;If&nbsp;WriteAt&nbsp;is&nbsp;writing&nbsp;to&nbsp;a&nbsp;destination&nbsp;with&nbsp;a&nbsp;seek&nbsp;offset,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;WriteAt&nbsp;should&nbsp;not&nbsp;affect&nbsp;nor&nbsp;be&nbsp;affected&nbsp;by&nbsp;the&nbsp;underlying</span><br>
+<span class="lineno">215</span><span class="comment">//&nbsp;seek&nbsp;offset.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Clients&nbsp;of&nbsp;WriteAt&nbsp;can&nbsp;execute&nbsp;parallel&nbsp;WriteAt&nbsp;calls&nbsp;on&nbsp;the&nbsp;same</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;destination&nbsp;if&nbsp;the&nbsp;ranges&nbsp;do&nbsp;not&nbsp;overlap.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">220</span><span class="comment">//&nbsp;Implementations&nbsp;must&nbsp;not&nbsp;retain&nbsp;p.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">WriterAt</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">WriteAt</span><span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="ident">off</span>&nbsp;<span class="ident">int64</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">n</span>&nbsp;<span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">225</span><span class="comment">//&nbsp;ByteReader&nbsp;is&nbsp;the&nbsp;interface&nbsp;that&nbsp;wraps&nbsp;the&nbsp;ReadByte&nbsp;method.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ReadByte&nbsp;reads&nbsp;and&nbsp;returns&nbsp;the&nbsp;next&nbsp;byte&nbsp;from&nbsp;the&nbsp;input.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;If&nbsp;no&nbsp;byte&nbsp;is&nbsp;available,&nbsp;err&nbsp;will&nbsp;be&nbsp;set.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">ByteReader</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">230</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ReadByte</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ByteScanner&nbsp;is&nbsp;the&nbsp;interface&nbsp;that&nbsp;adds&nbsp;the&nbsp;UnreadByte&nbsp;method&nbsp;to&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;basic&nbsp;ReadByte&nbsp;method.</span><br>
+<span class="lineno">235</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;UnreadByte&nbsp;causes&nbsp;the&nbsp;next&nbsp;call&nbsp;to&nbsp;ReadByte&nbsp;to&nbsp;return&nbsp;the&nbsp;same&nbsp;byte</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;as&nbsp;the&nbsp;previous&nbsp;call&nbsp;to&nbsp;ReadByte.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;It&nbsp;may&nbsp;be&nbsp;an&nbsp;error&nbsp;to&nbsp;call&nbsp;UnreadByte&nbsp;twice&nbsp;without&nbsp;an&nbsp;intervening</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;call&nbsp;to&nbsp;ReadByte.</span><br>
+<span class="lineno">240</span><span class="keyword">type</span>&nbsp;<span class="ident">ByteScanner</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ByteReader</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">UnreadByte</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">245</span><span class="comment">//&nbsp;ByteWriter&nbsp;is&nbsp;the&nbsp;interface&nbsp;that&nbsp;wraps&nbsp;the&nbsp;WriteByte&nbsp;method.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">ByteWriter</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">WriteByte</span><span class="op">(</span><span class="ident">c</span>&nbsp;<span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">250</span><span class="comment">//&nbsp;RuneReader&nbsp;is&nbsp;the&nbsp;interface&nbsp;that&nbsp;wraps&nbsp;the&nbsp;ReadRune&nbsp;method.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ReadRune&nbsp;reads&nbsp;a&nbsp;single&nbsp;UTF-8&nbsp;encoded&nbsp;Unicode&nbsp;character</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;and&nbsp;returns&nbsp;the&nbsp;rune&nbsp;and&nbsp;its&nbsp;size&nbsp;in&nbsp;bytes.&nbsp;If&nbsp;no&nbsp;character&nbsp;is</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;available,&nbsp;err&nbsp;will&nbsp;be&nbsp;set.</span><br>
+<span class="lineno">255</span><span class="keyword">type</span>&nbsp;<span class="ident">RuneReader</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ReadRune</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">r</span>&nbsp;<span class="builtintype">rune</span><span class="op">,</span>&nbsp;<span class="ident">size</span>&nbsp;<span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;RuneScanner&nbsp;is&nbsp;the&nbsp;interface&nbsp;that&nbsp;adds&nbsp;the&nbsp;UnreadRune&nbsp;method&nbsp;to&nbsp;the</span><br>
+<span class="lineno">260</span><span class="comment">//&nbsp;basic&nbsp;ReadRune&nbsp;method.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;UnreadRune&nbsp;causes&nbsp;the&nbsp;next&nbsp;call&nbsp;to&nbsp;ReadRune&nbsp;to&nbsp;return&nbsp;the&nbsp;same&nbsp;rune</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;as&nbsp;the&nbsp;previous&nbsp;call&nbsp;to&nbsp;ReadRune.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;It&nbsp;may&nbsp;be&nbsp;an&nbsp;error&nbsp;to&nbsp;call&nbsp;UnreadRune&nbsp;twice&nbsp;without&nbsp;an&nbsp;intervening</span><br>
+<span class="lineno">265</span><span class="comment">//&nbsp;call&nbsp;to&nbsp;ReadRune.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">RuneScanner</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">RuneReader</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">UnreadRune</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">270</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;stringWriter&nbsp;is&nbsp;the&nbsp;interface&nbsp;that&nbsp;wraps&nbsp;the&nbsp;WriteString&nbsp;method.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">stringWriter</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">WriteString</span><span class="op">(</span><span class="ident">s</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">n</span>&nbsp;<span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">275</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;WriteString&nbsp;writes&nbsp;the&nbsp;contents&nbsp;of&nbsp;the&nbsp;string&nbsp;s&nbsp;to&nbsp;w,&nbsp;which&nbsp;accepts&nbsp;an&nbsp;array&nbsp;of&nbsp;bytes.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;If&nbsp;w&nbsp;already&nbsp;implements&nbsp;a&nbsp;WriteString&nbsp;method,&nbsp;it&nbsp;is&nbsp;invoked&nbsp;directly.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">WriteString</span><span class="op">(</span><span class="ident">w</span>&nbsp;<span class="ident">Writer</span><span class="op">,</span>&nbsp;<span class="ident">s</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">n</span>&nbsp;<span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">sw</span><span class="op">,</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">w</span><span class="op">.</span><span class="op">(</span><span class="ident">stringWriter</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">280</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">sw</span><span class="op">.</span><span class="ident">WriteString</span><span class="op">(</span><span class="ident">s</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">w</span><span class="op">.</span><span class="ident">Write</span><span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">(</span><span class="ident">s</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">285</span><span class="comment">//&nbsp;ReadAtLeast&nbsp;reads&nbsp;from&nbsp;r&nbsp;into&nbsp;buf&nbsp;until&nbsp;it&nbsp;has&nbsp;read&nbsp;at&nbsp;least&nbsp;min&nbsp;bytes.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;It&nbsp;returns&nbsp;the&nbsp;number&nbsp;of&nbsp;bytes&nbsp;copied&nbsp;and&nbsp;an&nbsp;error&nbsp;if&nbsp;fewer&nbsp;bytes&nbsp;were&nbsp;read.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;error&nbsp;is&nbsp;EOF&nbsp;only&nbsp;if&nbsp;no&nbsp;bytes&nbsp;were&nbsp;read.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;If&nbsp;an&nbsp;EOF&nbsp;happens&nbsp;after&nbsp;reading&nbsp;fewer&nbsp;than&nbsp;min&nbsp;bytes,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ReadAtLeast&nbsp;returns&nbsp;ErrUnexpectedEOF.</span><br>
+<span class="lineno">290</span><span class="comment">//&nbsp;If&nbsp;min&nbsp;is&nbsp;greater&nbsp;than&nbsp;the&nbsp;length&nbsp;of&nbsp;buf,&nbsp;ReadAtLeast&nbsp;returns&nbsp;ErrShortBuffer.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;On&nbsp;return,&nbsp;n&nbsp;&gt;=&nbsp;min&nbsp;if&nbsp;and&nbsp;only&nbsp;if&nbsp;err&nbsp;==&nbsp;nil.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">ReadAtLeast</span><span class="op">(</span><span class="ident">r</span>&nbsp;<span class="ident">Reader</span><span class="op">,</span>&nbsp;<span class="ident">buf</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="ident">min</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">n</span>&nbsp;<span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">buf</span><span class="op">)</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">min</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">ErrShortBuffer</span><br>
+<span class="lineno">295</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">min</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">nn</span>&nbsp;<span class="builtintype">int</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nn</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">r</span><span class="op">.</span><span class="ident">Read</span><span class="op">(</span><span class="ident">buf</span><span class="op">[</span><span class="ident">n</span><span class="op">:</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="ident">nn</span><br>
+<span class="lineno">300</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="op">&gt;=</span>&nbsp;<span class="ident">min</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="keyword">if</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">EOF</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">ErrUnexpectedEOF</span><br>
+<span class="lineno">305</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ReadFull&nbsp;reads&nbsp;exactly&nbsp;len(buf)&nbsp;bytes&nbsp;from&nbsp;r&nbsp;into&nbsp;buf.</span><br>
+<span class="lineno">310</span><span class="comment">//&nbsp;It&nbsp;returns&nbsp;the&nbsp;number&nbsp;of&nbsp;bytes&nbsp;copied&nbsp;and&nbsp;an&nbsp;error&nbsp;if&nbsp;fewer&nbsp;bytes&nbsp;were&nbsp;read.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;error&nbsp;is&nbsp;EOF&nbsp;only&nbsp;if&nbsp;no&nbsp;bytes&nbsp;were&nbsp;read.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;If&nbsp;an&nbsp;EOF&nbsp;happens&nbsp;after&nbsp;reading&nbsp;some&nbsp;but&nbsp;not&nbsp;all&nbsp;the&nbsp;bytes,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ReadFull&nbsp;returns&nbsp;ErrUnexpectedEOF.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;On&nbsp;return,&nbsp;n&nbsp;==&nbsp;len(buf)&nbsp;if&nbsp;and&nbsp;only&nbsp;if&nbsp;err&nbsp;==&nbsp;nil.</span><br>
+<span class="lineno">315</span><span class="keyword">func</span>&nbsp;<span class="ident">ReadFull</span><span class="op">(</span><span class="ident">r</span>&nbsp;<span class="ident">Reader</span><span class="op">,</span>&nbsp;<span class="ident">buf</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">n</span>&nbsp;<span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">ReadAtLeast</span><span class="op">(</span><span class="ident">r</span><span class="op">,</span>&nbsp;<span class="ident">buf</span><span class="op">,</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">buf</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;CopyN&nbsp;copies&nbsp;n&nbsp;bytes&nbsp;(or&nbsp;until&nbsp;an&nbsp;error)&nbsp;from&nbsp;src&nbsp;to&nbsp;dst.</span><br>
+<span class="lineno">320</span><span class="comment">//&nbsp;It&nbsp;returns&nbsp;the&nbsp;number&nbsp;of&nbsp;bytes&nbsp;copied&nbsp;and&nbsp;the&nbsp;earliest</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;error&nbsp;encountered&nbsp;while&nbsp;copying.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;On&nbsp;return,&nbsp;written&nbsp;==&nbsp;n&nbsp;if&nbsp;and&nbsp;only&nbsp;if&nbsp;err&nbsp;==&nbsp;nil.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;If&nbsp;dst&nbsp;implements&nbsp;the&nbsp;ReaderFrom&nbsp;interface,</span><br>
+<span class="lineno">325</span><span class="comment">//&nbsp;the&nbsp;copy&nbsp;is&nbsp;implemented&nbsp;using&nbsp;it.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">CopyN</span><span class="op">(</span><span class="ident">dst</span>&nbsp;<span class="ident">Writer</span><span class="op">,</span>&nbsp;<span class="ident">src</span>&nbsp;<span class="ident">Reader</span><span class="op">,</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="ident">int64</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">written</span>&nbsp;<span class="ident">int64</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">written</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">Copy</span><span class="op">(</span><span class="ident">dst</span><span class="op">,</span>&nbsp;<span class="ident">LimitReader</span><span class="op">(</span><span class="ident">src</span><span class="op">,</span>&nbsp;<span class="ident">n</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">written</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">n</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno">330</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">written</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;src&nbsp;stopped&nbsp;early;&nbsp;must&nbsp;have&nbsp;been&nbsp;EOF.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">EOF</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">335</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Copy&nbsp;copies&nbsp;from&nbsp;src&nbsp;to&nbsp;dst&nbsp;until&nbsp;either&nbsp;EOF&nbsp;is&nbsp;reached</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;on&nbsp;src&nbsp;or&nbsp;an&nbsp;error&nbsp;occurs.&nbsp;&nbsp;It&nbsp;returns&nbsp;the&nbsp;number&nbsp;of&nbsp;bytes</span><br>
+<span class="lineno">340</span><span class="comment">//&nbsp;copied&nbsp;and&nbsp;the&nbsp;first&nbsp;error&nbsp;encountered&nbsp;while&nbsp;copying,&nbsp;if&nbsp;any.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;A&nbsp;successful&nbsp;Copy&nbsp;returns&nbsp;err&nbsp;==&nbsp;nil,&nbsp;not&nbsp;err&nbsp;==&nbsp;EOF.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Because&nbsp;Copy&nbsp;is&nbsp;defined&nbsp;to&nbsp;read&nbsp;from&nbsp;src&nbsp;until&nbsp;EOF,&nbsp;it&nbsp;does</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;not&nbsp;treat&nbsp;an&nbsp;EOF&nbsp;from&nbsp;Read&nbsp;as&nbsp;an&nbsp;error&nbsp;to&nbsp;be&nbsp;reported.</span><br>
+<span class="lineno">345</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;If&nbsp;src&nbsp;implements&nbsp;the&nbsp;WriterTo&nbsp;interface,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;the&nbsp;copy&nbsp;is&nbsp;implemented&nbsp;by&nbsp;calling&nbsp;src.WriteTo(dst).</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Otherwise,&nbsp;if&nbsp;dst&nbsp;implements&nbsp;the&nbsp;ReaderFrom&nbsp;interface,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;the&nbsp;copy&nbsp;is&nbsp;implemented&nbsp;by&nbsp;calling&nbsp;dst.ReadFrom(src).</span><br>
+<span class="lineno">350</span><span class="keyword">func</span>&nbsp;<span class="ident">Copy</span><span class="op">(</span><span class="ident">dst</span>&nbsp;<span class="ident">Writer</span><span class="op">,</span>&nbsp;<span class="ident">src</span>&nbsp;<span class="ident">Reader</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">written</span>&nbsp;<span class="ident">int64</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;If&nbsp;the&nbsp;reader&nbsp;has&nbsp;a&nbsp;WriteTo&nbsp;method,&nbsp;use&nbsp;it&nbsp;to&nbsp;do&nbsp;the&nbsp;copy.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Avoids&nbsp;an&nbsp;allocation&nbsp;and&nbsp;a&nbsp;copy.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">wt</span><span class="op">,</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">src</span><span class="op">.</span><span class="op">(</span><span class="ident">WriterTo</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">wt</span><span class="op">.</span><span class="ident">WriteTo</span><span class="op">(</span><span class="ident">dst</span><span class="op">)</span><br>
+<span class="lineno">355</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Similarly,&nbsp;if&nbsp;the&nbsp;writer&nbsp;has&nbsp;a&nbsp;ReadFrom&nbsp;method,&nbsp;use&nbsp;it&nbsp;to&nbsp;do&nbsp;the&nbsp;copy.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">rt</span><span class="op">,</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">dst</span><span class="op">.</span><span class="op">(</span><span class="ident">ReaderFrom</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">rt</span><span class="op">.</span><span class="ident">ReadFrom</span><span class="op">(</span><span class="ident">src</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">360</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">buf</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">make</span><span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="num">32</span><span class="op">*</span><span class="num">1024</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nr</span><span class="op">,</span>&nbsp;<span class="ident">er</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">src</span><span class="op">.</span><span class="ident">Read</span><span class="op">(</span><span class="ident">buf</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">nr</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nw</span><span class="op">,</span>&nbsp;<span class="ident">ew</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">dst</span><span class="op">.</span><span class="ident">Write</span><span class="op">(</span><span class="ident">buf</span><span class="op">[</span><span class="num">0</span><span class="op">:</span><span class="ident">nr</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno">365</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">nw</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">written</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="ident">int64</span><span class="op">(</span><span class="ident">nw</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">ew</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">ew</span><br>
+<span class="lineno">370</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">break</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">nr</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nw</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">ErrShortWrite</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">break</span><br>
+<span class="lineno">375</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">er</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">EOF</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">break</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">380</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">er</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">er</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">break</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">385</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">written</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;LimitReader&nbsp;returns&nbsp;a&nbsp;Reader&nbsp;that&nbsp;reads&nbsp;from&nbsp;r</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;but&nbsp;stops&nbsp;with&nbsp;EOF&nbsp;after&nbsp;n&nbsp;bytes.</span><br>
+<span class="lineno">390</span><span class="comment">//&nbsp;The&nbsp;underlying&nbsp;implementation&nbsp;is&nbsp;a&nbsp;*LimitedReader.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">LimitReader</span><span class="op">(</span><span class="ident">r</span>&nbsp;<span class="ident">Reader</span><span class="op">,</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="ident">int64</span><span class="op">)</span>&nbsp;<span class="ident">Reader</span>&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="op">&amp;</span><span class="ident">LimitedReader</span><span class="op">{</span><span class="ident">r</span><span class="op">,</span>&nbsp;<span class="ident">n</span><span class="op">}</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;A&nbsp;LimitedReader&nbsp;reads&nbsp;from&nbsp;R&nbsp;but&nbsp;limits&nbsp;the&nbsp;amount&nbsp;of</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;data&nbsp;returned&nbsp;to&nbsp;just&nbsp;N&nbsp;bytes.&nbsp;Each&nbsp;call&nbsp;to&nbsp;Read</span><br>
+<span class="lineno">395</span><span class="comment">//&nbsp;updates&nbsp;N&nbsp;to&nbsp;reflect&nbsp;the&nbsp;new&nbsp;amount&nbsp;remaining.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">LimitedReader</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">R</span>&nbsp;<span class="ident">Reader</span>&nbsp;<span class="comment">//&nbsp;underlying&nbsp;reader</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">N</span>&nbsp;<span class="ident">int64</span>&nbsp;&nbsp;<span class="comment">//&nbsp;max&nbsp;bytes&nbsp;remaining</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">400</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">l</span>&nbsp;<span class="op">*</span><span class="ident">LimitedReader</span><span class="op">)</span>&nbsp;<span class="ident">Read</span><span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">n</span>&nbsp;<span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">l</span><span class="op">.</span><span class="ident">N</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">EOF</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">405</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">int64</span><span class="op">(</span><span class="builtinfunc">len</span><span class="op">(</span><span class="ident">p</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="ident">l</span><span class="op">.</span><span class="ident">N</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">p</span><span class="op">[</span><span class="num">0</span><span class="op">:</span><span class="ident">l</span><span class="op">.</span><span class="ident">N</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">l</span><span class="op">.</span><span class="ident">R</span><span class="op">.</span><span class="ident">Read</span><span class="op">(</span><span class="ident">p</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">l</span><span class="op">.</span><span class="ident">N</span>&nbsp;<span class="op">-=</span>&nbsp;<span class="ident">int64</span><span class="op">(</span><span class="ident">n</span><span class="op">)</span><br>
+<span class="lineno">410</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;NewSectionReader&nbsp;returns&nbsp;a&nbsp;SectionReader&nbsp;that&nbsp;reads&nbsp;from&nbsp;r</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;starting&nbsp;at&nbsp;offset&nbsp;off&nbsp;and&nbsp;stops&nbsp;with&nbsp;EOF&nbsp;after&nbsp;n&nbsp;bytes.</span><br>
+<span class="lineno">415</span><span class="keyword">func</span>&nbsp;<span class="ident">NewSectionReader</span><span class="op">(</span><span class="ident">r</span>&nbsp;<span class="ident">ReaderAt</span><span class="op">,</span>&nbsp;<span class="ident">off</span>&nbsp;<span class="ident">int64</span><span class="op">,</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="ident">int64</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">SectionReader</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="op">&amp;</span><span class="ident">SectionReader</span><span class="op">{</span><span class="ident">r</span><span class="op">,</span>&nbsp;<span class="ident">off</span><span class="op">,</span>&nbsp;<span class="ident">off</span><span class="op">,</span>&nbsp;<span class="ident">off</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">n</span><span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;SectionReader&nbsp;implements&nbsp;Read,&nbsp;Seek,&nbsp;and&nbsp;ReadAt&nbsp;on&nbsp;a&nbsp;section</span><br>
+<span class="lineno">420</span><span class="comment">//&nbsp;of&nbsp;an&nbsp;underlying&nbsp;ReaderAt.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">SectionReader</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">ReaderAt</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">base</span>&nbsp;&nbsp;<span class="ident">int64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">off</span>&nbsp;&nbsp;&nbsp;<span class="ident">int64</span><br>
+<span class="lineno">425</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">limit</span>&nbsp;<span class="ident">int64</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">SectionReader</span><span class="op">)</span>&nbsp;<span class="ident">Read</span><span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">n</span>&nbsp;<span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">off</span>&nbsp;<span class="op">&gt;=</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">limit</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">430</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">EOF</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">max</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">limit</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">off</span><span class="op">;</span>&nbsp;<span class="ident">int64</span><span class="op">(</span><span class="builtinfunc">len</span><span class="op">(</span><span class="ident">p</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="ident">max</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">p</span><span class="op">[</span><span class="num">0</span><span class="op">:</span><span class="ident">max</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">435</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">r</span><span class="op">.</span><span class="ident">ReadAt</span><span class="op">(</span><span class="ident">p</span><span class="op">,</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">off</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">off</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="ident">int64</span><span class="op">(</span><span class="ident">n</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">440</span><span class="keyword">var</span>&nbsp;<span class="ident">errWhence</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">errors</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="string">&#34;Seek:&nbsp;invalid&nbsp;whence&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">errOffset</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">errors</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="string">&#34;Seek:&nbsp;invalid&nbsp;offset&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">SectionReader</span><span class="op">)</span>&nbsp;<span class="ident">Seek</span><span class="op">(</span><span class="ident">offset</span>&nbsp;<span class="ident">int64</span><span class="op">,</span>&nbsp;<span class="ident">whence</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">int64</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="ident">whence</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">445</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">default</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">errWhence</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="num">0</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">offset</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">base</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="num">1</span><span class="op">:</span><br>
+<span class="lineno">450</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">offset</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">off</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="num">2</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">offset</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">limit</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">offset</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">base</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">455</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">errOffset</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span><span class="op">.</span><span class="ident">off</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">offset</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">offset</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">base</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">460</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">SectionReader</span><span class="op">)</span>&nbsp;<span class="ident">ReadAt</span><span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="ident">off</span>&nbsp;<span class="ident">int64</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">n</span>&nbsp;<span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">off</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">off</span>&nbsp;<span class="op">&gt;=</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">limit</span><span class="op">-</span><span class="ident">s</span><span class="op">.</span><span class="ident">base</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">EOF</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">465</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">off</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">base</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">max</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">limit</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">off</span><span class="op">;</span>&nbsp;<span class="ident">int64</span><span class="op">(</span><span class="builtinfunc">len</span><span class="op">(</span><span class="ident">p</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="ident">max</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">p</span><span class="op">[</span><span class="num">0</span><span class="op">:</span><span class="ident">max</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">r</span><span class="op">.</span><span class="ident">ReadAt</span><span class="op">(</span><span class="ident">p</span><span class="op">,</span>&nbsp;<span class="ident">off</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">470</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">EOF</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">n</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">r</span><span class="op">.</span><span class="ident">ReadAt</span><span class="op">(</span><span class="ident">p</span><span class="op">,</span>&nbsp;<span class="ident">off</span><span class="op">)</span><br>
+<span class="lineno">475</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Size&nbsp;returns&nbsp;the&nbsp;size&nbsp;of&nbsp;the&nbsp;section&nbsp;in&nbsp;bytes.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">s</span>&nbsp;<span class="op">*</span><span class="ident">SectionReader</span><span class="op">)</span>&nbsp;<span class="ident">Size</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="ident">int64</span>&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">limit</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">s</span><span class="op">.</span><span class="ident">base</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">480</span><span class="comment">//&nbsp;TeeReader&nbsp;returns&nbsp;a&nbsp;Reader&nbsp;that&nbsp;writes&nbsp;to&nbsp;w&nbsp;what&nbsp;it&nbsp;reads&nbsp;from&nbsp;r.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;All&nbsp;reads&nbsp;from&nbsp;r&nbsp;performed&nbsp;through&nbsp;it&nbsp;are&nbsp;matched&nbsp;with</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;corresponding&nbsp;writes&nbsp;to&nbsp;w.&nbsp;&nbsp;There&nbsp;is&nbsp;no&nbsp;internal&nbsp;buffering&nbsp;-</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;the&nbsp;write&nbsp;must&nbsp;complete&nbsp;before&nbsp;the&nbsp;read&nbsp;completes.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Any&nbsp;error&nbsp;encountered&nbsp;while&nbsp;writing&nbsp;is&nbsp;reported&nbsp;as&nbsp;a&nbsp;read&nbsp;error.</span><br>
+<span class="lineno">485</span><span class="keyword">func</span>&nbsp;<span class="ident">TeeReader</span><span class="op">(</span><span class="ident">r</span>&nbsp;<span class="ident">Reader</span><span class="op">,</span>&nbsp;<span class="ident">w</span>&nbsp;<span class="ident">Writer</span><span class="op">)</span>&nbsp;<span class="ident">Reader</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="op">&amp;</span><span class="ident">teeReader</span><span class="op">{</span><span class="ident">r</span><span class="op">,</span>&nbsp;<span class="ident">w</span><span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">teeReader</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">490</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r</span>&nbsp;<span class="ident">Reader</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">w</span>&nbsp;<span class="ident">Writer</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">t</span>&nbsp;<span class="op">*</span><span class="ident">teeReader</span><span class="op">)</span>&nbsp;<span class="ident">Read</span><span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">n</span>&nbsp;<span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">495</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">t</span><span class="op">.</span><span class="ident">r</span><span class="op">.</span><span class="ident">Read</span><span class="op">(</span><span class="ident">p</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">n</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">n</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">t</span><span class="op">.</span><span class="ident">w</span><span class="op">.</span><span class="ident">Write</span><span class="op">(</span><span class="ident">p</span><span class="op">[</span><span class="op">:</span><span class="ident">n</span><span class="op">]</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">n</span><span class="op">,</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">500</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

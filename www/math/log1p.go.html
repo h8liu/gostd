@@ -1,0 +1,215 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2010&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">math</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;original&nbsp;C&nbsp;code,&nbsp;the&nbsp;long&nbsp;comment,&nbsp;and&nbsp;the&nbsp;constants</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;below&nbsp;are&nbsp;from&nbsp;FreeBSD&#39;s&nbsp;/usr/src/lib/msun/src/s_log1p.c</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;and&nbsp;came&nbsp;with&nbsp;this&nbsp;notice.&nbsp;&nbsp;The&nbsp;go&nbsp;code&nbsp;is&nbsp;a&nbsp;simplified</span><br>
+<span class="lineno">10</span><span class="comment">//&nbsp;version&nbsp;of&nbsp;the&nbsp;original&nbsp;C.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;====================================================</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Copyright&nbsp;(C)&nbsp;1993&nbsp;by&nbsp;Sun&nbsp;Microsystems,&nbsp;Inc.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">15</span><span class="comment">//&nbsp;Developed&nbsp;at&nbsp;SunPro,&nbsp;a&nbsp;Sun&nbsp;Microsystems,&nbsp;Inc.&nbsp;business.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Permission&nbsp;to&nbsp;use,&nbsp;copy,&nbsp;modify,&nbsp;and&nbsp;distribute&nbsp;this</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;software&nbsp;is&nbsp;freely&nbsp;granted,&nbsp;provided&nbsp;that&nbsp;this&nbsp;notice</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;is&nbsp;preserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;====================================================</span><br>
+<span class="lineno">20</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;double&nbsp;log1p(double&nbsp;x)</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Method&nbsp;:</span><br>
+<span class="lineno">25</span><span class="comment">//&nbsp;&nbsp;&nbsp;1.&nbsp;Argument&nbsp;Reduction:&nbsp;find&nbsp;k&nbsp;and&nbsp;f&nbsp;such&nbsp;that</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1+x&nbsp;=&nbsp;2**k&nbsp;*&nbsp;(1+f),</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;where&nbsp;&nbsp;sqrt(2)/2&nbsp;&lt;&nbsp;1+f&nbsp;&lt;&nbsp;sqrt(2)&nbsp;.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Note.&nbsp;If&nbsp;k=0,&nbsp;then&nbsp;f=x&nbsp;is&nbsp;exact.&nbsp;However,&nbsp;if&nbsp;k!=0,&nbsp;then&nbsp;f</span><br>
+<span class="lineno">30</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;may&nbsp;not&nbsp;be&nbsp;representable&nbsp;exactly.&nbsp;In&nbsp;that&nbsp;case,&nbsp;a&nbsp;correction</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;term&nbsp;is&nbsp;need.&nbsp;Let&nbsp;u=1+x&nbsp;rounded.&nbsp;Let&nbsp;c&nbsp;=&nbsp;(1+x)-u,&nbsp;then</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;log(1+x)&nbsp;-&nbsp;log(u)&nbsp;~&nbsp;c/u.&nbsp;Thus,&nbsp;we&nbsp;proceed&nbsp;to&nbsp;compute&nbsp;log(u),</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;and&nbsp;add&nbsp;back&nbsp;the&nbsp;correction&nbsp;term&nbsp;c/u.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(Note:&nbsp;when&nbsp;x&nbsp;&gt;&nbsp;2**53,&nbsp;one&nbsp;can&nbsp;simply&nbsp;return&nbsp;log(x))</span><br>
+<span class="lineno">35</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;2.&nbsp;Approximation&nbsp;of&nbsp;log1p(f).</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Let&nbsp;s&nbsp;=&nbsp;f/(2+f)&nbsp;;&nbsp;based&nbsp;on&nbsp;log(1+f)&nbsp;=&nbsp;log(1+s)&nbsp;-&nbsp;log(1-s)</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=&nbsp;2s&nbsp;+&nbsp;2/3&nbsp;s**3&nbsp;+&nbsp;2/5&nbsp;s**5&nbsp;+&nbsp;.....,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=&nbsp;2s&nbsp;+&nbsp;s*R</span><br>
+<span class="lineno">40</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;We&nbsp;use&nbsp;a&nbsp;special&nbsp;Reme&nbsp;algorithm&nbsp;on&nbsp;[0,0.1716]&nbsp;to&nbsp;generate</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;a&nbsp;polynomial&nbsp;of&nbsp;degree&nbsp;14&nbsp;to&nbsp;approximate&nbsp;R&nbsp;The&nbsp;maximum&nbsp;error</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;of&nbsp;this&nbsp;polynomial&nbsp;approximation&nbsp;is&nbsp;bounded&nbsp;by&nbsp;2**-58.45.&nbsp;In</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;other&nbsp;words,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;4&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;6&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;8&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;10&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;12&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;14</span><br>
+<span class="lineno">45</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;R(z)&nbsp;~&nbsp;Lp1*s&nbsp;+Lp2*s&nbsp;+Lp3*s&nbsp;+Lp4*s&nbsp;+Lp5*s&nbsp;&nbsp;+Lp6*s&nbsp;&nbsp;+Lp7*s</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;(the&nbsp;values&nbsp;of&nbsp;Lp1&nbsp;to&nbsp;Lp7&nbsp;are&nbsp;listed&nbsp;in&nbsp;the&nbsp;program)</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;and</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;14&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-58.45</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;Lp1*s&nbsp;+...+Lp7*s&nbsp;&nbsp;&nbsp;&nbsp;-&nbsp;&nbsp;R(z)&nbsp;|&nbsp;&lt;=&nbsp;2</span><br>
+<span class="lineno">50</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;|</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Note&nbsp;that&nbsp;2s&nbsp;=&nbsp;f&nbsp;-&nbsp;s*f&nbsp;=&nbsp;f&nbsp;-&nbsp;hfsq&nbsp;+&nbsp;s*hfsq,&nbsp;where&nbsp;hfsq&nbsp;=&nbsp;f*f/2.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;In&nbsp;order&nbsp;to&nbsp;guarantee&nbsp;error&nbsp;in&nbsp;log&nbsp;below&nbsp;1ulp,&nbsp;we&nbsp;compute&nbsp;log</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;by</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;log1p(f)&nbsp;=&nbsp;f&nbsp;-&nbsp;(hfsq&nbsp;-&nbsp;s*(hfsq+R)).</span><br>
+<span class="lineno">55</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;3.&nbsp;Finally,&nbsp;log1p(x)&nbsp;=&nbsp;k*ln2&nbsp;+&nbsp;log1p(f).</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;=&nbsp;k*ln2_hi+(f-(hfsq-(s*(hfsq+R)+k*ln2_lo)))</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Here&nbsp;ln2&nbsp;is&nbsp;split&nbsp;into&nbsp;two&nbsp;floating&nbsp;point&nbsp;number:</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;ln2_hi&nbsp;+&nbsp;ln2_lo,</span><br>
+<span class="lineno">60</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;where&nbsp;n*ln2_hi&nbsp;is&nbsp;always&nbsp;exact&nbsp;for&nbsp;|n|&nbsp;&lt;&nbsp;2000.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Special&nbsp;cases:</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;log1p(x)&nbsp;is&nbsp;NaN&nbsp;with&nbsp;signal&nbsp;if&nbsp;x&nbsp;&lt;&nbsp;-1&nbsp;(including&nbsp;-INF)&nbsp;;</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;log1p(+INF)&nbsp;is&nbsp;+INF;&nbsp;log1p(-1)&nbsp;is&nbsp;-INF&nbsp;with&nbsp;signal;</span><br>
+<span class="lineno">65</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;log1p(NaN)&nbsp;is&nbsp;that&nbsp;NaN&nbsp;with&nbsp;no&nbsp;signal.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Accuracy:</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;according&nbsp;to&nbsp;an&nbsp;error&nbsp;analysis,&nbsp;the&nbsp;error&nbsp;is&nbsp;always&nbsp;less&nbsp;than</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1&nbsp;ulp&nbsp;(unit&nbsp;in&nbsp;the&nbsp;last&nbsp;place).</span><br>
+<span class="lineno">70</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Constants:</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;hexadecimal&nbsp;values&nbsp;are&nbsp;the&nbsp;intended&nbsp;ones&nbsp;for&nbsp;the&nbsp;following</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;constants.&nbsp;The&nbsp;decimal&nbsp;values&nbsp;may&nbsp;be&nbsp;used,&nbsp;provided&nbsp;that&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;compiler&nbsp;will&nbsp;convert&nbsp;from&nbsp;decimal&nbsp;to&nbsp;binary&nbsp;accurately&nbsp;enough</span><br>
+<span class="lineno">75</span><span class="comment">//&nbsp;to&nbsp;produce&nbsp;the&nbsp;hexadecimal&nbsp;values&nbsp;shown.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Note:&nbsp;Assuming&nbsp;log()&nbsp;return&nbsp;accurate&nbsp;answer,&nbsp;the&nbsp;following</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;algorithm&nbsp;can&nbsp;be&nbsp;used&nbsp;to&nbsp;compute&nbsp;log1p(x)&nbsp;to&nbsp;within&nbsp;a&nbsp;few&nbsp;ULP:</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">80</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;u&nbsp;=&nbsp;1+x;</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;if(u==1.0)&nbsp;return&nbsp;x&nbsp;;&nbsp;else</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;return&nbsp;log(u)*(x/(u-1.0));</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;See&nbsp;HP-15C&nbsp;Advanced&nbsp;Functions&nbsp;Handbook,&nbsp;p.193.</span><br>
+<span class="lineno">85</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Log1p&nbsp;returns&nbsp;the&nbsp;natural&nbsp;logarithm&nbsp;of&nbsp;1&nbsp;plus&nbsp;its&nbsp;argument&nbsp;x.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;It&nbsp;is&nbsp;more&nbsp;accurate&nbsp;than&nbsp;Log(1&nbsp;+&nbsp;x)&nbsp;when&nbsp;x&nbsp;is&nbsp;near&nbsp;zero.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Special&nbsp;cases&nbsp;are:</span><br>
+<span class="lineno">90</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspLog1p(+Inf)&nbsp;=&nbsp;+Inf</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspLog1p(±0)&nbsp;=&nbsp;±0</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspLog1p(-1)&nbsp;=&nbsp;-Inf</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspLog1p(x&nbsp;&lt;&nbsp;-1)&nbsp;=&nbsp;NaN</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspLog1p(NaN)&nbsp;=&nbsp;NaN</span><br>
+<span class="lineno">95</span><span class="keyword">func</span>&nbsp;<span class="ident">Log1p</span><span class="op">(</span><span class="ident">x</span>&nbsp;<span class="builtintype">float64</span><span class="op">)</span>&nbsp;<span class="builtintype">float64</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">log1p</span><span class="op">(</span><span class="ident">x</span>&nbsp;<span class="builtintype">float64</span><span class="op">)</span>&nbsp;<span class="builtintype">float64</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Sqrt2M1</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">4.142135623730950488017e-01</span>&nbsp;&nbsp;<span class="comment">//&nbsp;Sqrt(2)-1&nbsp;=&nbsp;0x3fda827999fcef34</span><br>
+<span class="lineno">100</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Sqrt2HalfM1</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">-</span><span class="num">2.928932188134524755992e-01</span>&nbsp;<span class="comment">//&nbsp;Sqrt(2)/2-1&nbsp;=&nbsp;0xbfd2bec333018866</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Small</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">1.0</span>&nbsp;<span class="op">/</span>&nbsp;<span class="op">(</span><span class="num">1</span>&nbsp;<span class="op">&lt;&lt;</span>&nbsp;<span class="num">29</span><span class="op">)</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;2**-29&nbsp;=&nbsp;0x3e20000000000000</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Tiny</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">1.0</span>&nbsp;<span class="op">/</span>&nbsp;<span class="op">(</span><span class="num">1</span>&nbsp;<span class="op">&lt;&lt;</span>&nbsp;<span class="num">54</span><span class="op">)</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;2**-54</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Two53</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span>&nbsp;<span class="op">&lt;&lt;</span>&nbsp;<span class="num">53</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;2**53</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Ln2Hi</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">6.93147180369123816490e-01</span>&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;3fe62e42fee00000</span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Ln2Lo</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">1.90821492927058770002e-10</span>&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;3dea39ef35793c76</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Lp1</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">6.666666666666735130e-01</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;3FE5555555555593</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Lp2</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">3.999999999940941908e-01</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;3FD999999997FA04</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Lp3</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">2.857142874366239149e-01</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;3FD2492494229359</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Lp4</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">2.222219843214978396e-01</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;3FCC71C51D8E78AF</span><br>
+<span class="lineno">110</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Lp5</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">1.818357216161805012e-01</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;3FC7466496CB03DE</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Lp6</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">1.531383769920937332e-01</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;3FC39A09D078C69F</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Lp7</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">1.479819860511658591e-01</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;3FC2F112DF3E5244</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">115</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;special&nbsp;cases</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="op">-</span><span class="num">1</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">IsNaN</span><span class="op">(</span><span class="ident">x</span><span class="op">)</span><span class="op">:</span>&nbsp;<span class="comment">//&nbsp;includes&nbsp;-Inf</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">NaN</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">==</span>&nbsp;<span class="op">-</span><span class="num">1</span><span class="op">:</span><br>
+<span class="lineno">120</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">Inf</span><span class="op">(</span><span class="op">-</span><span class="num">1</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">IsInf</span><span class="op">(</span><span class="ident">x</span><span class="op">,</span>&nbsp;<span class="num">1</span><span class="op">)</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">Inf</span><span class="op">(</span><span class="num">1</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">125</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">absx</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">x</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">absx</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">absx</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">-</span><span class="ident">absx</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">130</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">f</span>&nbsp;<span class="builtintype">float64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">iu</span>&nbsp;<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">k</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">absx</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">Sqrt2M1</span>&nbsp;<span class="op">{</span>&nbsp;<span class="comment">//&nbsp;&nbsp;|x|&nbsp;&lt;&nbsp;Sqrt(2)-1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">absx</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">Small</span>&nbsp;<span class="op">{</span>&nbsp;<span class="comment">//&nbsp;|x|&nbsp;&lt;&nbsp;2**-29</span><br>
+<span class="lineno">135</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">absx</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">Tiny</span>&nbsp;<span class="op">{</span>&nbsp;<span class="comment">//&nbsp;|x|&nbsp;&lt;&nbsp;2**-54</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">x</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">x</span><span class="op">*</span><span class="ident">x</span><span class="op">*</span><span class="num">0.5</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">140</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="ident">Sqrt2HalfM1</span>&nbsp;<span class="op">{</span>&nbsp;<span class="comment">//&nbsp;Sqrt(2)/2-1&nbsp;&lt;&nbsp;x</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;(Sqrt(2)/2-1)&nbsp;&lt;&nbsp;x&nbsp;&lt;&nbsp;(Sqrt(2)-1)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">k</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">f</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">x</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">iu</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno">145</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="builtintype">float64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">k</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">u</span>&nbsp;<span class="builtintype">float64</span><br>
+<span class="lineno">150</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">absx</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">Two53</span>&nbsp;<span class="op">{</span>&nbsp;<span class="comment">//&nbsp;1&lt;&lt;53</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">u</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1.0</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">x</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">iu</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">Float64bits</span><span class="op">(</span><span class="ident">u</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">k</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtintype">int</span><span class="op">(</span><span class="op">(</span><span class="ident">iu</span>&nbsp;<span class="op">&gt;&gt;</span>&nbsp;<span class="num">52</span><span class="op">)</span>&nbsp;<span class="op">-</span>&nbsp;<span class="num">1023</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">k</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">155</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1.0</span>&nbsp;<span class="op">-</span>&nbsp;<span class="op">(</span><span class="ident">u</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">x</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">-</span>&nbsp;<span class="op">(</span><span class="ident">u</span>&nbsp;<span class="op">-</span>&nbsp;<span class="num">1.0</span><span class="op">)</span>&nbsp;<span class="comment">//&nbsp;correction&nbsp;term</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span>&nbsp;<span class="op">/=</span>&nbsp;<span class="ident">u</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">160</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">u</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">x</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">iu</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">Float64bits</span><span class="op">(</span><span class="ident">u</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">k</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtintype">int</span><span class="op">(</span><span class="op">(</span><span class="ident">iu</span>&nbsp;<span class="op">&gt;&gt;</span>&nbsp;<span class="num">52</span><span class="op">)</span>&nbsp;<span class="op">-</span>&nbsp;<span class="num">1023</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno">165</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">iu</span>&nbsp;<span class="op">&amp;=</span>&nbsp;<span class="num">0x000fffffffffffff</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">iu</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">0x0006a09e667f3bcd</span>&nbsp;<span class="op">{</span>&nbsp;<span class="comment">//&nbsp;mantissa&nbsp;of&nbsp;Sqrt(2)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">u</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">Float64frombits</span><span class="op">(</span><span class="ident">iu</span>&nbsp;<span class="op">|</span>&nbsp;<span class="num">0x3ff0000000000000</span><span class="op">)</span>&nbsp;<span class="comment">//&nbsp;normalize&nbsp;u</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">170</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">k</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">u</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">Float64frombits</span><span class="op">(</span><span class="ident">iu</span>&nbsp;<span class="op">|</span>&nbsp;<span class="num">0x3fe0000000000000</span><span class="op">)</span>&nbsp;<span class="comment">//&nbsp;normalize&nbsp;u/2</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">iu</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">(</span><span class="num">0x0010000000000000</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">iu</span><span class="op">)</span>&nbsp;<span class="op">&gt;&gt;</span>&nbsp;<span class="num">2</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">f</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">u</span>&nbsp;<span class="op">-</span>&nbsp;<span class="num">1.0</span>&nbsp;<span class="comment">//&nbsp;Sqrt(2)/2&nbsp;&lt;&nbsp;u&nbsp;&lt;&nbsp;Sqrt(2)</span><br>
+<span class="lineno">175</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">hfsq</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="num">0.5</span>&nbsp;<span class="op">*</span>&nbsp;<span class="ident">f</span>&nbsp;<span class="op">*</span>&nbsp;<span class="ident">f</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">s</span><span class="op">,</span>&nbsp;<span class="ident">R</span><span class="op">,</span>&nbsp;<span class="ident">z</span>&nbsp;<span class="builtintype">float64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">iu</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span>&nbsp;<span class="comment">//&nbsp;|f|&nbsp;&lt;&nbsp;2**-20</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">f</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">180</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">k</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="builtintype">float64</span><span class="op">(</span><span class="ident">k</span><span class="op">)</span>&nbsp;<span class="op">*</span>&nbsp;<span class="ident">Ln2Lo</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="builtintype">float64</span><span class="op">(</span><span class="ident">k</span><span class="op">)</span><span class="op">*</span><span class="ident">Ln2Hi</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">c</span><br>
+<span class="lineno">185</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">R</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">hfsq</span>&nbsp;<span class="op">*</span>&nbsp;<span class="op">(</span><span class="num">1.0</span>&nbsp;<span class="op">-</span>&nbsp;<span class="num">0.66666666666666666</span><span class="op">*</span><span class="ident">f</span><span class="op">)</span>&nbsp;<span class="comment">//&nbsp;avoid&nbsp;division</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">k</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">f</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">R</span><br>
+<span class="lineno">190</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="builtintype">float64</span><span class="op">(</span><span class="ident">k</span><span class="op">)</span><span class="op">*</span><span class="ident">Ln2Hi</span>&nbsp;<span class="op">-</span>&nbsp;<span class="op">(</span><span class="op">(</span><span class="ident">R</span>&nbsp;<span class="op">-</span>&nbsp;<span class="op">(</span><span class="builtintype">float64</span><span class="op">(</span><span class="ident">k</span><span class="op">)</span><span class="op">*</span><span class="ident">Ln2Lo</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">c</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">f</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">f</span>&nbsp;<span class="op">/</span>&nbsp;<span class="op">(</span><span class="num">2.0</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">f</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">z</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">s</span>&nbsp;<span class="op">*</span>&nbsp;<span class="ident">s</span><br>
+<span class="lineno">195</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">R</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">z</span>&nbsp;<span class="op">*</span>&nbsp;<span class="op">(</span><span class="ident">Lp1</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">z</span><span class="op">*</span><span class="op">(</span><span class="ident">Lp2</span><span class="op">+</span><span class="ident">z</span><span class="op">*</span><span class="op">(</span><span class="ident">Lp3</span><span class="op">+</span><span class="ident">z</span><span class="op">*</span><span class="op">(</span><span class="ident">Lp4</span><span class="op">+</span><span class="ident">z</span><span class="op">*</span><span class="op">(</span><span class="ident">Lp5</span><span class="op">+</span><span class="ident">z</span><span class="op">*</span><span class="op">(</span><span class="ident">Lp6</span><span class="op">+</span><span class="ident">z</span><span class="op">*</span><span class="ident">Lp7</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">k</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">f</span>&nbsp;<span class="op">-</span>&nbsp;<span class="op">(</span><span class="ident">hfsq</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">s</span><span class="op">*</span><span class="op">(</span><span class="ident">hfsq</span><span class="op">+</span><span class="ident">R</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="builtintype">float64</span><span class="op">(</span><span class="ident">k</span><span class="op">)</span><span class="op">*</span><span class="ident">Ln2Hi</span>&nbsp;<span class="op">-</span>&nbsp;<span class="op">(</span><span class="op">(</span><span class="ident">hfsq</span>&nbsp;<span class="op">-</span>&nbsp;<span class="op">(</span><span class="ident">s</span><span class="op">*</span><span class="op">(</span><span class="ident">hfsq</span><span class="op">+</span><span class="ident">R</span><span class="op">)</span>&nbsp;<span class="op">+</span>&nbsp;<span class="op">(</span><span class="builtintype">float64</span><span class="op">(</span><span class="ident">k</span><span class="op">)</span><span class="op">*</span><span class="ident">Ln2Lo</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">c</span><span class="op">)</span><span class="op">)</span><span class="op">)</span>&nbsp;<span class="op">-</span>&nbsp;<span class="ident">f</span><span class="op">)</span><br>
+<span class="lineno">200</span><span class="op">}</span>
+</div>
+</body>
+</html>

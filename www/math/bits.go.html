@@ -1,0 +1,74 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2009&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">math</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uvnan</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">0x7FF8000000000001</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uvinf</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">0x7FF0000000000000</span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uvneginf</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0xFFF0000000000000</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mask</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">0x7FF</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">shift</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">64</span>&nbsp;<span class="op">-</span>&nbsp;<span class="num">11</span>&nbsp;<span class="op">-</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">bias</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">1023</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno">15</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Inf&nbsp;returns&nbsp;positive&nbsp;infinity&nbsp;if&nbsp;sign&nbsp;&gt;=&nbsp;0,&nbsp;negative&nbsp;infinity&nbsp;if&nbsp;sign&nbsp;&lt;&nbsp;0.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">Inf</span><span class="op">(</span><span class="ident">sign</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">float64</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">v</span>&nbsp;<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">sign</span>&nbsp;<span class="op">&gt;=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">uvinf</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">uvneginf</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">Float64frombits</span><span class="op">(</span><span class="ident">v</span><span class="op">)</span><br>
+<span class="lineno">25</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;NaN&nbsp;returns&nbsp;an&nbsp;IEEE&nbsp;754&nbsp;``not-a-number&#39;&#39;&nbsp;value.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">NaN</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">float64</span>&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="ident">Float64frombits</span><span class="op">(</span><span class="ident">uvnan</span><span class="op">)</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">30</span><span class="comment">//&nbsp;IsNaN&nbsp;reports&nbsp;whether&nbsp;f&nbsp;is&nbsp;an&nbsp;IEEE&nbsp;754&nbsp;``not-a-number&#39;&#39;&nbsp;value.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">IsNaN</span><span class="op">(</span><span class="ident">f</span>&nbsp;<span class="builtintype">float64</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">is</span>&nbsp;<span class="builtintype">bool</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;IEEE&nbsp;754&nbsp;says&nbsp;that&nbsp;only&nbsp;NaNs&nbsp;satisfy&nbsp;f&nbsp;!=&nbsp;f.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;To&nbsp;avoid&nbsp;the&nbsp;floating-point&nbsp;hardware,&nbsp;could&nbsp;use:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;&nbsp;&nbsp;&nbspx&nbsp;:=&nbsp;Float64bits(f);</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;&nbsp;&nbsp;&nbspreturn&nbsp;uint32(x&gt;&gt;shift)&amp;mask&nbsp;==&nbsp;mask&nbsp;&amp;&amp;&nbsp;x&nbsp;!=&nbsp;uvinf&nbsp;&amp;&amp;&nbsp;x&nbsp;!=&nbsp;uvneginf</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">f</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">f</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;IsInf&nbsp;reports&nbsp;whether&nbsp;f&nbsp;is&nbsp;an&nbsp;infinity,&nbsp;according&nbsp;to&nbsp;sign.</span><br>
+<span class="lineno">40</span><span class="comment">//&nbsp;If&nbsp;sign&nbsp;&gt;&nbsp;0,&nbsp;IsInf&nbsp;reports&nbsp;whether&nbsp;f&nbsp;is&nbsp;positive&nbsp;infinity.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;If&nbsp;sign&nbsp;&lt;&nbsp;0,&nbsp;IsInf&nbsp;reports&nbsp;whether&nbsp;f&nbsp;is&nbsp;negative&nbsp;infinity.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;If&nbsp;sign&nbsp;==&nbsp;0,&nbsp;IsInf&nbsp;reports&nbsp;whether&nbsp;f&nbsp;is&nbsp;either&nbsp;infinity.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">IsInf</span><span class="op">(</span><span class="ident">f</span>&nbsp;<span class="builtintype">float64</span><span class="op">,</span>&nbsp;<span class="ident">sign</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Test&nbsp;for&nbsp;infinity&nbsp;by&nbsp;comparing&nbsp;against&nbsp;maximum&nbsp;float.</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;To&nbsp;avoid&nbsp;the&nbsp;floating-point&nbsp;hardware,&nbsp;could&nbsp;use:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;&nbsp;&nbsp;&nbspx&nbsp;:=&nbsp;Float64bits(f);</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;&nbsp;&nbsp;&nbspreturn&nbsp;sign&nbsp;&gt;=&nbsp;0&nbsp;&amp;&amp;&nbsp;x&nbsp;==&nbsp;uvinf&nbsp;||&nbsp;sign&nbsp;&lt;=&nbsp;0&nbsp;&amp;&amp;&nbsp;x&nbsp;==&nbsp;uvneginf;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">sign</span>&nbsp;<span class="op">&gt;=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">f</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="ident">MaxFloat64</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">sign</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">f</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="op">-</span><span class="ident">MaxFloat64</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">50</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;normalize&nbsp;returns&nbsp;a&nbsp;normal&nbsp;number&nbsp;y&nbsp;and&nbsp;exponent&nbsp;exp</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;satisfying&nbsp;x&nbsp;==&nbsp;y&nbsp;×&nbsp;2**exp.&nbsp;It&nbsp;assumes&nbsp;x&nbsp;is&nbsp;finite&nbsp;and&nbsp;non-zero.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">normalize</span><span class="op">(</span><span class="ident">x</span>&nbsp;<span class="builtintype">float64</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">y</span>&nbsp;<span class="builtintype">float64</span><span class="op">,</span>&nbsp;<span class="ident">exp</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">const</span>&nbsp;<span class="ident">SmallestNormal</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">2.2250738585072014e-308</span>&nbsp;<span class="comment">//&nbsp;2**-1022</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">Abs</span><span class="op">(</span><span class="ident">x</span><span class="op">)</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">SmallestNormal</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">*</span>&nbsp;<span class="op">(</span><span class="num">1</span>&nbsp;<span class="op">&lt;&lt;</span>&nbsp;<span class="num">52</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="op">-</span><span class="num">52</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">x</span><span class="op">,</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

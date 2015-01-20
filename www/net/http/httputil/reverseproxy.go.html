@@ -1,0 +1,240 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2011&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="comment">//&nbsp;HTTP&nbsp;reverse&nbsp;proxy&nbsp;handler</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">package</span>&nbsp;<span class="ident">httputil</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;io&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;log&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;net&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;net/http&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;net/url&#34;</span><br>
+<span class="lineno">15</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;strings&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;sync&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;time&#34;</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">20</span><span class="comment">//&nbsp;onExitFlushLoop&nbsp;is&nbsp;a&nbsp;callback&nbsp;set&nbsp;by&nbsp;tests&nbsp;to&nbsp;detect&nbsp;the&nbsp;state&nbsp;of&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;flushLoop()&nbsp;goroutine.</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">onExitFlushLoop</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ReverseProxy&nbsp;is&nbsp;an&nbsp;HTTP&nbsp;Handler&nbsp;that&nbsp;takes&nbsp;an&nbsp;incoming&nbsp;request&nbsp;and</span><br>
+<span class="lineno">25</span><span class="comment">//&nbsp;sends&nbsp;it&nbsp;to&nbsp;another&nbsp;server,&nbsp;proxying&nbsp;the&nbsp;response&nbsp;back&nbsp;to&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;client.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">ReverseProxy</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Director&nbsp;must&nbsp;be&nbsp;a&nbsp;function&nbsp;which&nbsp;modifies</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;the&nbsp;request&nbsp;into&nbsp;a&nbsp;new&nbsp;request&nbsp;to&nbsp;be&nbsp;sent</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;using&nbsp;Transport.&nbsp;Its&nbsp;response&nbsp;is&nbsp;then&nbsp;copied</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;back&nbsp;to&nbsp;the&nbsp;original&nbsp;client&nbsp;unmodified.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Director</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="op">*</span><span class="ident">http</span><span class="op">.</span><span class="ident">Request</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;The&nbsp;transport&nbsp;used&nbsp;to&nbsp;perform&nbsp;proxy&nbsp;requests.</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;If&nbsp;nil,&nbsp;http.DefaultTransport&nbsp;is&nbsp;used.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Transport</span>&nbsp;<span class="ident">http</span><span class="op">.</span><span class="ident">RoundTripper</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;FlushInterval&nbsp;specifies&nbsp;the&nbsp;flush&nbsp;interval</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;to&nbsp;flush&nbsp;to&nbsp;the&nbsp;client&nbsp;while&nbsp;copying&nbsp;the</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;response&nbsp;body.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;If&nbsp;zero,&nbsp;no&nbsp;periodic&nbsp;flushing&nbsp;is&nbsp;done.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">FlushInterval</span>&nbsp;<span class="ident">time</span><span class="op">.</span><span class="ident">Duration</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;ErrorLog&nbsp;specifies&nbsp;an&nbsp;optional&nbsp;logger&nbsp;for&nbsp;errors</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;that&nbsp;occur&nbsp;when&nbsp;attempting&nbsp;to&nbsp;proxy&nbsp;the&nbsp;request.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;If&nbsp;nil,&nbsp;logging&nbsp;goes&nbsp;to&nbsp;os.Stderr&nbsp;via&nbsp;the&nbsp;log&nbsp;package&#39;s</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;standard&nbsp;logger.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ErrorLog</span>&nbsp;<span class="op">*</span><span class="ident">log</span><span class="op">.</span><span class="ident">Logger</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">50</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">singleJoiningSlash</span><span class="op">(</span><span class="ident">a</span><span class="op">,</span>&nbsp;<span class="ident">b</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">aslash</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">strings</span><span class="op">.</span><span class="ident">HasSuffix</span><span class="op">(</span><span class="ident">a</span><span class="op">,</span>&nbsp;<span class="string">&#34;/&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">bslash</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">strings</span><span class="op">.</span><span class="ident">HasPrefix</span><span class="op">(</span><span class="ident">b</span><span class="op">,</span>&nbsp;<span class="string">&#34;/&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">aslash</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">bslash</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">a</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">b</span><span class="op">[</span><span class="num">1</span><span class="op">:</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="op">!</span><span class="ident">aslash</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="op">!</span><span class="ident">bslash</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">a</span>&nbsp;<span class="op">+</span>&nbsp;<span class="string">&#34;/&#34;</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">b</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">a</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">b</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;NewSingleHostReverseProxy&nbsp;returns&nbsp;a&nbsp;new&nbsp;ReverseProxy&nbsp;that&nbsp;rewrites</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;URLs&nbsp;to&nbsp;the&nbsp;scheme,&nbsp;host,&nbsp;and&nbsp;base&nbsp;path&nbsp;provided&nbsp;in&nbsp;target.&nbsp;If&nbsp;the</span><br>
+<span class="lineno">65</span><span class="comment">//&nbsp;target&#39;s&nbsp;path&nbsp;is&nbsp;&#34;/base&#34;&nbsp;and&nbsp;the&nbsp;incoming&nbsp;request&nbsp;was&nbsp;for&nbsp;&#34;/dir&#34;,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;the&nbsp;target&nbsp;request&nbsp;will&nbsp;be&nbsp;for&nbsp;/base/dir.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">NewSingleHostReverseProxy</span><span class="op">(</span><span class="ident">target</span>&nbsp;<span class="op">*</span><span class="ident">url</span><span class="op">.</span><span class="ident">URL</span><span class="op">)</span>&nbsp;<span class="op">*</span><span class="ident">ReverseProxy</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">targetQuery</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">target</span><span class="op">.</span><span class="ident">RawQuery</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">director</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">func</span><span class="op">(</span><span class="ident">req</span>&nbsp;<span class="op">*</span><span class="ident">http</span><span class="op">.</span><span class="ident">Request</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">req</span><span class="op">.</span><span class="ident">URL</span><span class="op">.</span><span class="ident">Scheme</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">target</span><span class="op">.</span><span class="ident">Scheme</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">req</span><span class="op">.</span><span class="ident">URL</span><span class="op">.</span><span class="ident">Host</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">target</span><span class="op">.</span><span class="ident">Host</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">req</span><span class="op">.</span><span class="ident">URL</span><span class="op">.</span><span class="ident">Path</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">singleJoiningSlash</span><span class="op">(</span><span class="ident">target</span><span class="op">.</span><span class="ident">Path</span><span class="op">,</span>&nbsp;<span class="ident">req</span><span class="op">.</span><span class="ident">URL</span><span class="op">.</span><span class="ident">Path</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">targetQuery</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#34;&#34;</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">req</span><span class="op">.</span><span class="ident">URL</span><span class="op">.</span><span class="ident">RawQuery</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#34;&#34;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">req</span><span class="op">.</span><span class="ident">URL</span><span class="op">.</span><span class="ident">RawQuery</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">targetQuery</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">req</span><span class="op">.</span><span class="ident">URL</span><span class="op">.</span><span class="ident">RawQuery</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">req</span><span class="op">.</span><span class="ident">URL</span><span class="op">.</span><span class="ident">RawQuery</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">targetQuery</span>&nbsp;<span class="op">+</span>&nbsp;<span class="string">&#34;&amp;&#34;</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">req</span><span class="op">.</span><span class="ident">URL</span><span class="op">.</span><span class="ident">RawQuery</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="op">&amp;</span><span class="ident">ReverseProxy</span><span class="op">{</span><span class="ident">Director</span><span class="op">:</span>&nbsp;<span class="ident">director</span><span class="op">}</span><br>
+<span class="lineno">80</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">copyHeader</span><span class="op">(</span><span class="ident">dst</span><span class="op">,</span>&nbsp;<span class="ident">src</span>&nbsp;<span class="ident">http</span><span class="op">.</span><span class="ident">Header</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">k</span><span class="op">,</span>&nbsp;<span class="ident">vv</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">src</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">v</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">vv</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dst</span><span class="op">.</span><span class="ident">Add</span><span class="op">(</span><span class="ident">k</span><span class="op">,</span>&nbsp;<span class="ident">v</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">90</span><span class="comment">//&nbsp;Hop-by-hop&nbsp;headers.&nbsp;These&nbsp;are&nbsp;removed&nbsp;when&nbsp;sent&nbsp;to&nbsp;the&nbsp;backend.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;http://www.w3.org/Protocols/rfc2616/rfc2616-sec13.html</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">hopHeaders</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">string</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;Connection&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;Keep-Alive&#34;</span><span class="op">,</span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;Proxy-Authenticate&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;Proxy-Authorization&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;Te&#34;</span><span class="op">,</span>&nbsp;<span class="comment">//&nbsp;canonicalized&nbsp;version&nbsp;of&nbsp;&#34;TE&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;Trailers&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;Transfer-Encoding&#34;</span><span class="op">,</span><br>
+<span class="lineno">100</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;Upgrade&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">*</span><span class="ident">ReverseProxy</span><span class="op">)</span>&nbsp;<span class="ident">ServeHTTP</span><span class="op">(</span><span class="ident">rw</span>&nbsp;<span class="ident">http</span><span class="op">.</span><span class="ident">ResponseWriter</span><span class="op">,</span>&nbsp;<span class="ident">req</span>&nbsp;<span class="op">*</span><span class="ident">http</span><span class="op">.</span><span class="ident">Request</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">transport</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">p</span><span class="op">.</span><span class="ident">Transport</span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">transport</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">transport</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">http</span><span class="op">.</span><span class="ident">DefaultTransport</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">outreq</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">new</span><span class="op">(</span><span class="ident">http</span><span class="op">.</span><span class="ident">Request</span><span class="op">)</span><br>
+<span class="lineno">110</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">outreq</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">*</span><span class="ident">req</span>&nbsp;<span class="comment">//&nbsp;includes&nbsp;shallow&nbsp;copies&nbsp;of&nbsp;maps,&nbsp;but&nbsp;okay</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">.</span><span class="ident">Director</span><span class="op">(</span><span class="ident">outreq</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">outreq</span><span class="op">.</span><span class="ident">Proto</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">&#34;HTTP/1.1&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">outreq</span><span class="op">.</span><span class="ident">ProtoMajor</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno">115</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">outreq</span><span class="op">.</span><span class="ident">ProtoMinor</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">outreq</span><span class="op">.</span><span class="ident">Close</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Remove&nbsp;hop-by-hop&nbsp;headers&nbsp;to&nbsp;the&nbsp;backend.&nbsp;&nbsp;Especially</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;important&nbsp;is&nbsp;&#34;Connection&#34;&nbsp;because&nbsp;we&nbsp;want&nbsp;a&nbsp;persistent</span><br>
+<span class="lineno">120</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;connection,&nbsp;regardless&nbsp;of&nbsp;what&nbsp;the&nbsp;client&nbsp;sent&nbsp;to&nbsp;us.&nbsp;&nbsp;This</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;is&nbsp;modifying&nbsp;the&nbsp;same&nbsp;underlying&nbsp;map&nbsp;from&nbsp;req&nbsp;(shallow</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;copied&nbsp;above)&nbsp;so&nbsp;we&nbsp;only&nbsp;copy&nbsp;it&nbsp;if&nbsp;necessary.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">copiedHeaders</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">h</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">hopHeaders</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">125</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">outreq</span><span class="op">.</span><span class="ident">Header</span><span class="op">.</span><span class="ident">Get</span><span class="op">(</span><span class="ident">h</span><span class="op">)</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="string">&#34;&#34;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">copiedHeaders</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">outreq</span><span class="op">.</span><span class="ident">Header</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">make</span><span class="op">(</span><span class="ident">http</span><span class="op">.</span><span class="ident">Header</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">copyHeader</span><span class="op">(</span><span class="ident">outreq</span><span class="op">.</span><span class="ident">Header</span><span class="op">,</span>&nbsp;<span class="ident">req</span><span class="op">.</span><span class="ident">Header</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">copiedHeaders</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno">130</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">outreq</span><span class="op">.</span><span class="ident">Header</span><span class="op">.</span><span class="ident">Del</span><span class="op">(</span><span class="ident">h</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">135</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">clientIP</span><span class="op">,</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">net</span><span class="op">.</span><span class="ident">SplitHostPort</span><span class="op">(</span><span class="ident">req</span><span class="op">.</span><span class="ident">RemoteAddr</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;If&nbsp;we&nbsp;aren&#39;t&nbsp;the&nbsp;first&nbsp;proxy&nbsp;retain&nbsp;prior</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;X-Forwarded-For&nbsp;information&nbsp;as&nbsp;a&nbsp;comma+space</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;separated&nbsp;list&nbsp;and&nbsp;fold&nbsp;multiple&nbsp;headers&nbsp;into&nbsp;one.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">prior</span><span class="op">,</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">outreq</span><span class="op">.</span><span class="ident">Header</span><span class="op">[</span><span class="string">&#34;X-Forwarded-For&#34;</span><span class="op">]</span><span class="op">;</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">140</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">clientIP</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">strings</span><span class="op">.</span><span class="ident">Join</span><span class="op">(</span><span class="ident">prior</span><span class="op">,</span>&nbsp;<span class="string">&#34;,&nbsp;&#34;</span><span class="op">)</span>&nbsp;<span class="op">+</span>&nbsp;<span class="string">&#34;,&nbsp;&#34;</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">clientIP</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">outreq</span><span class="op">.</span><span class="ident">Header</span><span class="op">.</span><span class="ident">Set</span><span class="op">(</span><span class="string">&#34;X-Forwarded-For&#34;</span><span class="op">,</span>&nbsp;<span class="ident">clientIP</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">145</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">res</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">transport</span><span class="op">.</span><span class="ident">RoundTrip</span><span class="op">(</span><span class="ident">outreq</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">.</span><span class="ident">logf</span><span class="op">(</span><span class="string">&#34;http:&nbsp;proxy&nbsp;error:&nbsp;%v&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">rw</span><span class="op">.</span><span class="ident">WriteHeader</span><span class="op">(</span><span class="ident">http</span><span class="op">.</span><span class="ident">StatusInternalServerError</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno">150</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">defer</span>&nbsp;<span class="ident">res</span><span class="op">.</span><span class="ident">Body</span><span class="op">.</span><span class="ident">Close</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">h</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">hopHeaders</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">res</span><span class="op">.</span><span class="ident">Header</span><span class="op">.</span><span class="ident">Del</span><span class="op">(</span><span class="ident">h</span><span class="op">)</span><br>
+<span class="lineno">155</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">copyHeader</span><span class="op">(</span><span class="ident">rw</span><span class="op">.</span><span class="ident">Header</span><span class="op">(</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">res</span><span class="op">.</span><span class="ident">Header</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">rw</span><span class="op">.</span><span class="ident">WriteHeader</span><span class="op">(</span><span class="ident">res</span><span class="op">.</span><span class="ident">StatusCode</span><span class="op">)</span><br>
+<span class="lineno">160</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">.</span><span class="ident">copyResponse</span><span class="op">(</span><span class="ident">rw</span><span class="op">,</span>&nbsp;<span class="ident">res</span><span class="op">.</span><span class="ident">Body</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">*</span><span class="ident">ReverseProxy</span><span class="op">)</span>&nbsp;<span class="ident">copyResponse</span><span class="op">(</span><span class="ident">dst</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">Writer</span><span class="op">,</span>&nbsp;<span class="ident">src</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">Reader</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">p</span><span class="op">.</span><span class="ident">FlushInterval</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">165</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">wf</span><span class="op">,</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">dst</span><span class="op">.</span><span class="op">(</span><span class="ident">writeFlusher</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mlw</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">&amp;</span><span class="ident">maxLatencyWriter</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dst</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">wf</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">latency</span><span class="op">:</span>&nbsp;<span class="ident">p</span><span class="op">.</span><span class="ident">FlushInterval</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">done</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtinfunc">make</span><span class="op">(</span><span class="keyword">chan</span>&nbsp;<span class="builtintype">bool</span><span class="op">)</span><span class="op">,</span><br>
+<span class="lineno">170</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">go</span>&nbsp;<span class="ident">mlw</span><span class="op">.</span><span class="ident">flushLoop</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">defer</span>&nbsp;<span class="ident">mlw</span><span class="op">.</span><span class="ident">stop</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dst</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">mlw</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">175</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">io</span><span class="op">.</span><span class="ident">Copy</span><span class="op">(</span><span class="ident">dst</span><span class="op">,</span>&nbsp;<span class="ident">src</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">180</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">*</span><span class="ident">ReverseProxy</span><span class="op">)</span>&nbsp;<span class="ident">logf</span><span class="op">(</span><span class="ident">format</span>&nbsp;<span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="ident">args</span>&nbsp;<span class="op">...</span><span class="keyword">interface</span><span class="op">{</span><span class="op">}</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">p</span><span class="op">.</span><span class="ident">ErrorLog</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span><span class="op">.</span><span class="ident">ErrorLog</span><span class="op">.</span><span class="ident">Printf</span><span class="op">(</span><span class="ident">format</span><span class="op">,</span>&nbsp;<span class="ident">args</span><span class="op">...</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">log</span><span class="op">.</span><span class="ident">Printf</span><span class="op">(</span><span class="ident">format</span><span class="op">,</span>&nbsp;<span class="ident">args</span><span class="op">...</span><span class="op">)</span><br>
+<span class="lineno">185</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">writeFlusher</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">io</span><span class="op">.</span><span class="ident">Writer</span><br>
+<span class="lineno">190</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">http</span><span class="op">.</span><span class="ident">Flusher</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">maxLatencyWriter</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dst</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">writeFlusher</span><br>
+<span class="lineno">195</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">latency</span>&nbsp;<span class="ident">time</span><span class="op">.</span><span class="ident">Duration</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">lk</span>&nbsp;&nbsp;&nbsp;<span class="ident">sync</span><span class="op">.</span><span class="ident">Mutex</span>&nbsp;<span class="comment">//&nbsp;protects&nbsp;Write&nbsp;+&nbsp;Flush</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">done</span>&nbsp;<span class="keyword">chan</span>&nbsp;<span class="builtintype">bool</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">200</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">m</span>&nbsp;<span class="op">*</span><span class="ident">maxLatencyWriter</span><span class="op">)</span>&nbsp;<span class="ident">Write</span><span class="op">(</span><span class="ident">p</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">m</span><span class="op">.</span><span class="ident">lk</span><span class="op">.</span><span class="ident">Lock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">defer</span>&nbsp;<span class="ident">m</span><span class="op">.</span><span class="ident">lk</span><span class="op">.</span><span class="ident">Unlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">m</span><span class="op">.</span><span class="ident">dst</span><span class="op">.</span><span class="ident">Write</span><span class="op">(</span><span class="ident">p</span><span class="op">)</span><br>
+<span class="lineno">205</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">m</span>&nbsp;<span class="op">*</span><span class="ident">maxLatencyWriter</span><span class="op">)</span>&nbsp;<span class="ident">flushLoop</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">time</span><span class="op">.</span><span class="ident">NewTicker</span><span class="op">(</span><span class="ident">m</span><span class="op">.</span><span class="ident">latency</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">defer</span>&nbsp;<span class="ident">t</span><span class="op">.</span><span class="ident">Stop</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">210</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">select</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="op">&lt;-</span><span class="ident">m</span><span class="op">.</span><span class="ident">done</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">onExitFlushLoop</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">onExitFlushLoop</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">215</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="op">&lt;-</span><span class="ident">t</span><span class="op">.</span><span class="ident">C</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">m</span><span class="op">.</span><span class="ident">lk</span><span class="op">.</span><span class="ident">Lock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">m</span><span class="op">.</span><span class="ident">dst</span><span class="op">.</span><span class="ident">Flush</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">220</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">m</span><span class="op">.</span><span class="ident">lk</span><span class="op">.</span><span class="ident">Unlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">225</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">m</span>&nbsp;<span class="op">*</span><span class="ident">maxLatencyWriter</span><span class="op">)</span>&nbsp;<span class="ident">stop</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span>&nbsp;<span class="ident">m</span><span class="op">.</span><span class="ident">done</span>&nbsp;<span class="op">&lt;-</span>&nbsp;<span class="ident">true</span>&nbsp;<span class="op">}</span>
+</div>
+</body>
+</html>

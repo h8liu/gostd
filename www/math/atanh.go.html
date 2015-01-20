@@ -1,0 +1,92 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2010&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">math</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;original&nbsp;C&nbsp;code,&nbsp;the&nbsp;long&nbsp;comment,&nbsp;and&nbsp;the&nbsp;constants</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;below&nbsp;are&nbsp;from&nbsp;FreeBSD&#39;s&nbsp;/usr/src/lib/msun/src/e_atanh.c</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;and&nbsp;came&nbsp;with&nbsp;this&nbsp;notice.&nbsp;&nbsp;The&nbsp;go&nbsp;code&nbsp;is&nbsp;a&nbsp;simplified</span><br>
+<span class="lineno">10</span><span class="comment">//&nbsp;version&nbsp;of&nbsp;the&nbsp;original&nbsp;C.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;====================================================</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Copyright&nbsp;(C)&nbsp;1993&nbsp;by&nbsp;Sun&nbsp;Microsystems,&nbsp;Inc.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">15</span><span class="comment">//&nbsp;Developed&nbsp;at&nbsp;SunPro,&nbsp;a&nbsp;Sun&nbsp;Microsystems,&nbsp;Inc.&nbsp;business.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Permission&nbsp;to&nbsp;use,&nbsp;copy,&nbsp;modify,&nbsp;and&nbsp;distribute&nbsp;this</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;software&nbsp;is&nbsp;freely&nbsp;granted,&nbsp;provided&nbsp;that&nbsp;this&nbsp;notice</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;is&nbsp;preserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;====================================================</span><br>
+<span class="lineno">20</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;__ieee754_atanh(x)</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Method&nbsp;:</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp1.&nbsp;Reduce&nbsp;x&nbsp;to&nbsp;positive&nbsp;by&nbsp;atanh(-x)&nbsp;=&nbsp;-atanh(x)</span><br>
+<span class="lineno">25</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp2.&nbsp;For&nbsp;x&gt;=0.5</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2x&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;x</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspatanh(x)&nbsp;=&nbsp;---&nbsp;*&nbsp;log(1&nbsp;+&nbsp;-------)&nbsp;=&nbsp;0.5&nbsp;*&nbsp;log1p(2&nbsp;*&nbsp;--------)</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1&nbsp;-&nbsp;x&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1&nbsp;-&nbsp;x</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">30</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspFor&nbsp;x&lt;0.5</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspatanh(x)&nbsp;=&nbsp;0.5*log1p(2x+2x*x/(1-x))</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Special&nbsp;cases:</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspatanh(x)&nbsp;is&nbsp;NaN&nbsp;if&nbsp;|x|&nbsp;&gt;&nbsp;1&nbsp;with&nbsp;signal;</span><br>
+<span class="lineno">35</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspatanh(NaN)&nbsp;is&nbsp;that&nbsp;NaN&nbsp;with&nbsp;no&nbsp;signal;</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspatanh(+-1)&nbsp;is&nbsp;+-INF&nbsp;with&nbsp;signal.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Atanh&nbsp;returns&nbsp;the&nbsp;inverse&nbsp;hyperbolic&nbsp;tangent&nbsp;of&nbsp;x.</span><br>
+<span class="lineno">40</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Special&nbsp;cases&nbsp;are:</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspAtanh(1)&nbsp;=&nbsp;+Inf</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspAtanh(±0)&nbsp;=&nbsp;±0</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspAtanh(-1)&nbsp;=&nbsp;-Inf</span><br>
+<span class="lineno">45</span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspAtanh(x)&nbsp;=&nbsp;NaN&nbsp;if&nbsp;x&nbsp;&lt;&nbsp;-1&nbsp;or&nbsp;x&nbsp;&gt;&nbsp;1</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspAtanh(NaN)&nbsp;=&nbsp;NaN</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">Atanh</span><span class="op">(</span><span class="ident">x</span>&nbsp;<span class="builtintype">float64</span><span class="op">)</span>&nbsp;<span class="builtintype">float64</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">const</span>&nbsp;<span class="ident">NearZero</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1.0</span>&nbsp;<span class="op">/</span>&nbsp;<span class="op">(</span><span class="num">1</span>&nbsp;<span class="op">&lt;&lt;</span>&nbsp;<span class="num">28</span><span class="op">)</span>&nbsp;<span class="comment">//&nbsp;2**-28</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;special&nbsp;cases</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="op">-</span><span class="num">1</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">1</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">IsNaN</span><span class="op">(</span><span class="ident">x</span><span class="op">)</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">NaN</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">1</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">Inf</span><span class="op">(</span><span class="num">1</span><span class="op">)</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">==</span>&nbsp;<span class="op">-</span><span class="num">1</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">Inf</span><span class="op">(</span><span class="op">-</span><span class="num">1</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sign</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">x</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">-</span><span class="ident">x</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sign</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">temp</span>&nbsp;<span class="builtintype">float64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="ident">NearZero</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">temp</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">x</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="num">0.5</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">temp</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">x</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">x</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">temp</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0.5</span>&nbsp;<span class="op">*</span>&nbsp;<span class="ident">Log1p</span><span class="op">(</span><span class="ident">temp</span><span class="op">+</span><span class="ident">temp</span><span class="op">*</span><span class="ident">x</span><span class="op">/</span><span class="op">(</span><span class="num">1</span><span class="op">-</span><span class="ident">x</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">default</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">temp</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0.5</span>&nbsp;<span class="op">*</span>&nbsp;<span class="ident">Log1p</span><span class="op">(</span><span class="op">(</span><span class="ident">x</span><span class="op">+</span><span class="ident">x</span><span class="op">)</span><span class="op">/</span><span class="op">(</span><span class="num">1</span><span class="op">-</span><span class="ident">x</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">sign</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">temp</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">-</span><span class="ident">temp</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">temp</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

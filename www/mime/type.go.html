@@ -1,0 +1,136 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2010&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="comment">//&nbsp;Package&nbsp;mime&nbsp;implements&nbsp;parts&nbsp;of&nbsp;the&nbsp;MIME&nbsp;spec.</span><br>
+<span class="lineno"></span><span class="keyword">package</span>&nbsp;<span class="ident">mime</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;fmt&#34;</span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;strings&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;sync&#34;</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno">15</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mimeLock</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">sync</span><span class="op">.</span><span class="ident">RWMutex</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mimeTypesLower</span>&nbsp;<span class="op">=</span>&nbsp;<span class="keyword">map</span><span class="op">[</span><span class="builtintype">string</span><span class="op">]</span><span class="builtintype">string</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;.css&#34;</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">&#34;text/css;&nbsp;charset=utf-8&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;.gif&#34;</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">&#34;image/gif&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;.htm&#34;</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">&#34;text/html;&nbsp;charset=utf-8&#34;</span><span class="op">,</span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;.html&#34;</span><span class="op">:</span>&nbsp;<span class="string">&#34;text/html;&nbsp;charset=utf-8&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;.jpg&#34;</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">&#34;image/jpeg&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;.js&#34;</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;<span class="string">&#34;application/x-javascript&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;.pdf&#34;</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">&#34;application/pdf&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;.png&#34;</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">&#34;image/png&#34;</span><span class="op">,</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;.xml&#34;</span><span class="op">:</span>&nbsp;&nbsp;<span class="string">&#34;text/xml;&nbsp;charset=utf-8&#34;</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mimeTypes</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">clone</span><span class="op">(</span><span class="ident">mimeTypesLower</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">30</span><span class="keyword">func</span>&nbsp;<span class="ident">clone</span><span class="op">(</span><span class="ident">m</span>&nbsp;<span class="keyword">map</span><span class="op">[</span><span class="builtintype">string</span><span class="op">]</span><span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="keyword">map</span><span class="op">[</span><span class="builtintype">string</span><span class="op">]</span><span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">m2</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="builtinfunc">make</span><span class="op">(</span><span class="keyword">map</span><span class="op">[</span><span class="builtintype">string</span><span class="op">]</span><span class="builtintype">string</span><span class="op">,</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">m</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">k</span><span class="op">,</span>&nbsp;<span class="ident">v</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="keyword">range</span>&nbsp;<span class="ident">m</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">m2</span><span class="op">[</span><span class="ident">k</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">v</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">strings</span><span class="op">.</span><span class="ident">ToLower</span><span class="op">(</span><span class="ident">k</span><span class="op">)</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">k</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">panic</span><span class="op">(</span><span class="string">&#34;keys&nbsp;in&nbsp;mimeTypesLower&nbsp;must&nbsp;be&nbsp;lowercase&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">m2</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">40</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">once</span>&nbsp;<span class="ident">sync</span><span class="op">.</span><span class="ident">Once</span>&nbsp;<span class="comment">//&nbsp;guards&nbsp;initMime</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;TypeByExtension&nbsp;returns&nbsp;the&nbsp;MIME&nbsp;type&nbsp;associated&nbsp;with&nbsp;the&nbsp;file&nbsp;extension&nbsp;ext.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;extension&nbsp;ext&nbsp;should&nbsp;begin&nbsp;with&nbsp;a&nbsp;leading&nbsp;dot,&nbsp;as&nbsp;in&nbsp;&#34;.html&#34;.</span><br>
+<span class="lineno">45</span><span class="comment">//&nbsp;When&nbsp;ext&nbsp;has&nbsp;no&nbsp;associated&nbsp;type,&nbsp;TypeByExtension&nbsp;returns&nbsp;&#34;&#34;.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Extensions&nbsp;are&nbsp;looked&nbsp;up&nbsp;first&nbsp;case-sensitively,&nbsp;then&nbsp;case-insensitively.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;built-in&nbsp;table&nbsp;is&nbsp;small&nbsp;but&nbsp;on&nbsp;unix&nbsp;it&nbsp;is&nbsp;augmented&nbsp;by&nbsp;the&nbsp;local</span><br>
+<span class="lineno">50</span><span class="comment">//&nbsp;system&#39;s&nbsp;mime.types&nbsp;file(s)&nbsp;if&nbsp;available&nbsp;under&nbsp;one&nbsp;or&nbsp;more&nbsp;of&nbsp;these</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;names:</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;/etc/mime.types</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;/etc/apache2/mime.types</span><br>
+<span class="lineno">55</span><span class="comment">//&nbsp;&nbsp;&nbsp;/etc/apache/mime.types</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;On&nbsp;Windows,&nbsp;MIME&nbsp;types&nbsp;are&nbsp;extracted&nbsp;from&nbsp;the&nbsp;registry.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Text&nbsp;types&nbsp;have&nbsp;the&nbsp;charset&nbsp;parameter&nbsp;set&nbsp;to&nbsp;&#34;utf-8&#34;&nbsp;by&nbsp;default.</span><br>
+<span class="lineno">60</span><span class="keyword">func</span>&nbsp;<span class="ident">TypeByExtension</span><span class="op">(</span><span class="ident">ext</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">once</span><span class="op">.</span><span class="ident">Do</span><span class="op">(</span><span class="ident">initMime</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mimeLock</span><span class="op">.</span><span class="ident">RLock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">defer</span>&nbsp;<span class="ident">mimeLock</span><span class="op">.</span><span class="ident">RUnlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Case-sensitive&nbsp;lookup.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">v</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">mimeTypes</span><span class="op">[</span><span class="ident">ext</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">v</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="string">&#34;&#34;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">v</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">70</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Case-insensitive&nbsp;lookup.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Optimistically&nbsp;assume&nbsp;a&nbsp;short&nbsp;ASCII&nbsp;extension&nbsp;and&nbsp;be</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;allocation-free&nbsp;in&nbsp;that&nbsp;case.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">buf</span>&nbsp;<span class="op">[</span><span class="num">10</span><span class="op">]</span><span class="builtintype">byte</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">lower</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">buf</span><span class="op">[</span><span class="op">:</span><span class="num">0</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">const</span>&nbsp;<span class="ident">utf8RuneSelf</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0x80</span>&nbsp;<span class="comment">//&nbsp;from&nbsp;utf8&nbsp;package,&nbsp;but&nbsp;not&nbsp;importing&nbsp;it.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="num">0</span><span class="op">;</span>&nbsp;<span class="ident">i</span>&nbsp;<span class="op">&lt;</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">ext</span><span class="op">)</span><span class="op">;</span>&nbsp;<span class="ident">i</span><span class="op">++</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">c</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">ext</span><span class="op">[</span><span class="ident">i</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&gt;=</span>&nbsp;<span class="ident">utf8RuneSelf</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Slow&nbsp;path.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">mimeTypesLower</span><span class="op">[</span><span class="ident">strings</span><span class="op">.</span><span class="ident">ToLower</span><span class="op">(</span><span class="ident">ext</span><span class="op">)</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="string">&#39;A&#39;</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">&lt;=</span>&nbsp;<span class="string">&#39;Z&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">lower</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">append</span><span class="op">(</span><span class="ident">lower</span><span class="op">,</span>&nbsp;<span class="ident">c</span><span class="op">+</span><span class="op">(</span><span class="string">&#39;a&#39;</span><span class="op">-</span><span class="string">&#39;A&#39;</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">lower</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">append</span><span class="op">(</span><span class="ident">lower</span><span class="op">,</span>&nbsp;<span class="ident">c</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;The&nbsp;conversion&nbsp;from&nbsp;[]byte&nbsp;to&nbsp;string&nbsp;doesn&#39;t&nbsp;allocate&nbsp;in</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;a&nbsp;map&nbsp;lookup.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">mimeTypesLower</span><span class="op">[</span><span class="builtintype">string</span><span class="op">(</span><span class="ident">lower</span><span class="op">)</span><span class="op">]</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;AddExtensionType&nbsp;sets&nbsp;the&nbsp;MIME&nbsp;type&nbsp;associated&nbsp;with</span><br>
+<span class="lineno">95</span><span class="comment">//&nbsp;the&nbsp;extension&nbsp;ext&nbsp;to&nbsp;typ.&nbsp;The&nbsp;extension&nbsp;should&nbsp;begin&nbsp;with</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;a&nbsp;leading&nbsp;dot,&nbsp;as&nbsp;in&nbsp;&#34;.html&#34;.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">AddExtensionType</span><span class="op">(</span><span class="ident">ext</span><span class="op">,</span>&nbsp;<span class="ident">typ</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">strings</span><span class="op">.</span><span class="ident">HasPrefix</span><span class="op">(</span><span class="ident">ext</span><span class="op">,</span>&nbsp;<span class="string">&#34;.&#34;</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">fmt</span><span class="op">.</span><span class="ident">Errorf</span><span class="op">(</span><span class="string">`mime:&nbsp;extension&nbsp;%q&nbsp;misses&nbsp;dot`</span><span class="op">,</span>&nbsp;<span class="ident">ext</span><span class="op">)</span><br>
+<span class="lineno">100</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">once</span><span class="op">.</span><span class="ident">Do</span><span class="op">(</span><span class="ident">initMime</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">setExtensionType</span><span class="op">(</span><span class="ident">ext</span><span class="op">,</span>&nbsp;<span class="ident">typ</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">105</span><span class="keyword">func</span>&nbsp;<span class="ident">setExtensionType</span><span class="op">(</span><span class="ident">extension</span><span class="op">,</span>&nbsp;<span class="ident">mimeType</span>&nbsp;<span class="builtintype">string</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_</span><span class="op">,</span>&nbsp;<span class="ident">param</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">ParseMediaType</span><span class="op">(</span><span class="ident">mimeType</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">err</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">110</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">strings</span><span class="op">.</span><span class="ident">HasPrefix</span><span class="op">(</span><span class="ident">mimeType</span><span class="op">,</span>&nbsp;<span class="string">&#34;text/&#34;</span><span class="op">)</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">param</span><span class="op">[</span><span class="string">&#34;charset&#34;</span><span class="op">]</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#34;&#34;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">param</span><span class="op">[</span><span class="string">&#34;charset&#34;</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">&#34;utf-8&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mimeType</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">FormatMediaType</span><span class="op">(</span><span class="ident">mimeType</span><span class="op">,</span>&nbsp;<span class="ident">param</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">extLower</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">strings</span><span class="op">.</span><span class="ident">ToLower</span><span class="op">(</span><span class="ident">extension</span><span class="op">)</span><br>
+<span class="lineno">115</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mimeLock</span><span class="op">.</span><span class="ident">Lock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mimeTypes</span><span class="op">[</span><span class="ident">extension</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">mimeType</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mimeTypesLower</span><span class="op">[</span><span class="ident">extLower</span><span class="op">]</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">mimeType</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mimeLock</span><span class="op">.</span><span class="ident">Unlock</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">120</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

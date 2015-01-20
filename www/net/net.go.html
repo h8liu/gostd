@@ -1,0 +1,440 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2009&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="comment">/*<br>
+<span class="lineno"></span>Package&nbsp;net&nbsp;provides&nbsp;a&nbsp;portable&nbsp;interface&nbsp;for&nbsp;network&nbsp;I/O,&nbsp;including<br>
+<span class="lineno"></span>TCP/IP,&nbsp;UDP,&nbsp;domain&nbsp;name&nbsp;resolution,&nbsp;and&nbsp;Unix&nbsp;domain&nbsp;sockets.<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>Although&nbsp;the&nbsp;package&nbsp;provides&nbsp;access&nbsp;to&nbsp;low-level&nbsp;networking<br>
+<span class="lineno">10</span>primitives,&nbsp;most&nbsp;clients&nbsp;will&nbsp;need&nbsp;only&nbsp;the&nbsp;basic&nbsp;interface&nbsp;provided<br>
+<span class="lineno"></span>by&nbsp;the&nbsp;Dial,&nbsp;Listen,&nbsp;and&nbsp;Accept&nbsp;functions&nbsp;and&nbsp;the&nbsp;associated<br>
+<span class="lineno"></span>Conn&nbsp;and&nbsp;Listener&nbsp;interfaces.&nbsp;The&nbsp;crypto/tls&nbsp;package&nbsp;uses<br>
+<span class="lineno"></span>the&nbsp;same&nbsp;interfaces&nbsp;and&nbsp;similar&nbsp;Dial&nbsp;and&nbsp;Listen&nbsp;functions.<br>
+<span class="lineno"></span><br>
+<span class="lineno">15</span>The&nbsp;Dial&nbsp;function&nbsp;connects&nbsp;to&nbsp;a&nbsp;server:<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspconn,&nbsp;err&nbsp;:=&nbsp;net.Dial(&#34;tcp&#34;,&nbsp;&#34;google.com:80&#34;)<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspif&nbsp;err&nbsp;!=&nbsp;nil&nbsp;{<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp//&nbsp;handle&nbsp;error<br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp}<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspfmt.Fprintf(conn,&nbsp;&#34;GET&nbsp;/&nbsp;HTTP/1.0\r\n\r\n&#34;)<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspstatus,&nbsp;err&nbsp;:=&nbsp;bufio.NewReader(conn).ReadString(&#39;\n&#39;)<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp//&nbsp;...<br>
+<span class="lineno"></span><br>
+<span class="lineno">25</span>The&nbsp;Listen&nbsp;function&nbsp;creates&nbsp;servers:<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspln,&nbsp;err&nbsp;:=&nbsp;net.Listen(&#34;tcp&#34;,&nbsp;&#34;:8080&#34;)<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspif&nbsp;err&nbsp;!=&nbsp;nil&nbsp;{<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp//&nbsp;handle&nbsp;error<br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp}<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspfor&nbsp;{<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspconn,&nbsp;err&nbsp;:=&nbsp;ln.Accept()<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspif&nbsp;err&nbsp;!=&nbsp;nil&nbsp;{<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp//&nbsp;handle&nbsp;error<br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp}<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspgo&nbsp;handleConnection(conn)<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp}<br>
+<span class="lineno"></span>*/</span><br>
+<span class="lineno"></span><span class="keyword">package</span>&nbsp;<span class="ident">net</span><br>
+<span class="lineno">40</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;TODO(rsc):</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;&nbsp;&nbsp;&nbspsupport&nbsp;for&nbsp;raw&nbsp;ethernet&nbsp;sockets</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;errors&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;io&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;os&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;syscall&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;time&#34;</span><br>
+<span class="lineno">50</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Addr&nbsp;represents&nbsp;a&nbsp;network&nbsp;end&nbsp;point&nbsp;address.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">Addr</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Network</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="comment">//&nbsp;name&nbsp;of&nbsp;the&nbsp;network</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">String</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;&nbsp;<span class="comment">//&nbsp;string&nbsp;form&nbsp;of&nbsp;address</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Conn&nbsp;is&nbsp;a&nbsp;generic&nbsp;stream-oriented&nbsp;network&nbsp;connection.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno">60</span><span class="comment">//&nbsp;Multiple&nbsp;goroutines&nbsp;may&nbsp;invoke&nbsp;methods&nbsp;on&nbsp;a&nbsp;Conn&nbsp;simultaneously.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">Conn</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Read&nbsp;reads&nbsp;data&nbsp;from&nbsp;the&nbsp;connection.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Read&nbsp;can&nbsp;be&nbsp;made&nbsp;to&nbsp;time&nbsp;out&nbsp;and&nbsp;return&nbsp;a&nbsp;Error&nbsp;with&nbsp;Timeout()&nbsp;==&nbsp;true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;after&nbsp;a&nbsp;fixed&nbsp;time&nbsp;limit;&nbsp;see&nbsp;SetDeadline&nbsp;and&nbsp;SetReadDeadline.</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Read</span><span class="op">(</span><span class="ident">b</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">n</span>&nbsp;<span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Write&nbsp;writes&nbsp;data&nbsp;to&nbsp;the&nbsp;connection.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Write&nbsp;can&nbsp;be&nbsp;made&nbsp;to&nbsp;time&nbsp;out&nbsp;and&nbsp;return&nbsp;a&nbsp;Error&nbsp;with&nbsp;Timeout()&nbsp;==&nbsp;true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;after&nbsp;a&nbsp;fixed&nbsp;time&nbsp;limit;&nbsp;see&nbsp;SetDeadline&nbsp;and&nbsp;SetWriteDeadline.</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Write</span><span class="op">(</span><span class="ident">b</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">n</span>&nbsp;<span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Close&nbsp;closes&nbsp;the&nbsp;connection.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Any&nbsp;blocked&nbsp;Read&nbsp;or&nbsp;Write&nbsp;operations&nbsp;will&nbsp;be&nbsp;unblocked&nbsp;and&nbsp;return&nbsp;errors.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Close</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span><br>
+<span class="lineno">75</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;LocalAddr&nbsp;returns&nbsp;the&nbsp;local&nbsp;network&nbsp;address.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">LocalAddr</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="ident">Addr</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;RemoteAddr&nbsp;returns&nbsp;the&nbsp;remote&nbsp;network&nbsp;address.</span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">RemoteAddr</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="ident">Addr</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;SetDeadline&nbsp;sets&nbsp;the&nbsp;read&nbsp;and&nbsp;write&nbsp;deadlines&nbsp;associated</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;with&nbsp;the&nbsp;connection.&nbsp;It&nbsp;is&nbsp;equivalent&nbsp;to&nbsp;calling&nbsp;both</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;SetReadDeadline&nbsp;and&nbsp;SetWriteDeadline.</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;A&nbsp;deadline&nbsp;is&nbsp;an&nbsp;absolute&nbsp;time&nbsp;after&nbsp;which&nbsp;I/O&nbsp;operations</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;fail&nbsp;with&nbsp;a&nbsp;timeout&nbsp;(see&nbsp;type&nbsp;Error)&nbsp;instead&nbsp;of</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;blocking.&nbsp;The&nbsp;deadline&nbsp;applies&nbsp;to&nbsp;all&nbsp;future&nbsp;I/O,&nbsp;not&nbsp;just</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;the&nbsp;immediately&nbsp;following&nbsp;call&nbsp;to&nbsp;Read&nbsp;or&nbsp;Write.</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;An&nbsp;idle&nbsp;timeout&nbsp;can&nbsp;be&nbsp;implemented&nbsp;by&nbsp;repeatedly&nbsp;extending</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;the&nbsp;deadline&nbsp;after&nbsp;successful&nbsp;Read&nbsp;or&nbsp;Write&nbsp;calls.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;A&nbsp;zero&nbsp;value&nbsp;for&nbsp;t&nbsp;means&nbsp;I/O&nbsp;operations&nbsp;will&nbsp;not&nbsp;time&nbsp;out.</span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">SetDeadline</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="ident">time</span><span class="op">.</span><span class="ident">Time</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;SetReadDeadline&nbsp;sets&nbsp;the&nbsp;deadline&nbsp;for&nbsp;future&nbsp;Read&nbsp;calls.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;A&nbsp;zero&nbsp;value&nbsp;for&nbsp;t&nbsp;means&nbsp;Read&nbsp;will&nbsp;not&nbsp;time&nbsp;out.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">SetReadDeadline</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="ident">time</span><span class="op">.</span><span class="ident">Time</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span><br>
+<span class="lineno">100</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;SetWriteDeadline&nbsp;sets&nbsp;the&nbsp;deadline&nbsp;for&nbsp;future&nbsp;Write&nbsp;calls.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Even&nbsp;if&nbsp;write&nbsp;times&nbsp;out,&nbsp;it&nbsp;may&nbsp;return&nbsp;n&nbsp;&gt;&nbsp;0,&nbsp;indicating&nbsp;that</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;some&nbsp;of&nbsp;the&nbsp;data&nbsp;was&nbsp;successfully&nbsp;written.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;A&nbsp;zero&nbsp;value&nbsp;for&nbsp;t&nbsp;means&nbsp;Write&nbsp;will&nbsp;not&nbsp;time&nbsp;out.</span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">SetWriteDeadline</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="ident">time</span><span class="op">.</span><span class="ident">Time</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">conn</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fd</span>&nbsp;<span class="op">*</span><span class="ident">netFD</span><br>
+<span class="lineno">110</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">conn</span><span class="op">)</span>&nbsp;<span class="ident">ok</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="ident">c</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">fd</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Implementation&nbsp;of&nbsp;the&nbsp;Conn&nbsp;interface.</span><br>
+<span class="lineno">115</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Read&nbsp;implements&nbsp;the&nbsp;Conn&nbsp;Read&nbsp;method.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">conn</span><span class="op">)</span>&nbsp;<span class="ident">Read</span><span class="op">(</span><span class="ident">b</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">c</span><span class="op">.</span><span class="ident">ok</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">syscall</span><span class="op">.</span><span class="ident">EINVAL</span><br>
+<span class="lineno">120</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">fd</span><span class="op">.</span><span class="ident">Read</span><span class="op">(</span><span class="ident">b</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Write&nbsp;implements&nbsp;the&nbsp;Conn&nbsp;Write&nbsp;method.</span><br>
+<span class="lineno">125</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">conn</span><span class="op">)</span>&nbsp;<span class="ident">Write</span><span class="op">(</span><span class="ident">b</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">c</span><span class="op">.</span><span class="ident">ok</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="num">0</span><span class="op">,</span>&nbsp;<span class="ident">syscall</span><span class="op">.</span><span class="ident">EINVAL</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">fd</span><span class="op">.</span><span class="ident">Write</span><span class="op">(</span><span class="ident">b</span><span class="op">)</span><br>
+<span class="lineno">130</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Close&nbsp;closes&nbsp;the&nbsp;connection.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">conn</span><span class="op">)</span>&nbsp;<span class="ident">Close</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">c</span><span class="op">.</span><span class="ident">ok</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">135</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">syscall</span><span class="op">.</span><span class="ident">EINVAL</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">fd</span><span class="op">.</span><span class="ident">Close</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">140</span><span class="comment">//&nbsp;LocalAddr&nbsp;returns&nbsp;the&nbsp;local&nbsp;network&nbsp;address.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">conn</span><span class="op">)</span>&nbsp;<span class="ident">LocalAddr</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="ident">Addr</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">c</span><span class="op">.</span><span class="ident">ok</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">145</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">fd</span><span class="op">.</span><span class="ident">laddr</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;RemoteAddr&nbsp;returns&nbsp;the&nbsp;remote&nbsp;network&nbsp;address.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">conn</span><span class="op">)</span>&nbsp;<span class="ident">RemoteAddr</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="ident">Addr</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">150</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">c</span><span class="op">.</span><span class="ident">ok</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">fd</span><span class="op">.</span><span class="ident">raddr</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">155</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;SetDeadline&nbsp;implements&nbsp;the&nbsp;Conn&nbsp;SetDeadline&nbsp;method.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">conn</span><span class="op">)</span>&nbsp;<span class="ident">SetDeadline</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="ident">time</span><span class="op">.</span><span class="ident">Time</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">c</span><span class="op">.</span><span class="ident">ok</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">syscall</span><span class="op">.</span><span class="ident">EINVAL</span><br>
+<span class="lineno">160</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">fd</span><span class="op">.</span><span class="ident">setDeadline</span><span class="op">(</span><span class="ident">t</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;SetReadDeadline&nbsp;implements&nbsp;the&nbsp;Conn&nbsp;SetReadDeadline&nbsp;method.</span><br>
+<span class="lineno">165</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">conn</span><span class="op">)</span>&nbsp;<span class="ident">SetReadDeadline</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="ident">time</span><span class="op">.</span><span class="ident">Time</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">c</span><span class="op">.</span><span class="ident">ok</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">syscall</span><span class="op">.</span><span class="ident">EINVAL</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">fd</span><span class="op">.</span><span class="ident">setReadDeadline</span><span class="op">(</span><span class="ident">t</span><span class="op">)</span><br>
+<span class="lineno">170</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;SetWriteDeadline&nbsp;implements&nbsp;the&nbsp;Conn&nbsp;SetWriteDeadline&nbsp;method.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">conn</span><span class="op">)</span>&nbsp;<span class="ident">SetWriteDeadline</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="ident">time</span><span class="op">.</span><span class="ident">Time</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">c</span><span class="op">.</span><span class="ident">ok</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">175</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">syscall</span><span class="op">.</span><span class="ident">EINVAL</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">fd</span><span class="op">.</span><span class="ident">setWriteDeadline</span><span class="op">(</span><span class="ident">t</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">180</span><span class="comment">//&nbsp;SetReadBuffer&nbsp;sets&nbsp;the&nbsp;size&nbsp;of&nbsp;the&nbsp;operating&nbsp;system&#39;s</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;receive&nbsp;buffer&nbsp;associated&nbsp;with&nbsp;the&nbsp;connection.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">conn</span><span class="op">)</span>&nbsp;<span class="ident">SetReadBuffer</span><span class="op">(</span><span class="ident">bytes</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">c</span><span class="op">.</span><span class="ident">ok</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">syscall</span><span class="op">.</span><span class="ident">EINVAL</span><br>
+<span class="lineno">185</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">setReadBuffer</span><span class="op">(</span><span class="ident">c</span><span class="op">.</span><span class="ident">fd</span><span class="op">,</span>&nbsp;<span class="ident">bytes</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;SetWriteBuffer&nbsp;sets&nbsp;the&nbsp;size&nbsp;of&nbsp;the&nbsp;operating&nbsp;system&#39;s</span><br>
+<span class="lineno">190</span><span class="comment">//&nbsp;transmit&nbsp;buffer&nbsp;associated&nbsp;with&nbsp;the&nbsp;connection.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">conn</span><span class="op">)</span>&nbsp;<span class="ident">SetWriteBuffer</span><span class="op">(</span><span class="ident">bytes</span>&nbsp;<span class="builtintype">int</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">c</span><span class="op">.</span><span class="ident">ok</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">syscall</span><span class="op">.</span><span class="ident">EINVAL</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">195</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">setWriteBuffer</span><span class="op">(</span><span class="ident">c</span><span class="op">.</span><span class="ident">fd</span><span class="op">,</span>&nbsp;<span class="ident">bytes</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;File&nbsp;sets&nbsp;the&nbsp;underlying&nbsp;os.File&nbsp;to&nbsp;blocking&nbsp;mode&nbsp;and&nbsp;returns&nbsp;a&nbsp;copy.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;It&nbsp;is&nbsp;the&nbsp;caller&#39;s&nbsp;responsibility&nbsp;to&nbsp;close&nbsp;f&nbsp;when&nbsp;finished.</span><br>
+<span class="lineno">200</span><span class="comment">//&nbsp;Closing&nbsp;c&nbsp;does&nbsp;not&nbsp;affect&nbsp;f,&nbsp;and&nbsp;closing&nbsp;f&nbsp;does&nbsp;not&nbsp;affect&nbsp;c.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;returned&nbsp;os.File&#39;s&nbsp;file&nbsp;descriptor&nbsp;is&nbsp;different&nbsp;from&nbsp;the&nbsp;connection&#39;s.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Attempting&nbsp;to&nbsp;change&nbsp;properties&nbsp;of&nbsp;the&nbsp;original&nbsp;using&nbsp;this&nbsp;duplicate</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;may&nbsp;or&nbsp;may&nbsp;not&nbsp;have&nbsp;the&nbsp;desired&nbsp;effect.</span><br>
+<span class="lineno">205</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="op">*</span><span class="ident">conn</span><span class="op">)</span>&nbsp;<span class="ident">File</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">f</span>&nbsp;<span class="op">*</span><span class="ident">os</span><span class="op">.</span><span class="ident">File</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="ident">c</span><span class="op">.</span><span class="ident">fd</span><span class="op">.</span><span class="ident">dup</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;An&nbsp;Error&nbsp;represents&nbsp;a&nbsp;network&nbsp;error.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">Error</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">error</span><br>
+<span class="lineno">210</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Timeout</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;Is&nbsp;the&nbsp;error&nbsp;a&nbsp;timeout?</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Temporary</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="comment">//&nbsp;Is&nbsp;the&nbsp;error&nbsp;temporary?</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;PacketConn&nbsp;is&nbsp;a&nbsp;generic&nbsp;packet-oriented&nbsp;network&nbsp;connection.</span><br>
+<span class="lineno">215</span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Multiple&nbsp;goroutines&nbsp;may&nbsp;invoke&nbsp;methods&nbsp;on&nbsp;a&nbsp;PacketConn&nbsp;simultaneously.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">PacketConn</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;ReadFrom&nbsp;reads&nbsp;a&nbsp;packet&nbsp;from&nbsp;the&nbsp;connection,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;copying&nbsp;the&nbsp;payload&nbsp;into&nbsp;b.&nbsp;&nbsp;It&nbsp;returns&nbsp;the&nbsp;number&nbsp;of</span><br>
+<span class="lineno">220</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;bytes&nbsp;copied&nbsp;into&nbsp;b&nbsp;and&nbsp;the&nbsp;return&nbsp;address&nbsp;that</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;was&nbsp;on&nbsp;the&nbsp;packet.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;ReadFrom&nbsp;can&nbsp;be&nbsp;made&nbsp;to&nbsp;time&nbsp;out&nbsp;and&nbsp;return</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;an&nbsp;error&nbsp;with&nbsp;Timeout()&nbsp;==&nbsp;true&nbsp;after&nbsp;a&nbsp;fixed&nbsp;time&nbsp;limit;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;see&nbsp;SetDeadline&nbsp;and&nbsp;SetReadDeadline.</span><br>
+<span class="lineno">225</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ReadFrom</span><span class="op">(</span><span class="ident">b</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">n</span>&nbsp;<span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">addr</span>&nbsp;<span class="ident">Addr</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;WriteTo&nbsp;writes&nbsp;a&nbsp;packet&nbsp;with&nbsp;payload&nbsp;b&nbsp;to&nbsp;addr.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;WriteTo&nbsp;can&nbsp;be&nbsp;made&nbsp;to&nbsp;time&nbsp;out&nbsp;and&nbsp;return</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;an&nbsp;error&nbsp;with&nbsp;Timeout()&nbsp;==&nbsp;true&nbsp;after&nbsp;a&nbsp;fixed&nbsp;time&nbsp;limit;</span><br>
+<span class="lineno">230</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;see&nbsp;SetDeadline&nbsp;and&nbsp;SetWriteDeadline.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;On&nbsp;packet-oriented&nbsp;connections,&nbsp;write&nbsp;timeouts&nbsp;are&nbsp;rare.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">WriteTo</span><span class="op">(</span><span class="ident">b</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="ident">addr</span>&nbsp;<span class="ident">Addr</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">n</span>&nbsp;<span class="builtintype">int</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Close&nbsp;closes&nbsp;the&nbsp;connection.</span><br>
+<span class="lineno">235</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Any&nbsp;blocked&nbsp;ReadFrom&nbsp;or&nbsp;WriteTo&nbsp;operations&nbsp;will&nbsp;be&nbsp;unblocked&nbsp;and&nbsp;return&nbsp;errors.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Close</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;LocalAddr&nbsp;returns&nbsp;the&nbsp;local&nbsp;network&nbsp;address.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">LocalAddr</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="ident">Addr</span><br>
+<span class="lineno">240</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;SetDeadline&nbsp;sets&nbsp;the&nbsp;read&nbsp;and&nbsp;write&nbsp;deadlines&nbsp;associated</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;with&nbsp;the&nbsp;connection.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">SetDeadline</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="ident">time</span><span class="op">.</span><span class="ident">Time</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">245</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;SetReadDeadline&nbsp;sets&nbsp;the&nbsp;deadline&nbsp;for&nbsp;future&nbsp;Read&nbsp;calls.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;If&nbsp;the&nbsp;deadline&nbsp;is&nbsp;reached,&nbsp;Read&nbsp;will&nbsp;fail&nbsp;with&nbsp;a&nbsp;timeout</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;(see&nbsp;type&nbsp;Error)&nbsp;instead&nbsp;of&nbsp;blocking.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;A&nbsp;zero&nbsp;value&nbsp;for&nbsp;t&nbsp;means&nbsp;Read&nbsp;will&nbsp;not&nbsp;time&nbsp;out.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">SetReadDeadline</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="ident">time</span><span class="op">.</span><span class="ident">Time</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span><br>
+<span class="lineno">250</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;SetWriteDeadline&nbsp;sets&nbsp;the&nbsp;deadline&nbsp;for&nbsp;future&nbsp;Write&nbsp;calls.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;If&nbsp;the&nbsp;deadline&nbsp;is&nbsp;reached,&nbsp;Write&nbsp;will&nbsp;fail&nbsp;with&nbsp;a&nbsp;timeout</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;(see&nbsp;type&nbsp;Error)&nbsp;instead&nbsp;of&nbsp;blocking.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;A&nbsp;zero&nbsp;value&nbsp;for&nbsp;t&nbsp;means&nbsp;Write&nbsp;will&nbsp;not&nbsp;time&nbsp;out.</span><br>
+<span class="lineno">255</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Even&nbsp;if&nbsp;write&nbsp;times&nbsp;out,&nbsp;it&nbsp;may&nbsp;return&nbsp;n&nbsp;&gt;&nbsp;0,&nbsp;indicating&nbsp;that</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;some&nbsp;of&nbsp;the&nbsp;data&nbsp;was&nbsp;successfully&nbsp;written.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">SetWriteDeadline</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="ident">time</span><span class="op">.</span><span class="ident">Time</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">260</span><span class="keyword">var</span>&nbsp;<span class="ident">listenerBacklog</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">maxListenerBacklog</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;A&nbsp;Listener&nbsp;is&nbsp;a&nbsp;generic&nbsp;network&nbsp;listener&nbsp;for&nbsp;stream-oriented&nbsp;protocols.</span><br>
+<span class="lineno"></span><span class="comment">//</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Multiple&nbsp;goroutines&nbsp;may&nbsp;invoke&nbsp;methods&nbsp;on&nbsp;a&nbsp;Listener&nbsp;simultaneously.</span><br>
+<span class="lineno">265</span><span class="keyword">type</span>&nbsp;<span class="ident">Listener</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Accept&nbsp;waits&nbsp;for&nbsp;and&nbsp;returns&nbsp;the&nbsp;next&nbsp;connection&nbsp;to&nbsp;the&nbsp;listener.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Accept</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">c</span>&nbsp;<span class="ident">Conn</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Close&nbsp;closes&nbsp;the&nbsp;listener.</span><br>
+<span class="lineno">270</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Any&nbsp;blocked&nbsp;Accept&nbsp;operations&nbsp;will&nbsp;be&nbsp;unblocked&nbsp;and&nbsp;return&nbsp;errors.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Close</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">error</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Addr&nbsp;returns&nbsp;the&nbsp;listener&#39;s&nbsp;network&nbsp;address.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Addr</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="ident">Addr</span><br>
+<span class="lineno">275</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Various&nbsp;errors&nbsp;contained&nbsp;in&nbsp;OpError.</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;For&nbsp;connection&nbsp;setup&nbsp;and&nbsp;write&nbsp;operations.</span><br>
+<span class="lineno">280</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">errMissingAddress</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">errors</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="string">&#34;missing&nbsp;address&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;For&nbsp;both&nbsp;read&nbsp;and&nbsp;write&nbsp;operations.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">errTimeout</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">error</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">&amp;</span><span class="ident">timeoutError</span><span class="op">{</span><span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">errClosing</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="ident">errors</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="string">&#34;use&nbsp;of&nbsp;closed&nbsp;network&nbsp;connection&#34;</span><span class="op">)</span><br>
+<span class="lineno">285</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ErrWriteToConnected</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="ident">errors</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="string">&#34;use&nbsp;of&nbsp;WriteTo&nbsp;with&nbsp;pre-connected&nbsp;connection&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;OpError&nbsp;is&nbsp;the&nbsp;error&nbsp;type&nbsp;usually&nbsp;returned&nbsp;by&nbsp;functions&nbsp;in&nbsp;the&nbsp;net</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;package.&nbsp;It&nbsp;describes&nbsp;the&nbsp;operation,&nbsp;network&nbsp;type,&nbsp;and&nbsp;address&nbsp;of</span><br>
+<span class="lineno">290</span><span class="comment">//&nbsp;an&nbsp;error.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">OpError</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Op&nbsp;is&nbsp;the&nbsp;operation&nbsp;which&nbsp;caused&nbsp;the&nbsp;error,&nbsp;such&nbsp;as</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;&#34;read&#34;&nbsp;or&nbsp;&#34;write&#34;.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Op</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno">295</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Net&nbsp;is&nbsp;the&nbsp;network&nbsp;type&nbsp;on&nbsp;which&nbsp;this&nbsp;error&nbsp;occurred,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;such&nbsp;as&nbsp;&#34;tcp&#34;&nbsp;or&nbsp;&#34;udp6&#34;.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Net</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">300</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Addr&nbsp;is&nbsp;the&nbsp;network&nbsp;address&nbsp;on&nbsp;which&nbsp;this&nbsp;error&nbsp;occurred.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Addr</span>&nbsp;<span class="ident">Addr</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Err&nbsp;is&nbsp;the&nbsp;error&nbsp;that&nbsp;occurred&nbsp;during&nbsp;the&nbsp;operation.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Err</span>&nbsp;<span class="builtintype">error</span><br>
+<span class="lineno">305</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">e</span>&nbsp;<span class="op">*</span><span class="ident">OpError</span><span class="op">)</span>&nbsp;<span class="ident">Error</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="string">&#34;&lt;nil&gt;&#34;</span><br>
+<span class="lineno">310</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">e</span><span class="op">.</span><span class="ident">Op</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">e</span><span class="op">.</span><span class="ident">Net</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="string">&#34;&#34;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="string">&#34;&nbsp;&#34;</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">e</span><span class="op">.</span><span class="ident">Net</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">315</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">e</span><span class="op">.</span><span class="ident">Addr</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="string">&#34;&nbsp;&#34;</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">e</span><span class="op">.</span><span class="ident">Addr</span><span class="op">.</span><span class="ident">String</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="string">&#34;:&nbsp;&#34;</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">e</span><span class="op">.</span><span class="ident">Err</span><span class="op">.</span><span class="ident">Error</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">s</span><br>
+<span class="lineno">320</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">temporary</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Temporary</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">325</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">e</span>&nbsp;<span class="op">*</span><span class="ident">OpError</span><span class="op">)</span>&nbsp;<span class="ident">Temporary</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">,</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">e</span><span class="op">.</span><span class="ident">Err</span><span class="op">.</span><span class="op">(</span><span class="ident">temporary</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">t</span><span class="op">.</span><span class="ident">Temporary</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">330</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">noDeadline</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">time</span><span class="op">.</span><span class="ident">Time</span><span class="op">{</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">timeout</span>&nbsp;<span class="keyword">interface</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Timeout</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span><br>
+<span class="lineno">335</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">e</span>&nbsp;<span class="op">*</span><span class="ident">OpError</span><span class="op">)</span>&nbsp;<span class="ident">Timeout</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span><span class="op">,</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">e</span><span class="op">.</span><span class="ident">Err</span><span class="op">.</span><span class="op">(</span><span class="ident">timeout</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">ok</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">t</span><span class="op">.</span><span class="ident">Timeout</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">340</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">timeoutError</span>&nbsp;<span class="keyword">struct</span><span class="op">{</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">e</span>&nbsp;<span class="op">*</span><span class="ident">timeoutError</span><span class="op">)</span>&nbsp;<span class="ident">Error</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;&nbsp;&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="string">&#34;i/o&nbsp;timeout&#34;</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno">345</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">e</span>&nbsp;<span class="op">*</span><span class="ident">timeoutError</span><span class="op">)</span>&nbsp;<span class="ident">Timeout</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;&nbsp;&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="ident">true</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">e</span>&nbsp;<span class="op">*</span><span class="ident">timeoutError</span><span class="op">)</span>&nbsp;<span class="ident">Temporary</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="ident">true</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">AddrError</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Err</span>&nbsp;&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno">350</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Addr</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">e</span>&nbsp;<span class="op">*</span><span class="ident">AddrError</span><span class="op">)</span>&nbsp;<span class="ident">Error</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">e</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">355</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="string">&#34;&lt;nil&gt;&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">e</span><span class="op">.</span><span class="ident">Err</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">e</span><span class="op">.</span><span class="ident">Addr</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="string">&#34;&#34;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="string">&#34;&nbsp;&#34;</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">e</span><span class="op">.</span><span class="ident">Addr</span><br>
+<span class="lineno">360</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">s</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">e</span>&nbsp;<span class="op">*</span><span class="ident">AddrError</span><span class="op">)</span>&nbsp;<span class="ident">Temporary</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">365</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">e</span>&nbsp;<span class="op">*</span><span class="ident">AddrError</span><span class="op">)</span>&nbsp;<span class="ident">Timeout</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">false</span><br>
+<span class="lineno">370</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">UnknownNetworkError</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">e</span>&nbsp;<span class="ident">UnknownNetworkError</span><span class="op">)</span>&nbsp;<span class="ident">Error</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;&nbsp;&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="string">&#34;unknown&nbsp;network&nbsp;&#34;</span>&nbsp;<span class="op">+</span>&nbsp;<span class="builtintype">string</span><span class="op">(</span><span class="ident">e</span><span class="op">)</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno">375</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">e</span>&nbsp;<span class="ident">UnknownNetworkError</span><span class="op">)</span>&nbsp;<span class="ident">Temporary</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="ident">false</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">e</span>&nbsp;<span class="ident">UnknownNetworkError</span><span class="op">)</span>&nbsp;<span class="ident">Timeout</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;&nbsp;&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="ident">false</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">InvalidAddrError</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">380</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">e</span>&nbsp;<span class="ident">InvalidAddrError</span><span class="op">)</span>&nbsp;<span class="ident">Error</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;&nbsp;&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="builtintype">string</span><span class="op">(</span><span class="ident">e</span><span class="op">)</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">e</span>&nbsp;<span class="ident">InvalidAddrError</span><span class="op">)</span>&nbsp;<span class="ident">Timeout</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;&nbsp;&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="ident">false</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">e</span>&nbsp;<span class="ident">InvalidAddrError</span><span class="op">)</span>&nbsp;<span class="ident">Temporary</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="ident">false</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;DNSConfigError&nbsp;represents&nbsp;an&nbsp;error&nbsp;reading&nbsp;the&nbsp;machine&#39;s&nbsp;DNS&nbsp;configuration.</span><br>
+<span class="lineno">385</span><span class="keyword">type</span>&nbsp;<span class="ident">DNSConfigError</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Err</span>&nbsp;<span class="builtintype">error</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">e</span>&nbsp;<span class="op">*</span><span class="ident">DNSConfigError</span><span class="op">)</span>&nbsp;<span class="ident">Error</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">390</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="string">&#34;error&nbsp;reading&nbsp;DNS&nbsp;config:&nbsp;&#34;</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">e</span><span class="op">.</span><span class="ident">Err</span><span class="op">.</span><span class="ident">Error</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">e</span>&nbsp;<span class="op">*</span><span class="ident">DNSConfigError</span><span class="op">)</span>&nbsp;<span class="ident">Timeout</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;&nbsp;&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="ident">false</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">e</span>&nbsp;<span class="op">*</span><span class="ident">DNSConfigError</span><span class="op">)</span>&nbsp;<span class="ident">Temporary</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="ident">false</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno">395</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">writerOnly</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">io</span><span class="op">.</span><span class="ident">Writer</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">400</span><span class="comment">//&nbsp;Fallback&nbsp;implementation&nbsp;of&nbsp;io.ReaderFrom&#39;s&nbsp;ReadFrom,&nbsp;when&nbsp;sendfile&nbsp;isn&#39;t</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;applicable.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">genericReadFrom</span><span class="op">(</span><span class="ident">w</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">Writer</span><span class="op">,</span>&nbsp;<span class="ident">r</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">Reader</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">n</span>&nbsp;<span class="ident">int64</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Use&nbsp;wrapper&nbsp;to&nbsp;hide&nbsp;existing&nbsp;r.ReadFrom&nbsp;from&nbsp;io.Copy.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">io</span><span class="op">.</span><span class="ident">Copy</span><span class="op">(</span><span class="ident">writerOnly</span><span class="op">{</span><span class="ident">w</span><span class="op">}</span><span class="op">,</span>&nbsp;<span class="ident">r</span><span class="op">)</span><br>
+<span class="lineno">405</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Limit&nbsp;the&nbsp;number&nbsp;of&nbsp;concurrent&nbsp;cgo-using&nbsp;goroutines,&nbsp;because</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;each&nbsp;will&nbsp;block&nbsp;an&nbsp;entire&nbsp;operating&nbsp;system&nbsp;thread.&nbsp;The&nbsp;usual&nbsp;culprit</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;is&nbsp;resolving&nbsp;many&nbsp;DNS&nbsp;names&nbsp;in&nbsp;separate&nbsp;goroutines&nbsp;but&nbsp;the&nbsp;DNS</span><br>
+<span class="lineno">410</span><span class="comment">//&nbsp;server&nbsp;is&nbsp;not&nbsp;responding.&nbsp;Then&nbsp;the&nbsp;many&nbsp;lookups&nbsp;each&nbsp;use&nbsp;a&nbsp;different</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;thread,&nbsp;and&nbsp;the&nbsp;system&nbsp;or&nbsp;the&nbsp;program&nbsp;runs&nbsp;out&nbsp;of&nbsp;threads.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">threadLimit</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtinfunc">make</span><span class="op">(</span><span class="keyword">chan</span>&nbsp;<span class="keyword">struct</span><span class="op">{</span><span class="op">}</span><span class="op">,</span>&nbsp;<span class="num">500</span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">415</span><span class="comment">//&nbsp;Using&nbsp;send&nbsp;for&nbsp;acquire&nbsp;is&nbsp;fine&nbsp;here&nbsp;because&nbsp;we&nbsp;are&nbsp;not&nbsp;using&nbsp;this</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;to&nbsp;protect&nbsp;any&nbsp;memory.&nbsp;All&nbsp;we&nbsp;care&nbsp;about&nbsp;is&nbsp;the&nbsp;number&nbsp;of&nbsp;goroutines</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;making&nbsp;calls&nbsp;at&nbsp;a&nbsp;time.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">acquireThread</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">420</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">threadLimit</span>&nbsp;<span class="op">&lt;-</span>&nbsp;<span class="keyword">struct</span><span class="op">{</span><span class="op">}</span><span class="op">{</span><span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">releaseThread</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">&lt;-</span><span class="ident">threadLimit</span><br>
+<span class="lineno">425</span><span class="op">}</span>
+</div>
+</body>
+</html>

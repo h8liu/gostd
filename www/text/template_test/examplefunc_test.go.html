@@ -1,0 +1,69 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2012&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">template_test</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;log&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;os&#34;</span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;strings&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;text/template&#34;</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;This&nbsp;example&nbsp;demonstrates&nbsp;a&nbsp;custom&nbsp;function&nbsp;to&nbsp;process&nbsp;template&nbsp;text.</span><br>
+<span class="lineno">15</span><span class="comment">//&nbsp;It&nbsp;installs&nbsp;the&nbsp;strings.Title&nbsp;function&nbsp;and&nbsp;uses&nbsp;it&nbsp;to</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Make&nbsp;Title&nbsp;Text&nbsp;Look&nbsp;Good&nbsp;In&nbsp;Our&nbsp;Template&#39;s&nbsp;Output.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">ExampleTemplate_func</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;First&nbsp;we&nbsp;create&nbsp;a&nbsp;FuncMap&nbsp;with&nbsp;which&nbsp;to&nbsp;register&nbsp;the&nbsp;function.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">funcMap</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">template</span><span class="op">.</span><span class="ident">FuncMap</span><span class="op">{</span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;The&nbsp;name&nbsp;&#34;title&#34;&nbsp;is&nbsp;what&nbsp;the&nbsp;function&nbsp;will&nbsp;be&nbsp;called&nbsp;in&nbsp;the&nbsp;template&nbsp;text.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;title&#34;</span><span class="op">:</span>&nbsp;<span class="ident">strings</span><span class="op">.</span><span class="ident">Title</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;A&nbsp;simple&nbsp;template&nbsp;definition&nbsp;to&nbsp;test&nbsp;our&nbsp;function.</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;We&nbsp;print&nbsp;the&nbsp;input&nbsp;text&nbsp;several&nbsp;ways:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;-&nbsp;the&nbsp;original</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;-&nbsp;title-cased</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;-&nbsp;title-cased&nbsp;and&nbsp;then&nbsp;printed&nbsp;with&nbsp;%q</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;-&nbsp;printed&nbsp;with&nbsp;%q&nbsp;and&nbsp;then&nbsp;title-cased.</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">const</span>&nbsp;<span class="ident">templateText</span>&nbsp;<span class="op">=</span>&nbsp;<span class="string">`<br>
+<span class="lineno"></span>Input:&nbsp;{{printf&nbsp;&#34;%q&#34;&nbsp;.}}<br>
+<span class="lineno"></span>Output&nbsp;0:&nbsp;{{title&nbsp;.}}<br>
+<span class="lineno"></span>Output&nbsp;1:&nbsp;{{title&nbsp;.&nbsp;|&nbsp;printf&nbsp;&#34;%q&#34;}}<br>
+<span class="lineno"></span>Output&nbsp;2:&nbsp;{{printf&nbsp;&#34;%q&#34;&nbsp;.&nbsp;|&nbsp;title}}<br>
+<span class="lineno">35</span>`</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Create&nbsp;a&nbsp;template,&nbsp;add&nbsp;the&nbsp;function&nbsp;map,&nbsp;and&nbsp;parse&nbsp;the&nbsp;text.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tmpl</span><span class="op">,</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">template</span><span class="op">.</span><span class="ident">New</span><span class="op">(</span><span class="string">&#34;titleTest&#34;</span><span class="op">)</span><span class="op">.</span><span class="ident">Funcs</span><span class="op">(</span><span class="ident">funcMap</span><span class="op">)</span><span class="op">.</span><span class="ident">Parse</span><span class="op">(</span><span class="ident">templateText</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">log</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;parsing:&nbsp;%s&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Run&nbsp;the&nbsp;template&nbsp;to&nbsp;verify&nbsp;the&nbsp;output.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">tmpl</span><span class="op">.</span><span class="ident">Execute</span><span class="op">(</span><span class="ident">os</span><span class="op">.</span><span class="ident">Stdout</span><span class="op">,</span>&nbsp;<span class="string">&#34;the&nbsp;go&nbsp;programming&nbsp;language&#34;</span><span class="op">)</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">err</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">log</span><span class="op">.</span><span class="ident">Fatalf</span><span class="op">(</span><span class="string">&#34;execution:&nbsp;%s&#34;</span><span class="op">,</span>&nbsp;<span class="ident">err</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Output:</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Input:&nbsp;&#34;the&nbsp;go&nbsp;programming&nbsp;language&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Output&nbsp;0:&nbsp;The&nbsp;Go&nbsp;Programming&nbsp;Language</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Output&nbsp;1:&nbsp;&#34;The&nbsp;Go&nbsp;Programming&nbsp;Language&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Output&nbsp;2:&nbsp;&#34;The&nbsp;Go&nbsp;Programming&nbsp;Language&#34;</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

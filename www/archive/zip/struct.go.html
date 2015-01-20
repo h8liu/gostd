@@ -1,0 +1,328 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2010&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="comment">/*<br>
+<span class="lineno"></span>Package&nbsp;zip&nbsp;provides&nbsp;support&nbsp;for&nbsp;reading&nbsp;and&nbsp;writing&nbsp;ZIP&nbsp;archives.<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>See:&nbsp;http://www.pkware.com/documents/casestudies/APPNOTE.TXT<br>
+<span class="lineno"></span><br>
+<span class="lineno">10</span>This&nbsp;package&nbsp;does&nbsp;not&nbsp;support&nbsp;disk&nbsp;spanning.<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>A&nbsp;note&nbsp;about&nbsp;ZIP64:<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>To&nbsp;be&nbsp;backwards&nbsp;compatible&nbsp;the&nbsp;FileHeader&nbsp;has&nbsp;both&nbsp;32&nbsp;and&nbsp;64&nbsp;bit&nbsp;Size<br>
+<span class="lineno">15</span>fields.&nbsp;The&nbsp;64&nbsp;bit&nbsp;fields&nbsp;will&nbsp;always&nbsp;contain&nbsp;the&nbsp;correct&nbsp;value&nbsp;and<br>
+<span class="lineno"></span>for&nbsp;normal&nbsp;archives&nbsp;both&nbsp;fields&nbsp;will&nbsp;be&nbsp;the&nbsp;same.&nbsp;For&nbsp;files&nbsp;requiring<br>
+<span class="lineno"></span>the&nbsp;ZIP64&nbsp;format&nbsp;the&nbsp;32&nbsp;bit&nbsp;fields&nbsp;will&nbsp;be&nbsp;0xffffffff&nbsp;and&nbsp;the&nbsp;64&nbsp;bit<br>
+<span class="lineno"></span>fields&nbsp;must&nbsp;be&nbsp;used&nbsp;instead.<br>
+<span class="lineno"></span>*/</span><br>
+<span class="lineno">20</span><span class="keyword">package</span>&nbsp;<span class="ident">zip</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;os&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;path&#34;</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string">&#34;time&#34;</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Compression&nbsp;methods.</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Store</span>&nbsp;&nbsp;&nbsp;<span class="builtintype">uint16</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Deflate</span>&nbsp;<span class="builtintype">uint16</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">8</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fileHeaderSignature</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">0x04034b50</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">directoryHeaderSignature</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0x02014b50</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">directoryEndSignature</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">0x06054b50</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">directory64LocSignature</span>&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">0x07064b50</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">directory64EndSignature</span>&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">0x06064b50</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dataDescriptorSignature</span>&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">0x08074b50</span>&nbsp;<span class="comment">//&nbsp;de-facto&nbsp;standard;&nbsp;required&nbsp;by&nbsp;OS&nbsp;X&nbsp;Finder</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fileHeaderLen</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">30</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;+&nbsp;filename&nbsp;+&nbsp;extra</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">directoryHeaderLen</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">46</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;+&nbsp;filename&nbsp;+&nbsp;extra&nbsp;+&nbsp;comment</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">directoryEndLen</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">22</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;+&nbsp;comment</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dataDescriptorLen</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">16</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;four&nbsp;uint32:&nbsp;descriptor&nbsp;signature,&nbsp;crc32,&nbsp;compressed&nbsp;size,&nbsp;size</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dataDescriptor64Len</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">24</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;descriptor&nbsp;with&nbsp;8&nbsp;byte&nbsp;sizes</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">directory64LocLen</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">20</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">directory64EndLen</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">56</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment">//&nbsp;+&nbsp;extra</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Constants&nbsp;for&nbsp;the&nbsp;first&nbsp;byte&nbsp;in&nbsp;CreatorVersion</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">creatorFAT</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">creatorUnix</span>&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">3</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">creatorNTFS</span>&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">11</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">creatorVFAT</span>&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">14</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">creatorMacOSX</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">19</span><br>
+<span class="lineno">55</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;version&nbsp;numbers</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">zipVersion20</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">20</span>&nbsp;<span class="comment">//&nbsp;2.0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">zipVersion45</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">45</span>&nbsp;<span class="comment">//&nbsp;4.5&nbsp;(reads&nbsp;and&nbsp;writes&nbsp;zip64&nbsp;archives)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;limits&nbsp;for&nbsp;non&nbsp;zip64&nbsp;files</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint16max</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">(</span><span class="num">1</span>&nbsp;<span class="op">&lt;&lt;</span>&nbsp;<span class="num">16</span><span class="op">)</span>&nbsp;<span class="op">-</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint32max</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">(</span><span class="num">1</span>&nbsp;<span class="op">&lt;&lt;</span>&nbsp;<span class="num">32</span><span class="op">)</span>&nbsp;<span class="op">-</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;extra&nbsp;header&nbsp;id&#39;s</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">zip64ExtraId</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0x0001</span>&nbsp;<span class="comment">//&nbsp;zip64&nbsp;Extended&nbsp;Information&nbsp;Extra&nbsp;Field</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;FileHeader&nbsp;describes&nbsp;a&nbsp;file&nbsp;within&nbsp;a&nbsp;zip&nbsp;file.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;See&nbsp;the&nbsp;zip&nbsp;spec&nbsp;for&nbsp;details.</span><br>
+<span class="lineno">70</span><span class="keyword">type</span>&nbsp;<span class="ident">FileHeader</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Name&nbsp;is&nbsp;the&nbsp;name&nbsp;of&nbsp;the&nbsp;file.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;It&nbsp;must&nbsp;be&nbsp;a&nbsp;relative&nbsp;path:&nbsp;it&nbsp;must&nbsp;not&nbsp;start&nbsp;with&nbsp;a&nbsp;drive</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;letter&nbsp;(e.g.&nbsp;C:)&nbsp;or&nbsp;leading&nbsp;slash,&nbsp;and&nbsp;only&nbsp;forward&nbsp;slashes</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;are&nbsp;allowed.</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Name</span>&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">CreatorVersion</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">uint16</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ReaderVersion</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">uint16</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Flags</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">uint16</span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Method</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">uint16</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ModifiedTime</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">uint16</span>&nbsp;<span class="comment">//&nbsp;MS-DOS&nbsp;time</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ModifiedDate</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">uint16</span>&nbsp;<span class="comment">//&nbsp;MS-DOS&nbsp;date</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">CRC32</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">CompressedSize</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">uint32</span>&nbsp;<span class="comment">//&nbsp;deprecated;&nbsp;use&nbsp;CompressedSize64</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">UncompressedSize</span>&nbsp;&nbsp;&nbsp;<span class="builtintype">uint32</span>&nbsp;<span class="comment">//&nbsp;deprecated;&nbsp;use&nbsp;UncompressedSize64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">CompressedSize64</span>&nbsp;&nbsp;&nbsp;<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">UncompressedSize64</span>&nbsp;<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Extra</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ExternalAttrs</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">uint32</span>&nbsp;<span class="comment">//&nbsp;Meaning&nbsp;depends&nbsp;on&nbsp;CreatorVersion</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Comment</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;FileInfo&nbsp;returns&nbsp;an&nbsp;os.FileInfo&nbsp;for&nbsp;the&nbsp;FileHeader.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">h</span>&nbsp;<span class="op">*</span><span class="ident">FileHeader</span><span class="op">)</span>&nbsp;<span class="ident">FileInfo</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="ident">os</span><span class="op">.</span><span class="ident">FileInfo</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">headerFileInfo</span><span class="op">{</span><span class="ident">h</span><span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;headerFileInfo&nbsp;implements&nbsp;os.FileInfo.</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">headerFileInfo</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">100</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fh</span>&nbsp;<span class="op">*</span><span class="ident">FileHeader</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">fi</span>&nbsp;<span class="ident">headerFileInfo</span><span class="op">)</span>&nbsp;<span class="ident">Name</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">string</span>&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="ident">path</span><span class="op">.</span><span class="ident">Base</span><span class="op">(</span><span class="ident">fi</span><span class="op">.</span><span class="ident">fh</span><span class="op">.</span><span class="ident">Name</span><span class="op">)</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">fi</span>&nbsp;<span class="ident">headerFileInfo</span><span class="op">)</span>&nbsp;<span class="ident">Size</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="ident">int64</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">fi</span><span class="op">.</span><span class="ident">fh</span><span class="op">.</span><span class="ident">UncompressedSize64</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">int64</span><span class="op">(</span><span class="ident">fi</span><span class="op">.</span><span class="ident">fh</span><span class="op">.</span><span class="ident">UncompressedSize64</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">int64</span><span class="op">(</span><span class="ident">fi</span><span class="op">.</span><span class="ident">fh</span><span class="op">.</span><span class="ident">UncompressedSize</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">110</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">fi</span>&nbsp;<span class="ident">headerFileInfo</span><span class="op">)</span>&nbsp;<span class="ident">IsDir</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="ident">fi</span><span class="op">.</span><span class="ident">Mode</span><span class="op">(</span><span class="op">)</span><span class="op">.</span><span class="ident">IsDir</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">fi</span>&nbsp;<span class="ident">headerFileInfo</span><span class="op">)</span>&nbsp;<span class="ident">ModTime</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="ident">time</span><span class="op">.</span><span class="ident">Time</span>&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="ident">fi</span><span class="op">.</span><span class="ident">fh</span><span class="op">.</span><span class="ident">ModTime</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">fi</span>&nbsp;<span class="ident">headerFileInfo</span><span class="op">)</span>&nbsp;<span class="ident">Mode</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="ident">os</span><span class="op">.</span><span class="ident">FileMode</span>&nbsp;&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="ident">fi</span><span class="op">.</span><span class="ident">fh</span><span class="op">.</span><span class="ident">Mode</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">fi</span>&nbsp;<span class="ident">headerFileInfo</span><span class="op">)</span>&nbsp;<span class="ident">Sys</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="keyword">interface</span><span class="op">{</span><span class="op">}</span>&nbsp;&nbsp;&nbsp;<span class="op">{</span>&nbsp;<span class="keyword">return</span>&nbsp;<span class="ident">fi</span><span class="op">.</span><span class="ident">fh</span>&nbsp;<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">115</span><span class="comment">//&nbsp;FileInfoHeader&nbsp;creates&nbsp;a&nbsp;partially-populated&nbsp;FileHeader&nbsp;from&nbsp;an</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;os.FileInfo.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Because&nbsp;os.FileInfo&#39;s&nbsp;Name&nbsp;method&nbsp;returns&nbsp;only&nbsp;the&nbsp;base&nbsp;name&nbsp;of</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;the&nbsp;file&nbsp;it&nbsp;describes,&nbsp;it&nbsp;may&nbsp;be&nbsp;necessary&nbsp;to&nbsp;modify&nbsp;the&nbsp;Name&nbsp;field</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;of&nbsp;the&nbsp;returned&nbsp;header&nbsp;to&nbsp;provide&nbsp;the&nbsp;full&nbsp;path&nbsp;name&nbsp;of&nbsp;the&nbsp;file.</span><br>
+<span class="lineno">120</span><span class="keyword">func</span>&nbsp;<span class="ident">FileInfoHeader</span><span class="op">(</span><span class="ident">fi</span>&nbsp;<span class="ident">os</span><span class="op">.</span><span class="ident">FileInfo</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="op">*</span><span class="ident">FileHeader</span><span class="op">,</span>&nbsp;<span class="builtintype">error</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">size</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">fi</span><span class="op">.</span><span class="ident">Size</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fh</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">&amp;</span><span class="ident">FileHeader</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">Name</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">fi</span><span class="op">.</span><span class="ident">Name</span><span class="op">(</span><span class="op">)</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">UncompressedSize64</span><span class="op">:</span>&nbsp;<span class="ident">uint64</span><span class="op">(</span><span class="ident">size</span><span class="op">)</span><span class="op">,</span><br>
+<span class="lineno">125</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fh</span><span class="op">.</span><span class="ident">SetModTime</span><span class="op">(</span><span class="ident">fi</span><span class="op">.</span><span class="ident">ModTime</span><span class="op">(</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fh</span><span class="op">.</span><span class="ident">SetMode</span><span class="op">(</span><span class="ident">fi</span><span class="op">.</span><span class="ident">Mode</span><span class="op">(</span><span class="op">)</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">fh</span><span class="op">.</span><span class="ident">UncompressedSize64</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="ident">uint32max</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fh</span><span class="op">.</span><span class="ident">UncompressedSize</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">uint32max</span><br>
+<span class="lineno">130</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fh</span><span class="op">.</span><span class="ident">UncompressedSize</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtintype">uint32</span><span class="op">(</span><span class="ident">fh</span><span class="op">.</span><span class="ident">UncompressedSize64</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">fh</span><span class="op">,</span>&nbsp;<span class="ident">nil</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">135</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">directoryEnd</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">diskNbr</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">uint32</span>&nbsp;<span class="comment">//&nbsp;unused</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dirDiskNbr</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">uint32</span>&nbsp;<span class="comment">//&nbsp;unused</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dirRecordsThisDisk</span>&nbsp;<span class="ident">uint64</span>&nbsp;<span class="comment">//&nbsp;unused</span><br>
+<span class="lineno">140</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">directoryRecords</span>&nbsp;&nbsp;&nbsp;<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">directorySize</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">directoryOffset</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">uint64</span>&nbsp;<span class="comment">//&nbsp;relative&nbsp;to&nbsp;file</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">commentLen</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">uint16</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">comment</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype">string</span><br>
+<span class="lineno">145</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;msDosTimeToTime&nbsp;converts&nbsp;an&nbsp;MS-DOS&nbsp;date&nbsp;and&nbsp;time&nbsp;into&nbsp;a&nbsp;time.Time.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;resolution&nbsp;is&nbsp;2s.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;See:&nbsp;http://msdn.microsoft.com/en-us/library/ms724247(v=VS.85).aspx</span><br>
+<span class="lineno">150</span><span class="keyword">func</span>&nbsp;<span class="ident">msDosTimeToTime</span><span class="op">(</span><span class="ident">dosDate</span><span class="op">,</span>&nbsp;<span class="ident">dosTime</span>&nbsp;<span class="builtintype">uint16</span><span class="op">)</span>&nbsp;<span class="ident">time</span><span class="op">.</span><span class="ident">Time</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">time</span><span class="op">.</span><span class="ident">Date</span><span class="op">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;date&nbsp;bits&nbsp;0-4:&nbsp;day&nbsp;of&nbsp;month;&nbsp;5-8:&nbsp;month;&nbsp;9-15:&nbsp;years&nbsp;since&nbsp;1980</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int</span><span class="op">(</span><span class="ident">dosDate</span><span class="op">&gt;&gt;</span><span class="num">9</span><span class="op">+</span><span class="num">1980</span><span class="op">)</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">time</span><span class="op">.</span><span class="ident">Month</span><span class="op">(</span><span class="ident">dosDate</span><span class="op">&gt;&gt;</span><span class="num">5</span><span class="op">&amp;</span><span class="num">0xf</span><span class="op">)</span><span class="op">,</span><br>
+<span class="lineno">155</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int</span><span class="op">(</span><span class="ident">dosDate</span><span class="op">&amp;</span><span class="num">0x1f</span><span class="op">)</span><span class="op">,</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;time&nbsp;bits&nbsp;0-4:&nbsp;second/2;&nbsp;5-10:&nbsp;minute;&nbsp;11-15:&nbsp;hour</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int</span><span class="op">(</span><span class="ident">dosTime</span><span class="op">&gt;&gt;</span><span class="num">11</span><span class="op">)</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int</span><span class="op">(</span><span class="ident">dosTime</span><span class="op">&gt;&gt;</span><span class="num">5</span><span class="op">&amp;</span><span class="num">0x3f</span><span class="op">)</span><span class="op">,</span><br>
+<span class="lineno">160</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int</span><span class="op">(</span><span class="ident">dosTime</span><span class="op">&amp;</span><span class="num">0x1f</span><span class="op">*</span><span class="num">2</span><span class="op">)</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="num">0</span><span class="op">,</span>&nbsp;<span class="comment">//&nbsp;nanoseconds</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">time</span><span class="op">.</span><span class="ident">UTC</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">)</span><br>
+<span class="lineno">165</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;timeToMsDosTime&nbsp;converts&nbsp;a&nbsp;time.Time&nbsp;to&nbsp;an&nbsp;MS-DOS&nbsp;date&nbsp;and&nbsp;time.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;resolution&nbsp;is&nbsp;2s.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;See:&nbsp;http://msdn.microsoft.com/en-us/library/ms724274(v=VS.85).aspx</span><br>
+<span class="lineno">170</span><span class="keyword">func</span>&nbsp;<span class="ident">timeToMsDosTime</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="ident">time</span><span class="op">.</span><span class="ident">Time</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">fDate</span>&nbsp;<span class="builtintype">uint16</span><span class="op">,</span>&nbsp;<span class="ident">fTime</span>&nbsp;<span class="builtintype">uint16</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">t</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">t</span><span class="op">.</span><span class="ident">In</span><span class="op">(</span><span class="ident">time</span><span class="op">.</span><span class="ident">UTC</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fDate</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtintype">uint16</span><span class="op">(</span><span class="ident">t</span><span class="op">.</span><span class="ident">Day</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">+</span>&nbsp;<span class="builtintype">int</span><span class="op">(</span><span class="ident">t</span><span class="op">.</span><span class="ident">Month</span><span class="op">(</span><span class="op">)</span><span class="op">)</span><span class="op">&lt;&lt;</span><span class="num">5</span>&nbsp;<span class="op">+</span>&nbsp;<span class="op">(</span><span class="ident">t</span><span class="op">.</span><span class="ident">Year</span><span class="op">(</span><span class="op">)</span><span class="op">-</span><span class="num">1980</span><span class="op">)</span><span class="op">&lt;&lt;</span><span class="num">9</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fTime</span>&nbsp;<span class="op">=</span>&nbsp;<span class="builtintype">uint16</span><span class="op">(</span><span class="ident">t</span><span class="op">.</span><span class="ident">Second</span><span class="op">(</span><span class="op">)</span><span class="op">/</span><span class="num">2</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">t</span><span class="op">.</span><span class="ident">Minute</span><span class="op">(</span><span class="op">)</span><span class="op">&lt;&lt;</span><span class="num">5</span>&nbsp;<span class="op">+</span>&nbsp;<span class="ident">t</span><span class="op">.</span><span class="ident">Hour</span><span class="op">(</span><span class="op">)</span><span class="op">&lt;&lt;</span><span class="num">11</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
+<span class="lineno">175</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;ModTime&nbsp;returns&nbsp;the&nbsp;modification&nbsp;time&nbsp;in&nbsp;UTC.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;resolution&nbsp;is&nbsp;2s.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">h</span>&nbsp;<span class="op">*</span><span class="ident">FileHeader</span><span class="op">)</span>&nbsp;<span class="ident">ModTime</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="ident">time</span><span class="op">.</span><span class="ident">Time</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">180</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">msDosTimeToTime</span><span class="op">(</span><span class="ident">h</span><span class="op">.</span><span class="ident">ModifiedDate</span><span class="op">,</span>&nbsp;<span class="ident">h</span><span class="op">.</span><span class="ident">ModifiedTime</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;SetModTime&nbsp;sets&nbsp;the&nbsp;ModifiedTime&nbsp;and&nbsp;ModifiedDate&nbsp;fields&nbsp;to&nbsp;the&nbsp;given&nbsp;time&nbsp;in&nbsp;UTC.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;The&nbsp;resolution&nbsp;is&nbsp;2s.</span><br>
+<span class="lineno">185</span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">h</span>&nbsp;<span class="op">*</span><span class="ident">FileHeader</span><span class="op">)</span>&nbsp;<span class="ident">SetModTime</span><span class="op">(</span><span class="ident">t</span>&nbsp;<span class="ident">time</span><span class="op">.</span><span class="ident">Time</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">h</span><span class="op">.</span><span class="ident">ModifiedDate</span><span class="op">,</span>&nbsp;<span class="ident">h</span><span class="op">.</span><span class="ident">ModifiedTime</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">timeToMsDosTime</span><span class="op">(</span><span class="ident">t</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="op">(</span><br>
+<span class="lineno">190</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Unix&nbsp;constants.&nbsp;The&nbsp;specification&nbsp;doesn&#39;t&nbsp;mention&nbsp;them,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;but&nbsp;these&nbsp;seem&nbsp;to&nbsp;be&nbsp;the&nbsp;values&nbsp;agreed&nbsp;on&nbsp;by&nbsp;tools.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s_IFMT</span>&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">0xf000</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s_IFSOCK</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0xc000</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s_IFLNK</span>&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">0xa000</span><br>
+<span class="lineno">195</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s_IFREG</span>&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">0x8000</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s_IFBLK</span>&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">0x6000</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s_IFDIR</span>&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">0x4000</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s_IFCHR</span>&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">0x2000</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s_IFIFO</span>&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">0x1000</span><br>
+<span class="lineno">200</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s_ISUID</span>&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">0x800</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s_ISGID</span>&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">0x400</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">s_ISVTX</span>&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">0x200</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">msdosDir</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">=</span>&nbsp;<span class="num">0x10</span><br>
+<span class="lineno">205</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">msdosReadOnly</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0x01</span><br>
+<span class="lineno"></span><span class="op">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Mode&nbsp;returns&nbsp;the&nbsp;permission&nbsp;and&nbsp;mode&nbsp;bits&nbsp;for&nbsp;the&nbsp;FileHeader.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">h</span>&nbsp;<span class="op">*</span><span class="ident">FileHeader</span><span class="op">)</span>&nbsp;<span class="ident">Mode</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">mode</span>&nbsp;<span class="ident">os</span><span class="op">.</span><span class="ident">FileMode</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">210</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="ident">h</span><span class="op">.</span><span class="ident">CreatorVersion</span>&nbsp;<span class="op">&gt;&gt;</span>&nbsp;<span class="num">8</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">creatorUnix</span><span class="op">,</span>&nbsp;<span class="ident">creatorMacOSX</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mode</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">unixModeToFileMode</span><span class="op">(</span><span class="ident">h</span><span class="op">.</span><span class="ident">ExternalAttrs</span>&nbsp;<span class="op">&gt;&gt;</span>&nbsp;<span class="num">16</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">creatorNTFS</span><span class="op">,</span>&nbsp;<span class="ident">creatorVFAT</span><span class="op">,</span>&nbsp;<span class="ident">creatorFAT</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mode</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">msdosModeToFileMode</span><span class="op">(</span><span class="ident">h</span><span class="op">.</span><span class="ident">ExternalAttrs</span><span class="op">)</span><br>
+<span class="lineno">215</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">h</span><span class="op">.</span><span class="ident">Name</span><span class="op">)</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">h</span><span class="op">.</span><span class="ident">Name</span><span class="op">[</span><span class="builtinfunc">len</span><span class="op">(</span><span class="ident">h</span><span class="op">.</span><span class="ident">Name</span><span class="op">)</span><span class="op">-</span><span class="num">1</span><span class="op">]</span>&nbsp;<span class="op">==</span>&nbsp;<span class="string">&#39;/&#39;</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mode</span>&nbsp;<span class="op">|=</span>&nbsp;<span class="ident">os</span><span class="op">.</span><span class="ident">ModeDir</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">mode</span><br>
+<span class="lineno">220</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;SetMode&nbsp;changes&nbsp;the&nbsp;permission&nbsp;and&nbsp;mode&nbsp;bits&nbsp;for&nbsp;the&nbsp;FileHeader.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">h</span>&nbsp;<span class="op">*</span><span class="ident">FileHeader</span><span class="op">)</span>&nbsp;<span class="ident">SetMode</span><span class="op">(</span><span class="ident">mode</span>&nbsp;<span class="ident">os</span><span class="op">.</span><span class="ident">FileMode</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">h</span><span class="op">.</span><span class="ident">CreatorVersion</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">h</span><span class="op">.</span><span class="ident">CreatorVersion</span><span class="op">&amp;</span><span class="num">0xff</span>&nbsp;<span class="op">|</span>&nbsp;<span class="ident">creatorUnix</span><span class="op">&lt;&lt;</span><span class="num">8</span><br>
+<span class="lineno">225</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">h</span><span class="op">.</span><span class="ident">ExternalAttrs</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">fileModeToUnixMode</span><span class="op">(</span><span class="ident">mode</span><span class="op">)</span>&nbsp;<span class="op">&lt;&lt;</span>&nbsp;<span class="num">16</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;set&nbsp;MSDOS&nbsp;attributes&nbsp;too,&nbsp;as&nbsp;the&nbsp;original&nbsp;zip&nbsp;does.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">mode</span><span class="op">&amp;</span><span class="ident">os</span><span class="op">.</span><span class="ident">ModeDir</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">h</span><span class="op">.</span><span class="ident">ExternalAttrs</span>&nbsp;<span class="op">|=</span>&nbsp;<span class="ident">msdosDir</span><br>
+<span class="lineno">230</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">mode</span><span class="op">&amp;</span><span class="num">0200</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">h</span><span class="op">.</span><span class="ident">ExternalAttrs</span>&nbsp;<span class="op">|=</span>&nbsp;<span class="ident">msdosReadOnly</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">235</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;isZip64&nbsp;returns&nbsp;true&nbsp;if&nbsp;the&nbsp;file&nbsp;size&nbsp;exceeds&nbsp;the&nbsp;32&nbsp;bit&nbsp;limit</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">fh</span>&nbsp;<span class="op">*</span><span class="ident">FileHeader</span><span class="op">)</span>&nbsp;<span class="ident">isZip64</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="builtintype">bool</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">fh</span><span class="op">.</span><span class="ident">CompressedSize64</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="ident">uint32max</span>&nbsp;<span class="op">||</span>&nbsp;<span class="ident">fh</span><span class="op">.</span><span class="ident">UncompressedSize64</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="ident">uint32max</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">240</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">msdosModeToFileMode</span><span class="op">(</span><span class="ident">m</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span>&nbsp;<span class="op">(</span><span class="ident">mode</span>&nbsp;<span class="ident">os</span><span class="op">.</span><span class="ident">FileMode</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">m</span><span class="op">&amp;</span><span class="ident">msdosDir</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mode</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">os</span><span class="op">.</span><span class="ident">ModeDir</span>&nbsp;<span class="op">|</span>&nbsp;<span class="num">0777</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">245</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mode</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0666</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">m</span><span class="op">&amp;</span><span class="ident">msdosReadOnly</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mode</span>&nbsp;<span class="op">&amp;^=</span>&nbsp;<span class="num">0222</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">250</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">mode</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">fileModeToUnixMode</span><span class="op">(</span><span class="ident">mode</span>&nbsp;<span class="ident">os</span><span class="op">.</span><span class="ident">FileMode</span><span class="op">)</span>&nbsp;<span class="builtintype">uint32</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">m</span>&nbsp;<span class="builtintype">uint32</span><br>
+<span class="lineno">255</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="ident">mode</span>&nbsp;<span class="op">&amp;</span>&nbsp;<span class="ident">os</span><span class="op">.</span><span class="ident">ModeType</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">default</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">m</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">s_IFREG</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">os</span><span class="op">.</span><span class="ident">ModeDir</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">m</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">s_IFDIR</span><br>
+<span class="lineno">260</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">os</span><span class="op">.</span><span class="ident">ModeSymlink</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">m</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">s_IFLNK</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">os</span><span class="op">.</span><span class="ident">ModeNamedPipe</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">m</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">s_IFIFO</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">os</span><span class="op">.</span><span class="ident">ModeSocket</span><span class="op">:</span><br>
+<span class="lineno">265</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">m</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">s_IFSOCK</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">os</span><span class="op">.</span><span class="ident">ModeDevice</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">mode</span><span class="op">&amp;</span><span class="ident">os</span><span class="op">.</span><span class="ident">ModeCharDevice</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">m</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">s_IFCHR</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span>&nbsp;<span class="keyword">else</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">270</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">m</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">s_IFBLK</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">mode</span><span class="op">&amp;</span><span class="ident">os</span><span class="op">.</span><span class="ident">ModeSetuid</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">m</span>&nbsp;<span class="op">|=</span>&nbsp;<span class="ident">s_ISUID</span><br>
+<span class="lineno">275</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">mode</span><span class="op">&amp;</span><span class="ident">os</span><span class="op">.</span><span class="ident">ModeSetgid</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">m</span>&nbsp;<span class="op">|=</span>&nbsp;<span class="ident">s_ISGID</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">mode</span><span class="op">&amp;</span><span class="ident">os</span><span class="op">.</span><span class="ident">ModeSticky</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">280</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">m</span>&nbsp;<span class="op">|=</span>&nbsp;<span class="ident">s_ISVTX</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">m</span>&nbsp;<span class="op">|</span>&nbsp;<span class="builtintype">uint32</span><span class="op">(</span><span class="ident">mode</span><span class="op">&amp;</span><span class="num">0777</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">285</span><span class="keyword">func</span>&nbsp;<span class="ident">unixModeToFileMode</span><span class="op">(</span><span class="ident">m</span>&nbsp;<span class="builtintype">uint32</span><span class="op">)</span>&nbsp;<span class="ident">os</span><span class="op">.</span><span class="ident">FileMode</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mode</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">os</span><span class="op">.</span><span class="ident">FileMode</span><span class="op">(</span><span class="ident">m</span>&nbsp;<span class="op">&amp;</span>&nbsp;<span class="num">0777</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="ident">m</span>&nbsp;<span class="op">&amp;</span>&nbsp;<span class="ident">s_IFMT</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">s_IFBLK</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mode</span>&nbsp;<span class="op">|=</span>&nbsp;<span class="ident">os</span><span class="op">.</span><span class="ident">ModeDevice</span><br>
+<span class="lineno">290</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">s_IFCHR</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mode</span>&nbsp;<span class="op">|=</span>&nbsp;<span class="ident">os</span><span class="op">.</span><span class="ident">ModeDevice</span>&nbsp;<span class="op">|</span>&nbsp;<span class="ident">os</span><span class="op">.</span><span class="ident">ModeCharDevice</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">s_IFDIR</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mode</span>&nbsp;<span class="op">|=</span>&nbsp;<span class="ident">os</span><span class="op">.</span><span class="ident">ModeDir</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">s_IFIFO</span><span class="op">:</span><br>
+<span class="lineno">295</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mode</span>&nbsp;<span class="op">|=</span>&nbsp;<span class="ident">os</span><span class="op">.</span><span class="ident">ModeNamedPipe</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">s_IFLNK</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mode</span>&nbsp;<span class="op">|=</span>&nbsp;<span class="ident">os</span><span class="op">.</span><span class="ident">ModeSymlink</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">s_IFREG</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;nothing&nbsp;to&nbsp;do</span><br>
+<span class="lineno">300</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="ident">s_IFSOCK</span><span class="op">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mode</span>&nbsp;<span class="op">|=</span>&nbsp;<span class="ident">os</span><span class="op">.</span><span class="ident">ModeSocket</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">m</span><span class="op">&amp;</span><span class="ident">s_ISGID</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mode</span>&nbsp;<span class="op">|=</span>&nbsp;<span class="ident">os</span><span class="op">.</span><span class="ident">ModeSetgid</span><br>
+<span class="lineno">305</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">m</span><span class="op">&amp;</span><span class="ident">s_ISUID</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mode</span>&nbsp;<span class="op">|=</span>&nbsp;<span class="ident">os</span><span class="op">.</span><span class="ident">ModeSetuid</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">m</span><span class="op">&amp;</span><span class="ident">s_ISVTX</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">310</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mode</span>&nbsp;<span class="op">|=</span>&nbsp;<span class="ident">os</span><span class="op">.</span><span class="ident">ModeSticky</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">mode</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

@@ -1,0 +1,1529 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;auto&nbsp;generated&nbsp;by&nbsp;go&nbsp;tool&nbsp;dist</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;+build&nbsp;!android</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword">package</span>&nbsp;<span class="ident">runtime</span><br>
+<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="string">&#34;unsafe&#34;</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">_</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_Gidle</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno">10</span><span class="keyword">const</span>&nbsp;<span class="ident">_Grunnable</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_Grunning</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">2</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_Gsyscall</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">3</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_Gwaiting</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">4</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_Gmoribund_unused</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">5</span><br>
+<span class="lineno">15</span><span class="keyword">const</span>&nbsp;<span class="ident">_Gdead</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">6</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_Genqueue</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">7</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_Gcopystack</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">8</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_Gscan</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">4096</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_Gscanrunnable</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">4097</span><br>
+<span class="lineno">20</span><span class="keyword">const</span>&nbsp;<span class="ident">_Gscanrunning</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">4098</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_Gscansyscall</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">4099</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_Gscanwaiting</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">4100</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_Gscanenqueue</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">4103</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_Pidle</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno">25</span><span class="keyword">const</span>&nbsp;<span class="ident">_Prunning</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_Psyscall</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">2</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_Pgcstop</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">3</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_Pdead</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">4</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_PtrSize</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">8</span><br>
+<span class="lineno">30</span><span class="keyword">type</span>&nbsp;<span class="ident">mutex</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">key</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">note</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">key</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">_string</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">str</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="builtintype">byte</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">len</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">funcval</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fn</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><br>
+<span class="lineno">45</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">iface</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tab</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">itab</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">data</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><br>
+<span class="lineno">50</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">eface</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_type</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">_type</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">data</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><br>
+<span class="lineno">55</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">_complex64</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">real</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">float32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">imag</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">float32</span><br>
+<span class="lineno">60</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">_complex128</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">real</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">float64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">imag</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">float64</span><br>
+<span class="lineno">65</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">slice</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">array</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">len</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">cap</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">gobuf</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sp</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pc</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">g</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">g</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ctxt</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uintreg</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">lr</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno">80</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">sudog</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">g</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">g</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">selectdone</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="builtintype">uint32</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">next</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">sudog</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">prev</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">sudog</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">elem</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">releasetime</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">int64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nrelease</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">waitlink</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">sudog</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">gcstats</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nhandoff</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nhandoffcnt</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nprocyield</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nosyield</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nsleep</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">100</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">libcall</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fn</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">args</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r1</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r2</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">110</span><span class="keyword">type</span>&nbsp;<span class="ident">wincallbackcontext</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gobody</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">argsize</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">restorestack</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">cleanstack</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">bool</span><br>
+<span class="lineno">115</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">stack</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">lo</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">hi</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno">120</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">g</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stack</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stack</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stackguard0</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno">125</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stackguard1</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_panic</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">_panic</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_defer</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">_defer</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sched</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gobuf</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">syscallsp</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno">130</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">syscallpc</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">param</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">atomicstatus</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">goid</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">int64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">waitsince</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">int64</span><br>
+<span class="lineno">135</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">waitreason</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">string</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">schedlink</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">g</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">issystem</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">bool</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">preempt</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">bool</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">paniconfault</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">bool</span><br>
+<span class="lineno">140</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">preemptscan</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">bool</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gcworkdone</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">bool</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">throwsplit</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">bool</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">raceignore</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int8</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">m</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">m</span><br>
+<span class="lineno">145</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">lockedm</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">m</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sig</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">writebuf</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sigcode0</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sigcode1</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno">150</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sigpc</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gopc</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">racectx</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">waiting</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">sudog</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">end</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="builtintype">uintptr</span><br>
+<span class="lineno">155</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">m</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">g0</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">g</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">morebuf</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gobuf</span><br>
+<span class="lineno">160</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">procid</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gsignal</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">g</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tls</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">4</span><span class="op">]</span><span class="builtintype">uintptr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mstartfn</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">curg</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">g</span><br>
+<span class="lineno">165</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">caughtsig</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">g</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">p</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">p</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nextp</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">p</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">id</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mallocing</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno">170</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">throwing</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gcing</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">locks</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">softfloat</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dying</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno">175</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">profilehz</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">helpgc</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">spinning</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">bool</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">blocked</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">bool</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fastrand</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno">180</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ncgocall</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ncgo</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">cgomal</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">cgomal</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">park</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">note</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alllink</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">m</span><br>
+<span class="lineno">185</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">schedlink</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">m</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">machport</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mcache</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">mcache</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">lockedg</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">g</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">createstack</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">32</span><span class="op">]</span><span class="builtintype">uintptr</span><br>
+<span class="lineno">190</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">freglo</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">16</span><span class="op">]</span><span class="builtintype">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">freghi</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">16</span><span class="op">]</span><span class="builtintype">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fflag</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">locked</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nextwaitm</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">m</span><br>
+<span class="lineno">195</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">waitsema</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">waitsemacount</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">waitsemalock</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gcstats</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gcstats</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">needextram</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">bool</span><br>
+<span class="lineno">200</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">traceback</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint8</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">waitunlockf</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">waitlock</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">scalararg</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">4</span><span class="op">]</span><span class="builtintype">uintptr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ptrarg</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">4</span><span class="op">]</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><br>
+<span class="lineno">205</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">end</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="builtintype">uintptr</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">p</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">lock</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mutex</span><br>
+<span class="lineno">210</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">id</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">status</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">link</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">p</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">schedtick</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">syscalltick</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno">215</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">m</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">m</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mcache</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">mcache</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">deferpool</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">5</span><span class="op">]</span><span class="op">*</span><span class="ident">_defer</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">goidcache</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">goidcacheend</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno">220</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">runqhead</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">runqtail</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">runq</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">256</span><span class="op">]</span><span class="op">*</span><span class="ident">g</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gfree</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">g</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gfreecnt</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno">225</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pad</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">64</span><span class="op">]</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_MaxGomaxprocs</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">256</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">schedt</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">230</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">lock</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mutex</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">goidgen</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">midle</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">m</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nmidle</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nmidlelocked</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno">235</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mcount</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">maxmcount</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pidle</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">p</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">npidle</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nmspinning</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno">240</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">runqhead</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">g</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">runqtail</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">g</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">runqsize</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gflock</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mutex</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gfree</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">g</span><br>
+<span class="lineno">245</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ngfree</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gcwaiting</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stopwait</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stopnote</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">note</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sysmonwait</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno">250</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sysmonnote</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">note</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">lastpoll</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">profilehz</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">255</span><span class="keyword">const</span>&nbsp;<span class="ident">_LockExternal</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_LockInternal</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">2</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">sigtab</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">flags</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">name</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="builtintype">int8</span><br>
+<span class="lineno">260</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_SigNotify</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_SigKill</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">2</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_SigThrow</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">4</span><br>
+<span class="lineno">265</span><span class="keyword">const</span>&nbsp;<span class="ident">_SigPanic</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">8</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_SigDefault</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">16</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_SigHandling</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">32</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_SigIgnored</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">64</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_SigGoExit</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">128</span><br>
+<span class="lineno">270</span><span class="keyword">type</span>&nbsp;<span class="ident">_func</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">entry</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nameoff</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">args</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">frame</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno">275</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pcsp</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pcfile</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pcln</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">npcdata</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nfuncdata</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno">280</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">itab</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">inter</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">interfacetype</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_type</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">_type</span><br>
+<span class="lineno">285</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">link</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">itab</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">bad</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">unused</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fun</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">290</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_NaCl</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_Windows</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_Solaris</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_Plan9</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno">295</span><span class="keyword">type</span>&nbsp;<span class="ident">lfnode</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">next</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">lfnode</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pushcnt</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">300</span><span class="keyword">type</span>&nbsp;<span class="ident">parfor</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">body</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">done</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nthr</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nthrmax</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno">305</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">thrseq</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">cnt</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ctx</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">wait</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">bool</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">thr</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">parforthread</span><br>
+<span class="lineno">310</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pad</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nsteal</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nstealcnt</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nprocyield</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nosyield</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno">315</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nsleep</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">cgomal</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">next</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">cgomal</span><br>
+<span class="lineno">320</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alloc</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">debugvars</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">allocfreetrace</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno">325</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">efence</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gctrace</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gcdead</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">scheddetail</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">schedtrace</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno">330</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">scavenge</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_GCoff</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_GCquiesce</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno">335</span><span class="keyword">const</span>&nbsp;<span class="ident">_GCstw</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">2</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_GCmark</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">3</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_GCsweep</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">4</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">forcegcstate</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">lock</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mutex</span><br>
+<span class="lineno">340</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">g</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">g</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">idle</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">gcphase</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno">345</span><span class="keyword">const</span>&nbsp;<span class="ident">_Structrnd</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">8</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">startup_random_data</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">startup_random_data_len</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">invalidptr</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_HashRandomBytes</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">32</span><br>
+<span class="lineno">350</span><span class="keyword">type</span>&nbsp;<span class="ident">_defer</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">siz</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">started</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">bool</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">argp</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pc</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno">355</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fn</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">funcval</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_panic</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">_panic</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">link</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">_defer</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">360</span><span class="keyword">type</span>&nbsp;<span class="ident">_panic</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">argp</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">arg</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">interface</span><span class="op">{</span><span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">link</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">_panic</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">recovered</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">bool</span><br>
+<span class="lineno">365</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">aborted</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">bool</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">stkframe</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fn</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">_func</span><br>
+<span class="lineno">370</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pc</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">continpc</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">lr</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sp</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fp</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno">375</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">varp</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">argp</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">arglen</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">argmap</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">bitvector</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">380</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_TraceRuntimeFrames</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_TraceTrap</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">2</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_TracebackMaxFrames</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">100</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">emptystring</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">string</span><br>
+<span class="lineno">385</span><span class="keyword">var</span>&nbsp;<span class="ident">allg</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="op">*</span><span class="ident">g</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">allglen</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">lastg</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">g</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">allm</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">m</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">allp</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">257</span><span class="op">]</span><span class="op">*</span><span class="ident">p</span><br>
+<span class="lineno">390</span><span class="keyword">var</span>&nbsp;<span class="ident">gomaxprocs</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">needextram</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">panicking</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">goos</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="builtintype">int8</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">ncpu</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno">395</span><span class="keyword">var</span>&nbsp;<span class="ident">iscgo</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">bool</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">sysargs</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">maxstring</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">cpuid_ecx</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">cpuid_edx</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno">400</span><span class="keyword">var</span>&nbsp;<span class="ident">debug</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">debugvars</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">maxstacksize</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">signote</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">note</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">forcegc</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">forcegcstate</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">sched</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">schedt</span><br>
+<span class="lineno">405</span><span class="keyword">var</span>&nbsp;<span class="ident">newprocs</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">worldsema</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">nan</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">float64</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">posinf</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">float64</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">neginf</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">float64</span><br>
+<span class="lineno">410</span><span class="keyword">const</span>&nbsp;<span class="ident">_UseSpanType</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">thechar</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">54</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_BigEndian</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_CacheLineSize</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">64</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_RuntimeGogoBytes</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">64</span><br>
+<span class="lineno">415</span><span class="keyword">const</span>&nbsp;<span class="ident">_PhysPageSize</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">4096</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_PCQuantum</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_Int64Align</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">8</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_PageShift</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">13</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_PageSize</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">8192</span><br>
+<span class="lineno">420</span><span class="keyword">const</span>&nbsp;<span class="ident">_PageMask</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">8191</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_NumSizeClasses</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">67</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_MaxSmallSize</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">32768</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_TinySize</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">16</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_TinySizeClass</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">2</span><br>
+<span class="lineno">425</span><span class="keyword">const</span>&nbsp;<span class="ident">_FixAllocChunk</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">16384</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_MaxMHeapList</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">128</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_HeapAllocChunk</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1048576</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_StackCacheSize</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">32768</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_NumStackOrders</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">3</span><br>
+<span class="lineno">430</span><span class="keyword">const</span>&nbsp;<span class="ident">_MHeapMap_Bits</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">24</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_MaxGcproc</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">32</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">mlink</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">next</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">mlink</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">435</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">fixalloc</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">size</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">first</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">arg</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><br>
+<span class="lineno">440</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">list</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">mlink</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">chunk</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nchunk</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">inuse</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stat</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">uint64</span><br>
+<span class="lineno">445</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">mstatsbysize</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">size</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nmalloc</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno">450</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nfree</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">mstats</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alloc</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno">455</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">total_alloc</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sys</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nlookup</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nmalloc</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nfree</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno">460</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">heap_alloc</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">heap_sys</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">heap_idle</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">heap_inuse</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">heap_released</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno">465</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">heap_objects</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stacks_inuse</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stacks_sys</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mspan_inuse</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mspan_sys</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno">470</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mcache_inuse</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mcache_sys</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">buckhash_sys</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gc_sys</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">other_sys</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno">475</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">next_gc</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">last_gc</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pause_total_ns</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pause_ns</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">256</span><span class="op">]</span><span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pause_end</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">256</span><span class="op">]</span><span class="ident">uint64</span><br>
+<span class="lineno">480</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">numgc</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">enablegc</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">bool</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">debuggc</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">bool</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">by_size</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">67</span><span class="op">]</span><span class="ident">mstatsbysize</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tinyallocs</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno">485</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">memstats</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mstats</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">class_to_size</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">67</span><span class="op">]</span><span class="builtintype">int32</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">class_to_allocnpages</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">67</span><span class="op">]</span><span class="builtintype">int32</span><br>
+<span class="lineno">490</span><span class="keyword">var</span>&nbsp;<span class="ident">size_to_class8</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">129</span><span class="op">]</span><span class="builtintype">int8</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">size_to_class128</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">249</span><span class="op">]</span><span class="builtintype">int8</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">mcachelist</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">list</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">mlink</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nlist</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno">495</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">stackfreelist</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">list</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">mlink</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">size</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno">500</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">mcache</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">next_sample</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">local_cachealloc</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">intptr</span><br>
+<span class="lineno">505</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tiny</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tinysize</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">local_tinyallocs</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alloc</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">67</span><span class="op">]</span><span class="op">*</span><span class="ident">mspan</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stackcache</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">3</span><span class="op">]</span><span class="ident">stackfreelist</span><br>
+<span class="lineno">510</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sudogcache</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">sudog</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gcworkbuf</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">local_nlookup</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">local_largefree</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">local_nlargefree</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno">515</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">local_nsmallfree</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">67</span><span class="op">]</span><span class="builtintype">uintptr</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_KindSpecialFinalizer</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_KindSpecialProfile</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">2</span><br>
+<span class="lineno">520</span><span class="keyword">type</span>&nbsp;<span class="ident">special</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">next</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">special</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">offset</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint16</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">kind</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">byte</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">525</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">specialfinalizer</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">special</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">special</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fn</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">funcval</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nret</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno">530</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fint</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">_type</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ot</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">ptrtype</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">specialprofile</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">535</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">special</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">special</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">bucket</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_MSpanInUse</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno">540</span><span class="keyword">const</span>&nbsp;<span class="ident">_MSpanStack</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_MSpanFree</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">2</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_MSpanListHead</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">3</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_MSpanDead</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">4</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">mspan</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">545</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">next</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">mspan</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">prev</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">mspan</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">start</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pageID</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">npages</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">freelist</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">mlink</span><br>
+<span class="lineno">550</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sweepgen</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ref</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint16</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sizeclass</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint8</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">incache</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">bool</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">state</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint8</span><br>
+<span class="lineno">555</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">needzero</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint8</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">elemsize</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">unusedsince</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">int64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">npreleased</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">limit</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="builtintype">byte</span><br>
+<span class="lineno">560</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">speciallock</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mutex</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">specials</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">special</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">mcentral</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">565</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">lock</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mutex</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sizeclass</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nonempty</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mspan</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">empty</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mspan</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">570</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">mheapcentral</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mcentral</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mcentral</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pad</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">64</span><span class="op">]</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">575</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">mheap</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">lock</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mutex</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">free</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">128</span><span class="op">]</span><span class="ident">mspan</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">freelarge</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mspan</span><br>
+<span class="lineno">580</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">busy</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">128</span><span class="op">]</span><span class="ident">mspan</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">busylarge</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mspan</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">allspans</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="op">*</span><span class="ident">mspan</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gcspans</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="op">*</span><span class="ident">mspan</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nspan</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno">585</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nspancap</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sweepgen</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sweepdone</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">spans</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="op">*</span><span class="ident">mspan</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">spans_mapped</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno">590</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">bitmap</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">bitmap_mapped</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">arena_start</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">arena_used</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">arena_end</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="builtintype">byte</span><br>
+<span class="lineno">595</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">arena_reserved</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">bool</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">central</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">67</span><span class="op">]</span><span class="ident">mheapcentral</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">spanalloc</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fixalloc</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">cachealloc</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fixalloc</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">specialfinalizeralloc</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fixalloc</span><br>
+<span class="lineno">600</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">specialprofilealloc</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fixalloc</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">speciallock</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mutex</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">largefree</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nlargefree</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nsmallfree</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">67</span><span class="op">]</span><span class="ident">uint64</span><br>
+<span class="lineno">605</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">mheap_</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mheap</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">gcpercent</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_FlagNoScan</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno">610</span><span class="keyword">const</span>&nbsp;<span class="ident">_FlagNoZero</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">2</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">finalizer</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fn</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">funcval</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">arg</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nret</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno">615</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fint</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">_type</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ot</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">ptrtype</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">finblock</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">620</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alllink</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">finblock</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">next</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">finblock</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">cnt</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">cap</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fin</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">1</span><span class="op">]</span><span class="ident">finalizer</span><br>
+<span class="lineno">625</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">finlock</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mutex</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">fing</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">g</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">fingwait</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">bool</span><br>
+<span class="lineno">630</span><span class="keyword">var</span>&nbsp;<span class="ident">fingwake</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">bool</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">finq</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">finblock</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">finc</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">finblock</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">bitvector</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno">635</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">bytedata</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="builtintype">uint8</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">stackmap</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno">640</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nbit</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">bytedata</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="builtintype">uint8</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">gcdatamask</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">bitvector</span><br>
+<span class="lineno">645</span><span class="keyword">var</span>&nbsp;<span class="ident">gcbssmask</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">bitvector</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">_type</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">size</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">hash</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_unused</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint8</span><br>
+<span class="lineno">650</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">align</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint8</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fieldalign</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint8</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">kind</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint8</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alg</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gc</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">2</span><span class="op">]</span><span class="builtintype">uintptr</span><br>
+<span class="lineno">655</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_string</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="builtintype">string</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">x</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">uncommontype</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ptrto</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">_type</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">zero</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">660</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">method</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">name</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="builtintype">string</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pkgpath</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="builtintype">string</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mtyp</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">_type</span><br>
+<span class="lineno">665</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">typ</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">_type</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ifn</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tfn</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">670</span><span class="keyword">type</span>&nbsp;<span class="ident">uncommontype</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">name</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="builtintype">string</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pkgpath</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="builtintype">string</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mhdr</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">m</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="ident">method</span><br>
+<span class="lineno">675</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">imethod</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">name</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="builtintype">string</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pkgpath</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="builtintype">string</span><br>
+<span class="lineno">680</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_type</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">_type</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">interfacetype</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">typ</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_type</span><br>
+<span class="lineno">685</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mhdr</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">m</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="ident">imethod</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">maptype</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">690</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">typ</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_type</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">key</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">_type</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">elem</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">_type</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">bucket</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">_type</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">hmap</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">_type</span><br>
+<span class="lineno">695</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">keysize</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint8</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">indirectkey</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">bool</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">valuesize</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint8</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">indirectvalue</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">bool</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">bucketsize</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint16</span><br>
+<span class="lineno">700</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">chantype</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">typ</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_type</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">elem</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">_type</span><br>
+<span class="lineno">705</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dir</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">slicetype</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">typ</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_type</span><br>
+<span class="lineno">710</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">elem</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">_type</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">functype</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">typ</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_type</span><br>
+<span class="lineno">715</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dotdotdot</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">bool</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">in</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">out</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">720</span><span class="keyword">type</span>&nbsp;<span class="ident">ptrtype</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">typ</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_type</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">elem</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">_type</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">725</span><span class="keyword">type</span>&nbsp;<span class="ident">waitq</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">first</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">sudog</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">last</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">sudog</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">730</span><span class="keyword">type</span>&nbsp;<span class="ident">hchan</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">qcount</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dataqsiz</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">buf</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">elemsize</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint16</span><br>
+<span class="lineno">735</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">closed</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">elemtype</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">_type</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sendx</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">recvx</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">recvq</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">waitq</span><br>
+<span class="lineno">740</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sendq</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">waitq</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">lock</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mutex</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_CaseRecv</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno">745</span><span class="keyword">const</span>&nbsp;<span class="ident">_CaseSend</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">2</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_CaseDefault</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">3</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">scase</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">elem</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_chan</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">hchan</span><br>
+<span class="lineno">750</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pc</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">kind</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint16</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">so</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint16</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">receivedp</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="builtintype">bool</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">releasetime</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">int64</span><br>
+<span class="lineno">755</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">_select</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tcase</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint16</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ncase</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint16</span><br>
+<span class="lineno">760</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pollorder</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="builtintype">uint16</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">lockorder</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="op">*</span><span class="ident">hchan</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">scase</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">1</span><span class="op">]</span><span class="ident">scase</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">765</span><span class="keyword">const</span>&nbsp;<span class="ident">_EINTR</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">4</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_EAGAIN</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">11</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_ENOMEM</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">12</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_PROT_NONE</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_PROT_READ</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno">770</span><span class="keyword">const</span>&nbsp;<span class="ident">_PROT_WRITE</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">2</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_PROT_EXEC</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">4</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_MAP_ANON</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">32</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_MAP_PRIVATE</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">2</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_MAP_FIXED</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">16</span><br>
+<span class="lineno">775</span><span class="keyword">const</span>&nbsp;<span class="ident">_MADV_DONTNEED</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">4</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_SA_RESTART</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">268435456</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_SA_ONSTACK</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">134217728</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_SA_RESTORER</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">67108864</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_SA_SIGINFO</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">4</span><br>
+<span class="lineno">780</span><span class="keyword">const</span>&nbsp;<span class="ident">_SIGHUP</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_SIGINT</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">2</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_SIGQUIT</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">3</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_SIGILL</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">4</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_SIGTRAP</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">5</span><br>
+<span class="lineno">785</span><span class="keyword">const</span>&nbsp;<span class="ident">_SIGABRT</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">6</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_SIGBUS</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">7</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_SIGFPE</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">8</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_SIGKILL</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">9</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_SIGUSR1</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">10</span><br>
+<span class="lineno">790</span><span class="keyword">const</span>&nbsp;<span class="ident">_SIGSEGV</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">11</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_SIGUSR2</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">12</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_SIGPIPE</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">13</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_SIGALRM</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">14</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_SIGSTKFLT</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">16</span><br>
+<span class="lineno">795</span><span class="keyword">const</span>&nbsp;<span class="ident">_SIGCHLD</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">17</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_SIGCONT</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">18</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_SIGSTOP</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">19</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_SIGTSTP</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">20</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_SIGTTIN</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">21</span><br>
+<span class="lineno">800</span><span class="keyword">const</span>&nbsp;<span class="ident">_SIGTTOU</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">22</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_SIGURG</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">23</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_SIGXCPU</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">24</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_SIGXFSZ</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">25</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_SIGVTALRM</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">26</span><br>
+<span class="lineno">805</span><span class="keyword">const</span>&nbsp;<span class="ident">_SIGPROF</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">27</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_SIGWINCH</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">28</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_SIGIO</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">29</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_SIGPWR</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">30</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_SIGSYS</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">31</span><br>
+<span class="lineno">810</span><span class="keyword">const</span>&nbsp;<span class="ident">_FPE_INTDIV</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_FPE_INTOVF</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">2</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_FPE_FLTDIV</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">3</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_FPE_FLTOVF</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">4</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_FPE_FLTUND</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">5</span><br>
+<span class="lineno">815</span><span class="keyword">const</span>&nbsp;<span class="ident">_FPE_FLTRES</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">6</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_FPE_FLTINV</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">7</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_FPE_FLTSUB</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">8</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_BUS_ADRALN</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_BUS_ADRERR</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">2</span><br>
+<span class="lineno">820</span><span class="keyword">const</span>&nbsp;<span class="ident">_BUS_OBJERR</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">3</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_SEGV_MAPERR</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_SEGV_ACCERR</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">2</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_ITIMER_REAL</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_ITIMER_VIRTUAL</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno">825</span><span class="keyword">const</span>&nbsp;<span class="ident">_ITIMER_PROF</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">2</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_EPOLLIN</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_EPOLLOUT</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">4</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_EPOLLERR</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">8</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_EPOLLHUP</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">16</span><br>
+<span class="lineno">830</span><span class="keyword">const</span>&nbsp;<span class="ident">_EPOLLRDHUP</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">8192</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_EPOLLET</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">2147483648</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_EPOLL_CLOEXEC</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">524288</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_EPOLL_CTL_ADD</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_EPOLL_CTL_DEL</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">2</span><br>
+<span class="lineno">835</span><span class="keyword">const</span>&nbsp;<span class="ident">_EPOLL_CTL_MOD</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">3</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">timespec</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tv_sec</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">int64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tv_nsec</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">int64</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">840</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">timeval</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tv_sec</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">int64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tv_usec</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">int64</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">845</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">sigactiont</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sa_handler</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sa_flags</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sa_restorer</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><br>
+<span class="lineno">850</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sa_mask</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">siginfo</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">si_signo</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno">855</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">si_errno</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">si_code</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pad_cgo_0</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">4</span><span class="op">]</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_sifields</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">112</span><span class="op">]</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">860</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">itimerval</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">it_interval</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">timeval</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">it_value</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">timeval</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">865</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">epollevent</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">events</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">data</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">8</span><span class="op">]</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">870</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_O_RDONLY</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_O_CLOEXEC</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">524288</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">usigset</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">__val</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">16</span><span class="op">]</span><span class="ident">uint64</span><br>
+<span class="lineno">875</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">fpxreg</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">significand</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">4</span><span class="op">]</span><span class="builtintype">uint16</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">exponent</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint16</span><br>
+<span class="lineno">880</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">padding</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">3</span><span class="op">]</span><span class="builtintype">uint16</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">xmmreg</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">element</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">4</span><span class="op">]</span><span class="builtintype">uint32</span><br>
+<span class="lineno">885</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">fpstate</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">cwd</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint16</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">swd</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint16</span><br>
+<span class="lineno">890</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ftw</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint16</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fop</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint16</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">rip</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">rdp</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mxcsr</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno">895</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mxcr_mask</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_st</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">8</span><span class="op">]</span><span class="ident">fpxreg</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_xmm</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">16</span><span class="op">]</span><span class="ident">xmmreg</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">padding</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">24</span><span class="op">]</span><span class="builtintype">uint32</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">900</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">fpxreg1</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">significand</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">4</span><span class="op">]</span><span class="builtintype">uint16</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">exponent</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint16</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">padding</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">3</span><span class="op">]</span><span class="builtintype">uint16</span><br>
+<span class="lineno">905</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">xmmreg1</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">element</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">4</span><span class="op">]</span><span class="builtintype">uint32</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">910</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">fpstate1</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">cwd</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint16</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">swd</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint16</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ftw</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint16</span><br>
+<span class="lineno">915</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fop</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint16</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">rip</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">rdp</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mxcsr</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mxcr_mask</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno">920</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_st</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">8</span><span class="op">]</span><span class="ident">fpxreg1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">_xmm</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">16</span><span class="op">]</span><span class="ident">xmmreg1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">padding</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">24</span><span class="op">]</span><span class="builtintype">uint32</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">925</span><span class="keyword">type</span>&nbsp;<span class="ident">fpreg1</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">significand</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">4</span><span class="op">]</span><span class="builtintype">uint16</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">exponent</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint16</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">930</span><span class="keyword">type</span>&nbsp;<span class="ident">sigaltstackt</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ss_sp</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ss_flags</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pad_cgo_0</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">4</span><span class="op">]</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ss_size</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno">935</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">mcontext</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gregs</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">23</span><span class="op">]</span><span class="ident">int64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fpregs</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">fpstate</span><br>
+<span class="lineno">940</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">__reserved1</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">8</span><span class="op">]</span><span class="ident">uint64</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">ucontext</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uc_flags</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno">945</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uc_link</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">ucontext</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uc_stack</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sigaltstackt</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uc_mcontext</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mcontext</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uc_sigmask</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">usigset</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">__fpregs_mem</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fpstate</span><br>
+<span class="lineno">950</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">sigcontext</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r8</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r9</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno">955</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r10</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r11</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r12</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r13</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r14</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno">960</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">r15</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">rdi</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">rsi</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">rbp</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">rbx</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno">965</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">rdx</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">rax</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">rcx</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">rsp</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">rip</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno">970</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">eflags</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">cs</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint16</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gs</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint16</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fs</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint16</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">__pad0</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint16</span><br>
+<span class="lineno">975</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">err</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">trapno</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">oldmask</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">cr2</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fpstate</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">fpstate1</span><br>
+<span class="lineno">980</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">__reserved1</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">8</span><span class="op">]</span><span class="ident">uint64</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_SS_DISABLE</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">2</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_NSIG</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">65</span><br>
+<span class="lineno">985</span><span class="keyword">const</span>&nbsp;<span class="ident">_SI_USER</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_SIG_SETMASK</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">2</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_RLIMIT_AS</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">9</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">sigset</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mask</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">2</span><span class="op">]</span><span class="builtintype">uint32</span><br>
+<span class="lineno">990</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">rlimit</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">rlim_cur</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">rlim_max</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno">995</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1000</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1005</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1010</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1015</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1020</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1025</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1030</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1035</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1040</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1045</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1050</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1055</span><span class="keyword">const</span>&nbsp;<span class="ident">_KindBool</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_KindInt</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">2</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_KindInt8</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">3</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_KindInt16</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">4</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_KindInt32</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">5</span><br>
+<span class="lineno">1060</span><span class="keyword">const</span>&nbsp;<span class="ident">_KindInt64</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">6</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_KindUint</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">7</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_KindUint8</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">8</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_KindUint16</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">9</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_KindUint32</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">10</span><br>
+<span class="lineno">1065</span><span class="keyword">const</span>&nbsp;<span class="ident">_KindUint64</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">11</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_KindUintptr</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">12</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_KindFloat32</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">13</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_KindFloat64</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">14</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_KindComplex64</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">15</span><br>
+<span class="lineno">1070</span><span class="keyword">const</span>&nbsp;<span class="ident">_KindComplex128</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">16</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_KindArray</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">17</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_KindChan</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">18</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_KindFunc</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">19</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_KindInterface</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">20</span><br>
+<span class="lineno">1075</span><span class="keyword">const</span>&nbsp;<span class="ident">_KindMap</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">21</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_KindPtr</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">22</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_KindSlice</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">23</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_KindString</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">24</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_KindStruct</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">25</span><br>
+<span class="lineno">1080</span><span class="keyword">const</span>&nbsp;<span class="ident">_KindUnsafePointer</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">26</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_KindDirectIface</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">32</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_KindGCProg</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">64</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_KindNoPointers</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">128</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_KindMask</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">31</span><br>
+<span class="lineno">1085</span><span class="keyword">const</span>&nbsp;<span class="ident">_StackSystem</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_StackMin</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">2048</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_FixedStack0</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">2048</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_FixedStack1</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">2047</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_FixedStack2</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">2047</span><br>
+<span class="lineno">1090</span><span class="keyword">const</span>&nbsp;<span class="ident">_FixedStack3</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">2047</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_FixedStack4</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">2047</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_FixedStack5</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">2047</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_FixedStack6</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">2047</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_FixedStack</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">2048</span><br>
+<span class="lineno">1095</span><span class="keyword">const</span>&nbsp;<span class="ident">_StackBig</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">4096</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_StackGuard</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">512</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_StackSmall</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">128</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_StackLimit</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">384</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">sizeof_c_mstats</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno">1100</span><span class="keyword">var</span>&nbsp;<span class="ident">maxmem</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">end</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1105</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1110</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1115</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1120</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1125</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1130</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1135</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1140</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1145</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1150</span><span class="keyword">var</span>&nbsp;<span class="ident">memprofilerate</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">emptymspan</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mspan</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1155</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1160</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1165</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1170</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1175</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1180</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1185</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1190</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1195</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1200</span><span class="keyword">const</span>&nbsp;<span class="ident">gcBits</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">4</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">wordsPerBitmapByte</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">2</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">insData</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">insArray</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">2</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">insArrayEnd</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">3</span><br>
+<span class="lineno">1205</span><span class="keyword">const</span>&nbsp;<span class="ident">insEnd</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">4</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_BitsPerPointer</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">2</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_BitsMask</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">3</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_PointersPerByte</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">4</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_BitsDead</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno">1210</span><span class="keyword">const</span>&nbsp;<span class="ident">_BitsScalar</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_BitsPointer</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">2</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_BitsMultiWord</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">3</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_BitsIface</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">2</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_BitsEface</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">3</span><br>
+<span class="lineno">1215</span><span class="keyword">const</span>&nbsp;<span class="ident">_MaxGCMask</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">64</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">bitBoundary</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">bitMarked</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">2</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">bitMask</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">3</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">bitPtrMask</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">12</span><br>
+<span class="lineno">1220</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1225</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1230</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_Debug</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno">1235</span><span class="keyword">const</span>&nbsp;<span class="ident">_DebugPtrs</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_ConcurrentSweep</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_WorkbufSize</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">4096</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_FinBlockSize</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">4096</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_RootData</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno">1240</span><span class="keyword">const</span>&nbsp;<span class="ident">_RootBss</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_RootFinalizers</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">2</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_RootSpans</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">3</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_RootFlushCaches</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">4</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_RootCount</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">5</span><br>
+<span class="lineno">1245</span><span class="keyword">var</span>&nbsp;<span class="ident">oneptr</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">workbuf</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">node</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">lfnode</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nobj</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">obj</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">509</span><span class="op">]</span><span class="op">*</span><span class="builtintype">byte</span><br>
+<span class="lineno">1250</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">data</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">edata</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">bss</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="builtintype">byte</span><br>
+<span class="lineno">1255</span><span class="keyword">var</span>&nbsp;<span class="ident">ebss</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">gcdata</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">gcbss</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">finptrmask</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">128</span><span class="op">]</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">allfin</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">finblock</span><br>
+<span class="lineno">1260</span><span class="keyword">var</span>&nbsp;<span class="ident">gclock</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mutex</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">badblock</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">1024</span><span class="op">]</span><span class="builtintype">uintptr</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">nbadblock</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">bgsweepv</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">funcval</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">workdata</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">1265</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">full</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">empty</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pad0</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">64</span><span class="op">]</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nproc</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tstart</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">int64</span><br>
+<span class="lineno">1270</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nwait</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ndone</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">alldone</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">note</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">markfor</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">parfor</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">spans</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="op">*</span><span class="ident">mspan</span><br>
+<span class="lineno">1275</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nspan</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">work</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">workdata</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">finalizer1</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="builtintype">byte</span><br>
+<span class="lineno">1280</span><span class="keyword">type</span>&nbsp;<span class="ident">sweepdata</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">g</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">g</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">parked</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">bool</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">spanidx</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nbgsweep</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno">1285</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">npausesweep</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">sweep</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sweepdata</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">gc_args</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">1290</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">start_time</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">int64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">eagersweep</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">bool</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">bitmapChunk</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">8192</span><br>
+<span class="lineno">1295</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1300</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1305</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1310</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1315</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1320</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1325</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1330</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1335</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1340</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1345</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1350</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_GoidCacheBatch</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">16</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">m0</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">m</span><br>
+<span class="lineno">1355</span><span class="keyword">var</span>&nbsp;<span class="ident">g0</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">g</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">extram</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">m</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">allglock</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mutex</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">buildversion</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">string</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">_cgo_init</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><br>
+<span class="lineno">1360</span><span class="keyword">var</span>&nbsp;<span class="ident">_cgo_malloc</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">_cgo_free</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">cgomalloc</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">cgofree</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">_cgo_thread_start</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><br>
+<span class="lineno">1365</span><span class="keyword">type</span>&nbsp;<span class="ident">cgothreadstart</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">g</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="ident">g</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">tls</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">*</span><span class="builtintype">uintptr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fn</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">1370</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">profstate</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">lock</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">hz</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">int32</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">1375</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">prof</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">profstate</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">etext</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">pdesc</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">schedtick</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno">1380</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">schedwhen</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">int64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">syscalltick</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">syscallwhen</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">int64</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1385</span><span class="keyword">var</span>&nbsp;<span class="ident">experiment</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="builtintype">int8</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1390</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1395</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1400</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1405</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1410</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1415</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1420</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1425</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1430</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">parforthread</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">1435</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pos</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nsteal</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nstealcnt</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nprocyield</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nosyield</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno">1440</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">nsleep</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">pad</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">64</span><span class="op">]</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1445</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1450</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1455</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1460</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1465</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1470</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1475</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1480</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1485</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1490</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1495</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><br>
+<span class="lineno">1500</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_StackDebug</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_StackFromSystem</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_StackFaultOnFree</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno">1505</span><span class="keyword">const</span>&nbsp;<span class="ident">_StackPoisonCopy</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span><span class="keyword">const</span>&nbsp;<span class="ident">_StackCache</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">1</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">stackpool</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">3</span><span class="op">]</span><span class="ident">mspan</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">stackpoolmu</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mutex</span><br>
+<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">stackfreequeue</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stack</span><br>
+<span class="lineno">1510</span><span class="keyword">var</span>&nbsp;<span class="ident">mapnames</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">[</span><span class="num">0</span><span class="op">]</span><span class="op">*</span><span class="builtintype">uint8</span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">adjustinfo</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">old</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">stack</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">delta</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype">uintptr</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

@@ -1,0 +1,87 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2010&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="comment">//&nbsp;CFB&nbsp;(Cipher&nbsp;Feedback)&nbsp;Mode.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">package</span>&nbsp;<span class="ident">cipher</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">type</span>&nbsp;<span class="ident">cfb</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">Block</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">next</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">out</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">outUsed</span>&nbsp;<span class="builtintype">int</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">15</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">decrypt</span>&nbsp;<span class="builtintype">bool</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="op">(</span><span class="ident">x</span>&nbsp;<span class="op">*</span><span class="ident">cfb</span><span class="op">)</span>&nbsp;<span class="ident">XORKeyStream</span><span class="op">(</span><span class="ident">dst</span><span class="op">,</span>&nbsp;<span class="ident">src</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">for</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">src</span><span class="op">)</span>&nbsp;<span class="op">&gt;</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">x</span><span class="op">.</span><span class="ident">outUsed</span>&nbsp;<span class="op">==</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">x</span><span class="op">.</span><span class="ident">out</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">x</span><span class="op">.</span><span class="ident">b</span><span class="op">.</span><span class="ident">Encrypt</span><span class="op">(</span><span class="ident">x</span><span class="op">.</span><span class="ident">out</span><span class="op">,</span>&nbsp;<span class="ident">x</span><span class="op">.</span><span class="ident">next</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">x</span><span class="op">.</span><span class="ident">outUsed</span>&nbsp;<span class="op">=</span>&nbsp;<span class="num">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">x</span><span class="op">.</span><span class="ident">decrypt</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;We&nbsp;can&nbsp;precompute&nbsp;a&nbsp;larger&nbsp;segment&nbsp;of&nbsp;the</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;keystream&nbsp;on&nbsp;decryption.&nbsp;This&nbsp;will&nbsp;allow</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;larger&nbsp;batches&nbsp;for&nbsp;xor,&nbsp;and&nbsp;we&nbsp;should&nbsp;be</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;able&nbsp;to&nbsp;match&nbsp;CTR/OFB&nbsp;performance.</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">copy</span><span class="op">(</span><span class="ident">x</span><span class="op">.</span><span class="ident">next</span><span class="op">[</span><span class="ident">x</span><span class="op">.</span><span class="ident">outUsed</span><span class="op">:</span><span class="op">]</span><span class="op">,</span>&nbsp;<span class="ident">src</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">xorBytes</span><span class="op">(</span><span class="ident">dst</span><span class="op">,</span>&nbsp;<span class="ident">src</span><span class="op">,</span>&nbsp;<span class="ident">x</span><span class="op">.</span><span class="ident">out</span><span class="op">[</span><span class="ident">x</span><span class="op">.</span><span class="ident">outUsed</span><span class="op">:</span><span class="op">]</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">x</span><span class="op">.</span><span class="ident">decrypt</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">copy</span><span class="op">(</span><span class="ident">x</span><span class="op">.</span><span class="ident">next</span><span class="op">[</span><span class="ident">x</span><span class="op">.</span><span class="ident">outUsed</span><span class="op">:</span><span class="op">]</span><span class="op">,</span>&nbsp;<span class="ident">dst</span><span class="op">)</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">dst</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">dst</span><span class="op">[</span><span class="ident">n</span><span class="op">:</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">src</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">src</span><span class="op">[</span><span class="ident">n</span><span class="op">:</span><span class="op">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">x</span><span class="op">.</span><span class="ident">outUsed</span>&nbsp;<span class="op">+=</span>&nbsp;<span class="ident">n</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">40</span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;NewCFBEncrypter&nbsp;returns&nbsp;a&nbsp;Stream&nbsp;which&nbsp;encrypts&nbsp;with&nbsp;cipher&nbsp;feedback&nbsp;mode,</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;using&nbsp;the&nbsp;given&nbsp;Block.&nbsp;The&nbsp;iv&nbsp;must&nbsp;be&nbsp;the&nbsp;same&nbsp;length&nbsp;as&nbsp;the&nbsp;Block&#39;s&nbsp;block</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;size.</span><br>
+<span class="lineno">45</span><span class="keyword">func</span>&nbsp;<span class="ident">NewCFBEncrypter</span><span class="op">(</span><span class="ident">block</span>&nbsp;<span class="ident">Block</span><span class="op">,</span>&nbsp;<span class="ident">iv</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="ident">Stream</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">newCFB</span><span class="op">(</span><span class="ident">block</span><span class="op">,</span>&nbsp;<span class="ident">iv</span><span class="op">,</span>&nbsp;<span class="ident">false</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;NewCFBDecrypter&nbsp;returns&nbsp;a&nbsp;Stream&nbsp;which&nbsp;decrypts&nbsp;with&nbsp;cipher&nbsp;feedback&nbsp;mode,</span><br>
+<span class="lineno">50</span><span class="comment">//&nbsp;using&nbsp;the&nbsp;given&nbsp;Block.&nbsp;The&nbsp;iv&nbsp;must&nbsp;be&nbsp;the&nbsp;same&nbsp;length&nbsp;as&nbsp;the&nbsp;Block&#39;s&nbsp;block</span><br>
+<span class="lineno"></span><span class="comment">//&nbsp;size.</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">NewCFBDecrypter</span><span class="op">(</span><span class="ident">block</span>&nbsp;<span class="ident">Block</span><span class="op">,</span>&nbsp;<span class="ident">iv</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">)</span>&nbsp;<span class="ident">Stream</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">newCFB</span><span class="op">(</span><span class="ident">block</span><span class="op">,</span>&nbsp;<span class="ident">iv</span><span class="op">,</span>&nbsp;<span class="ident">true</span><span class="op">)</span><br>
+<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">55</span><br>
+<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">newCFB</span><span class="op">(</span><span class="ident">block</span>&nbsp;<span class="ident">Block</span><span class="op">,</span>&nbsp;<span class="ident">iv</span>&nbsp;<span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="ident">decrypt</span>&nbsp;<span class="builtintype">bool</span><span class="op">)</span>&nbsp;<span class="ident">Stream</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">blockSize</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">block</span><span class="op">.</span><span class="ident">BlockSize</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="builtinfunc">len</span><span class="op">(</span><span class="ident">iv</span><span class="op">)</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">blockSize</span>&nbsp;<span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;stack&nbsp;trace&nbsp;will&nbsp;indicate&nbsp;whether&nbsp;it&nbsp;was&nbsp;de&nbsp;or&nbsp;encryption</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">panic</span><span class="op">(</span><span class="string">&#34;cipher.newCFB:&nbsp;IV&nbsp;length&nbsp;must&nbsp;equal&nbsp;block&nbsp;size&#34;</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">x</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">&amp;</span><span class="ident">cfb</span><span class="op">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">b</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">block</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">out</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtinfunc">make</span><span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="ident">blockSize</span><span class="op">)</span><span class="op">,</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">next</span><span class="op">:</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtinfunc">make</span><span class="op">(</span><span class="op">[</span><span class="op">]</span><span class="builtintype">byte</span><span class="op">,</span>&nbsp;<span class="ident">blockSize</span><span class="op">)</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">outUsed</span><span class="op">:</span>&nbsp;<span class="ident">blockSize</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">decrypt</span><span class="op">:</span>&nbsp;<span class="ident">decrypt</span><span class="op">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">copy</span><span class="op">(</span><span class="ident">x</span><span class="op">.</span><span class="ident">next</span><span class="op">,</span>&nbsp;<span class="ident">iv</span><span class="op">)</span><br>
+<span class="lineno">70</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">x</span><br>
+<span class="lineno"></span><span class="op">}</span>
+</div>
+</body>
+</html>

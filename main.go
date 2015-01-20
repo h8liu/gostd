@@ -3,8 +3,6 @@ package main
 import (
 	"fmt"
 	"go/build"
-	// "go/token"
-	"log"
 	"path/filepath"
 	"strings"
 
@@ -22,6 +20,9 @@ func listPackages() []string {
 	var ret []string
 	for _, p := range pkgs {
 		if strings.HasPrefix(p, "cmd/") || p == "cmd" {
+			continue
+		}
+		if p == "runtime/cgo" {
 			continue
 		}
 
@@ -46,13 +47,7 @@ func loadPackages(pkgs []string) (*loader.Program, error) {
 	return conf.Load()
 }
 
-func ne(e error) {
-	if e != nil {
-		log.Fatal(e)
-	}
-}
-
-func main() {
+func makePkgs() []*pkg {
 	pkgs := listPackages()
 	prog, e := loadPackages(pkgs)
 	ne(e)
@@ -92,10 +87,16 @@ func main() {
 		ps = append(ps, p)
 	}
 
+	return ps
+}
+
+func main() {
+	ps := makePkgs()
 	for _, p := range ps {
 		fmt.Printf("[%s]\n", p.path)
 		for _, f := range p.files {
 			fmt.Printf("   %s (%s)\n", f.name, f.path)
+			f.parseToks()
 		}
 	}
 }

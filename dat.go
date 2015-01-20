@@ -1,7 +1,10 @@
 package main
 
 import (
+	"fmt"
+	"go/scanner"
 	"go/token"
+	"io/ioutil"
 )
 
 type tok struct {
@@ -21,4 +24,25 @@ type file struct {
 type pkg struct {
 	path  string
 	files []*file
+}
+
+func (f *file) parseToks() {
+	bs, e := ioutil.ReadFile(f.path)
+	ne(e)
+
+	onError := func(pos token.Position, msg string) {
+		fmt.Printf("%s: %s\n", pos, msg)
+	}
+	s := new(scanner.Scanner)
+	s.Init(f.file, bs, onError, scanner.ScanComments)
+
+	f.toks = nil
+
+	for {
+		p, t, l := s.Scan()
+		f.toks = append(f.toks, &tok{pos: p, tok: t, lit: l})
+		if t == token.EOF {
+			break
+		}
+	}
 }

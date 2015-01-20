@@ -91,6 +91,8 @@ var builtinTypes = []string{
 	"uintptr",
 	"bool",
 	"map",
+	"true",
+	"false",
 }
 
 var builtinFuncs = []string{

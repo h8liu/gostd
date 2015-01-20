@@ -217,7 +217,9 @@ func (f *file) html() []byte {
 			panic("lit unmatch")
 		}
 
-		fmt.Fprintf(out, `<span class="%s">`, tokClass(t.tok, lit))
+		fmt.Fprintf(out, `<span class="%s" id="%d">`, 
+			tokClass(t.tok, lit), int(t.pos),
+		)
 		for _, ch := range str {
 			fmt.Fprint(out, runeHtml(ch))
 			if ch == '\n' {

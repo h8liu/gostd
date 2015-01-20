@@ -10,125 +10,125 @@
 <body>
 
 <div class="code">
-<span class="lineno">1</span><span class="comment">//&nbsp;Copyright&nbsp;2009&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno">1</span><span class="comment" id="1468992">//&nbsp;Copyright&nbsp;2009&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment" id="1469048">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment" id="1469102">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
 <span class="lineno"></span><br>
-<span class="lineno">5</span><span class="comment">//&nbsp;Cgo&nbsp;call&nbsp;and&nbsp;callback&nbsp;support.</span><br>
-<span class="lineno"></span><span class="comment">//</span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;To&nbsp;call&nbsp;into&nbsp;the&nbsp;C&nbsp;function&nbsp;f&nbsp;from&nbsp;Go,&nbsp;the&nbsp;cgo-generated&nbsp;code&nbsp;calls</span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;runtime.cgocall(_cgo_Cfunc_f,&nbsp;frame),&nbsp;where&nbsp;_cgo_Cfunc_f&nbsp;is&nbsp;a</span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;gcc-compiled&nbsp;function&nbsp;written&nbsp;by&nbsp;cgo.</span><br>
-<span class="lineno">10</span><span class="comment">//</span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;runtime.cgocall&nbsp;(below)&nbsp;locks&nbsp;g&nbsp;to&nbsp;m,&nbsp;calls&nbsp;entersyscall</span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;so&nbsp;as&nbsp;not&nbsp;to&nbsp;block&nbsp;other&nbsp;goroutines&nbsp;or&nbsp;the&nbsp;garbage&nbsp;collector,</span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;and&nbsp;then&nbsp;calls&nbsp;runtime.asmcgocall(_cgo_Cfunc_f,&nbsp;frame).</span><br>
-<span class="lineno"></span><span class="comment">//</span><br>
-<span class="lineno">15</span><span class="comment">//&nbsp;runtime.asmcgocall&nbsp;(in&nbsp;asm_$GOARCH.s)&nbsp;switches&nbsp;to&nbsp;the&nbsp;m-&gt;g0&nbsp;stack</span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;(assumed&nbsp;to&nbsp;be&nbsp;an&nbsp;operating&nbsp;system-allocated&nbsp;stack,&nbsp;so&nbsp;safe&nbsp;to&nbsp;run</span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;gcc-compiled&nbsp;code&nbsp;on)&nbsp;and&nbsp;calls&nbsp;_cgo_Cfunc_f(frame).</span><br>
-<span class="lineno"></span><span class="comment">//</span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;_cgo_Cfunc_f&nbsp;invokes&nbsp;the&nbsp;actual&nbsp;C&nbsp;function&nbsp;f&nbsp;with&nbsp;arguments</span><br>
-<span class="lineno">20</span><span class="comment">//&nbsp;taken&nbsp;from&nbsp;the&nbsp;frame&nbsp;structure,&nbsp;records&nbsp;the&nbsp;results&nbsp;in&nbsp;the&nbsp;frame,</span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;and&nbsp;returns&nbsp;to&nbsp;runtime.asmcgocall.</span><br>
-<span class="lineno"></span><span class="comment">//</span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;After&nbsp;it&nbsp;regains&nbsp;control,&nbsp;runtime.asmcgocall&nbsp;switches&nbsp;back&nbsp;to&nbsp;the</span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;original&nbsp;g&nbsp;(m-&gt;curg)&#39;s&nbsp;stack&nbsp;and&nbsp;returns&nbsp;to&nbsp;runtime.cgocall.</span><br>
-<span class="lineno">25</span><span class="comment">//</span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;After&nbsp;it&nbsp;regains&nbsp;control,&nbsp;runtime.cgocall&nbsp;calls&nbsp;exitsyscall,&nbsp;which&nbsp;blocks</span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;until&nbsp;this&nbsp;m&nbsp;can&nbsp;run&nbsp;Go&nbsp;code&nbsp;without&nbsp;violating&nbsp;the&nbsp;$GOMAXPROCS&nbsp;limit,</span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;and&nbsp;then&nbsp;unlocks&nbsp;g&nbsp;from&nbsp;m.</span><br>
-<span class="lineno"></span><span class="comment">//</span><br>
-<span class="lineno">30</span><span class="comment">//&nbsp;The&nbsp;above&nbsp;description&nbsp;skipped&nbsp;over&nbsp;the&nbsp;possibility&nbsp;of&nbsp;the&nbsp;gcc-compiled</span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;function&nbsp;f&nbsp;calling&nbsp;back&nbsp;into&nbsp;Go.&nbsp;&nbsp;If&nbsp;that&nbsp;happens,&nbsp;we&nbsp;continue&nbsp;down</span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;the&nbsp;rabbit&nbsp;hole&nbsp;during&nbsp;the&nbsp;execution&nbsp;of&nbsp;f.</span><br>
-<span class="lineno"></span><span class="comment">//</span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;To&nbsp;make&nbsp;it&nbsp;possible&nbsp;for&nbsp;gcc-compiled&nbsp;C&nbsp;code&nbsp;to&nbsp;call&nbsp;a&nbsp;Go&nbsp;function&nbsp;p.GoF,</span><br>
-<span class="lineno">35</span><span class="comment">//&nbsp;cgo&nbsp;writes&nbsp;a&nbsp;gcc-compiled&nbsp;function&nbsp;named&nbsp;GoF&nbsp;(not&nbsp;p.GoF,&nbsp;since&nbsp;gcc&nbsp;doesn&#39;t</span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;know&nbsp;about&nbsp;packages).&nbsp;&nbsp;The&nbsp;gcc-compiled&nbsp;C&nbsp;function&nbsp;f&nbsp;calls&nbsp;GoF.</span><br>
-<span class="lineno"></span><span class="comment">//</span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;GoF&nbsp;calls&nbsp;crosscall2(_cgoexp_GoF,&nbsp;frame,&nbsp;framesize).&nbsp;&nbsp;Crosscall2</span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;(in&nbsp;cgo/gcc_$GOARCH.S,&nbsp;a&nbsp;gcc-compiled&nbsp;assembly&nbsp;file)&nbsp;is&nbsp;a&nbsp;two-argument</span><br>
-<span class="lineno">40</span><span class="comment">//&nbsp;adapter&nbsp;from&nbsp;the&nbsp;gcc&nbsp;function&nbsp;call&nbsp;ABI&nbsp;to&nbsp;the&nbsp;6c&nbsp;function&nbsp;call&nbsp;ABI.</span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;It&nbsp;is&nbsp;called&nbsp;from&nbsp;gcc&nbsp;to&nbsp;call&nbsp;6c&nbsp;functions.&nbsp;&nbsp;In&nbsp;this&nbsp;case&nbsp;it&nbsp;calls</span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;_cgoexp_GoF(frame,&nbsp;framesize),&nbsp;still&nbsp;running&nbsp;on&nbsp;m-&gt;g0&#39;s&nbsp;stack</span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;and&nbsp;outside&nbsp;the&nbsp;$GOMAXPROCS&nbsp;limit.&nbsp;&nbsp;Thus,&nbsp;this&nbsp;code&nbsp;cannot&nbsp;yet</span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;call&nbsp;arbitrary&nbsp;Go&nbsp;code&nbsp;directly&nbsp;and&nbsp;must&nbsp;be&nbsp;careful&nbsp;not&nbsp;to&nbsp;allocate</span><br>
-<span class="lineno">45</span><span class="comment">//&nbsp;memory&nbsp;or&nbsp;use&nbsp;up&nbsp;m-&gt;g0&#39;s&nbsp;stack.</span><br>
-<span class="lineno"></span><span class="comment">//</span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;_cgoexp_GoF&nbsp;calls&nbsp;runtime.cgocallback(p.GoF,&nbsp;frame,&nbsp;framesize).</span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;(The&nbsp;reason&nbsp;for&nbsp;having&nbsp;_cgoexp_GoF&nbsp;instead&nbsp;of&nbsp;writing&nbsp;a&nbsp;crosscall3</span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;to&nbsp;make&nbsp;this&nbsp;call&nbsp;directly&nbsp;is&nbsp;that&nbsp;_cgoexp_GoF,&nbsp;because&nbsp;it&nbsp;is&nbsp;compiled</span><br>
-<span class="lineno">50</span><span class="comment">//&nbsp;with&nbsp;6c&nbsp;instead&nbsp;of&nbsp;gcc,&nbsp;can&nbsp;refer&nbsp;to&nbsp;dotted&nbsp;names&nbsp;like</span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;runtime.cgocallback&nbsp;and&nbsp;p.GoF.)</span><br>
-<span class="lineno"></span><span class="comment">//</span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;runtime.cgocallback&nbsp;(in&nbsp;asm_$GOARCH.s)&nbsp;switches&nbsp;from&nbsp;m-&gt;g0&#39;s</span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;stack&nbsp;to&nbsp;the&nbsp;original&nbsp;g&nbsp;(m-&gt;curg)&#39;s&nbsp;stack,&nbsp;on&nbsp;which&nbsp;it&nbsp;calls</span><br>
-<span class="lineno">55</span><span class="comment">//&nbsp;runtime.cgocallbackg(p.GoF,&nbsp;frame,&nbsp;framesize).</span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;As&nbsp;part&nbsp;of&nbsp;the&nbsp;stack&nbsp;switch,&nbsp;runtime.cgocallback&nbsp;saves&nbsp;the&nbsp;current</span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;SP&nbsp;as&nbsp;m-&gt;g0-&gt;sched.sp,&nbsp;so&nbsp;that&nbsp;any&nbsp;use&nbsp;of&nbsp;m-&gt;g0&#39;s&nbsp;stack&nbsp;during&nbsp;the</span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;execution&nbsp;of&nbsp;the&nbsp;callback&nbsp;will&nbsp;be&nbsp;done&nbsp;below&nbsp;the&nbsp;existing&nbsp;stack&nbsp;frames.</span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;Before&nbsp;overwriting&nbsp;m-&gt;g0-&gt;sched.sp,&nbsp;it&nbsp;pushes&nbsp;the&nbsp;old&nbsp;value&nbsp;on&nbsp;the</span><br>
-<span class="lineno">60</span><span class="comment">//&nbsp;m-&gt;g0&nbsp;stack,&nbsp;so&nbsp;that&nbsp;it&nbsp;can&nbsp;be&nbsp;restored&nbsp;later.</span><br>
-<span class="lineno"></span><span class="comment">//</span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;runtime.cgocallbackg&nbsp;(below)&nbsp;is&nbsp;now&nbsp;running&nbsp;on&nbsp;a&nbsp;real&nbsp;goroutine</span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;stack&nbsp;(not&nbsp;an&nbsp;m-&gt;g0&nbsp;stack).&nbsp;&nbsp;First&nbsp;it&nbsp;calls&nbsp;runtime.exitsyscall,&nbsp;which&nbsp;will</span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;block&nbsp;until&nbsp;the&nbsp;$GOMAXPROCS&nbsp;limit&nbsp;allows&nbsp;running&nbsp;this&nbsp;goroutine.</span><br>
-<span class="lineno">65</span><span class="comment">//&nbsp;Once&nbsp;exitsyscall&nbsp;has&nbsp;returned,&nbsp;it&nbsp;is&nbsp;safe&nbsp;to&nbsp;do&nbsp;things&nbsp;like&nbsp;call&nbsp;the&nbsp;memory</span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;allocator&nbsp;or&nbsp;invoke&nbsp;the&nbsp;Go&nbsp;callback&nbsp;function&nbsp;p.GoF.&nbsp;&nbsp;runtime.cgocallbackg</span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;first&nbsp;defers&nbsp;a&nbsp;function&nbsp;to&nbsp;unwind&nbsp;m-&gt;g0.sched.sp,&nbsp;so&nbsp;that&nbsp;if&nbsp;p.GoF</span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;panics,&nbsp;m-&gt;g0.sched.sp&nbsp;will&nbsp;be&nbsp;restored&nbsp;to&nbsp;its&nbsp;old&nbsp;value:&nbsp;the&nbsp;m-&gt;g0&nbsp;stack</span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;and&nbsp;the&nbsp;m-&gt;curg&nbsp;stack&nbsp;will&nbsp;be&nbsp;unwound&nbsp;in&nbsp;lock&nbsp;step.</span><br>
-<span class="lineno">70</span><span class="comment">//&nbsp;Then&nbsp;it&nbsp;calls&nbsp;p.GoF.&nbsp;&nbsp;Finally&nbsp;it&nbsp;pops&nbsp;but&nbsp;does&nbsp;not&nbsp;execute&nbsp;the&nbsp;deferred</span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;function,&nbsp;calls&nbsp;runtime.entersyscall,&nbsp;and&nbsp;returns&nbsp;to&nbsp;runtime.cgocallback.</span><br>
-<span class="lineno"></span><span class="comment">//</span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;After&nbsp;it&nbsp;regains&nbsp;control,&nbsp;runtime.cgocallback&nbsp;switches&nbsp;back&nbsp;to</span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;m-&gt;g0&#39;s&nbsp;stack&nbsp;(the&nbsp;pointer&nbsp;is&nbsp;still&nbsp;in&nbsp;m-&gt;g0.sched.sp),&nbsp;restores&nbsp;the&nbsp;old</span><br>
-<span class="lineno">75</span><span class="comment">//&nbsp;m-&gt;g0.sched.sp&nbsp;value&nbsp;from&nbsp;the&nbsp;stack,&nbsp;and&nbsp;returns&nbsp;to&nbsp;_cgoexp_GoF.</span><br>
-<span class="lineno"></span><span class="comment">//</span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;_cgoexp_GoF&nbsp;immediately&nbsp;returns&nbsp;to&nbsp;crosscall2,&nbsp;which&nbsp;restores&nbsp;the</span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;callee-save&nbsp;registers&nbsp;for&nbsp;gcc&nbsp;and&nbsp;returns&nbsp;to&nbsp;GoF,&nbsp;which&nbsp;returns&nbsp;to&nbsp;f.</span><br>
+<span class="lineno">5</span><span class="comment" id="1469153">//&nbsp;Cgo&nbsp;call&nbsp;and&nbsp;callback&nbsp;support.</span><br>
+<span class="lineno"></span><span class="comment" id="1469187">//</span><br>
+<span class="lineno"></span><span class="comment" id="1469190">//&nbsp;To&nbsp;call&nbsp;into&nbsp;the&nbsp;C&nbsp;function&nbsp;f&nbsp;from&nbsp;Go,&nbsp;the&nbsp;cgo-generated&nbsp;code&nbsp;calls</span><br>
+<span class="lineno"></span><span class="comment" id="1469261">//&nbsp;runtime.cgocall(_cgo_Cfunc_f,&nbsp;frame),&nbsp;where&nbsp;_cgo_Cfunc_f&nbsp;is&nbsp;a</span><br>
+<span class="lineno"></span><span class="comment" id="1469326">//&nbsp;gcc-compiled&nbsp;function&nbsp;written&nbsp;by&nbsp;cgo.</span><br>
+<span class="lineno">10</span><span class="comment" id="1469367">//</span><br>
+<span class="lineno"></span><span class="comment" id="1469370">//&nbsp;runtime.cgocall&nbsp;(below)&nbsp;locks&nbsp;g&nbsp;to&nbsp;m,&nbsp;calls&nbsp;entersyscall</span><br>
+<span class="lineno"></span><span class="comment" id="1469430">//&nbsp;so&nbsp;as&nbsp;not&nbsp;to&nbsp;block&nbsp;other&nbsp;goroutines&nbsp;or&nbsp;the&nbsp;garbage&nbsp;collector,</span><br>
+<span class="lineno"></span><span class="comment" id="1469495">//&nbsp;and&nbsp;then&nbsp;calls&nbsp;runtime.asmcgocall(_cgo_Cfunc_f,&nbsp;frame).</span><br>
+<span class="lineno"></span><span class="comment" id="1469554">//</span><br>
+<span class="lineno">15</span><span class="comment" id="1469557">//&nbsp;runtime.asmcgocall&nbsp;(in&nbsp;asm_$GOARCH.s)&nbsp;switches&nbsp;to&nbsp;the&nbsp;m-&gt;g0&nbsp;stack</span><br>
+<span class="lineno"></span><span class="comment" id="1469626">//&nbsp;(assumed&nbsp;to&nbsp;be&nbsp;an&nbsp;operating&nbsp;system-allocated&nbsp;stack,&nbsp;so&nbsp;safe&nbsp;to&nbsp;run</span><br>
+<span class="lineno"></span><span class="comment" id="1469696">//&nbsp;gcc-compiled&nbsp;code&nbsp;on)&nbsp;and&nbsp;calls&nbsp;_cgo_Cfunc_f(frame).</span><br>
+<span class="lineno"></span><span class="comment" id="1469752">//</span><br>
+<span class="lineno"></span><span class="comment" id="1469755">//&nbsp;_cgo_Cfunc_f&nbsp;invokes&nbsp;the&nbsp;actual&nbsp;C&nbsp;function&nbsp;f&nbsp;with&nbsp;arguments</span><br>
+<span class="lineno">20</span><span class="comment" id="1469818">//&nbsp;taken&nbsp;from&nbsp;the&nbsp;frame&nbsp;structure,&nbsp;records&nbsp;the&nbsp;results&nbsp;in&nbsp;the&nbsp;frame,</span><br>
+<span class="lineno"></span><span class="comment" id="1469887">//&nbsp;and&nbsp;returns&nbsp;to&nbsp;runtime.asmcgocall.</span><br>
+<span class="lineno"></span><span class="comment" id="1469925">//</span><br>
+<span class="lineno"></span><span class="comment" id="1469928">//&nbsp;After&nbsp;it&nbsp;regains&nbsp;control,&nbsp;runtime.asmcgocall&nbsp;switches&nbsp;back&nbsp;to&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment" id="1469997">//&nbsp;original&nbsp;g&nbsp;(m-&gt;curg)&#39;s&nbsp;stack&nbsp;and&nbsp;returns&nbsp;to&nbsp;runtime.cgocall.</span><br>
+<span class="lineno">25</span><span class="comment" id="1470061">//</span><br>
+<span class="lineno"></span><span class="comment" id="1470064">//&nbsp;After&nbsp;it&nbsp;regains&nbsp;control,&nbsp;runtime.cgocall&nbsp;calls&nbsp;exitsyscall,&nbsp;which&nbsp;blocks</span><br>
+<span class="lineno"></span><span class="comment" id="1470141">//&nbsp;until&nbsp;this&nbsp;m&nbsp;can&nbsp;run&nbsp;Go&nbsp;code&nbsp;without&nbsp;violating&nbsp;the&nbsp;$GOMAXPROCS&nbsp;limit,</span><br>
+<span class="lineno"></span><span class="comment" id="1470214">//&nbsp;and&nbsp;then&nbsp;unlocks&nbsp;g&nbsp;from&nbsp;m.</span><br>
+<span class="lineno"></span><span class="comment" id="1470244">//</span><br>
+<span class="lineno">30</span><span class="comment" id="1470247">//&nbsp;The&nbsp;above&nbsp;description&nbsp;skipped&nbsp;over&nbsp;the&nbsp;possibility&nbsp;of&nbsp;the&nbsp;gcc-compiled</span><br>
+<span class="lineno"></span><span class="comment" id="1470321">//&nbsp;function&nbsp;f&nbsp;calling&nbsp;back&nbsp;into&nbsp;Go.&nbsp;&nbsp;If&nbsp;that&nbsp;happens,&nbsp;we&nbsp;continue&nbsp;down</span><br>
+<span class="lineno"></span><span class="comment" id="1470392">//&nbsp;the&nbsp;rabbit&nbsp;hole&nbsp;during&nbsp;the&nbsp;execution&nbsp;of&nbsp;f.</span><br>
+<span class="lineno"></span><span class="comment" id="1470438">//</span><br>
+<span class="lineno"></span><span class="comment" id="1470441">//&nbsp;To&nbsp;make&nbsp;it&nbsp;possible&nbsp;for&nbsp;gcc-compiled&nbsp;C&nbsp;code&nbsp;to&nbsp;call&nbsp;a&nbsp;Go&nbsp;function&nbsp;p.GoF,</span><br>
+<span class="lineno">35</span><span class="comment" id="1470517">//&nbsp;cgo&nbsp;writes&nbsp;a&nbsp;gcc-compiled&nbsp;function&nbsp;named&nbsp;GoF&nbsp;(not&nbsp;p.GoF,&nbsp;since&nbsp;gcc&nbsp;doesn&#39;t</span><br>
+<span class="lineno"></span><span class="comment" id="1470595">//&nbsp;know&nbsp;about&nbsp;packages).&nbsp;&nbsp;The&nbsp;gcc-compiled&nbsp;C&nbsp;function&nbsp;f&nbsp;calls&nbsp;GoF.</span><br>
+<span class="lineno"></span><span class="comment" id="1470662">//</span><br>
+<span class="lineno"></span><span class="comment" id="1470665">//&nbsp;GoF&nbsp;calls&nbsp;crosscall2(_cgoexp_GoF,&nbsp;frame,&nbsp;framesize).&nbsp;&nbsp;Crosscall2</span><br>
+<span class="lineno"></span><span class="comment" id="1470733">//&nbsp;(in&nbsp;cgo/gcc_$GOARCH.S,&nbsp;a&nbsp;gcc-compiled&nbsp;assembly&nbsp;file)&nbsp;is&nbsp;a&nbsp;two-argument</span><br>
+<span class="lineno">40</span><span class="comment" id="1470807">//&nbsp;adapter&nbsp;from&nbsp;the&nbsp;gcc&nbsp;function&nbsp;call&nbsp;ABI&nbsp;to&nbsp;the&nbsp;6c&nbsp;function&nbsp;call&nbsp;ABI.</span><br>
+<span class="lineno"></span><span class="comment" id="1470878">//&nbsp;It&nbsp;is&nbsp;called&nbsp;from&nbsp;gcc&nbsp;to&nbsp;call&nbsp;6c&nbsp;functions.&nbsp;&nbsp;In&nbsp;this&nbsp;case&nbsp;it&nbsp;calls</span><br>
+<span class="lineno"></span><span class="comment" id="1470948">//&nbsp;_cgoexp_GoF(frame,&nbsp;framesize),&nbsp;still&nbsp;running&nbsp;on&nbsp;m-&gt;g0&#39;s&nbsp;stack</span><br>
+<span class="lineno"></span><span class="comment" id="1471013">//&nbsp;and&nbsp;outside&nbsp;the&nbsp;$GOMAXPROCS&nbsp;limit.&nbsp;&nbsp;Thus,&nbsp;this&nbsp;code&nbsp;cannot&nbsp;yet</span><br>
+<span class="lineno"></span><span class="comment" id="1471079">//&nbsp;call&nbsp;arbitrary&nbsp;Go&nbsp;code&nbsp;directly&nbsp;and&nbsp;must&nbsp;be&nbsp;careful&nbsp;not&nbsp;to&nbsp;allocate</span><br>
+<span class="lineno">45</span><span class="comment" id="1471150">//&nbsp;memory&nbsp;or&nbsp;use&nbsp;up&nbsp;m-&gt;g0&#39;s&nbsp;stack.</span><br>
+<span class="lineno"></span><span class="comment" id="1471185">//</span><br>
+<span class="lineno"></span><span class="comment" id="1471188">//&nbsp;_cgoexp_GoF&nbsp;calls&nbsp;runtime.cgocallback(p.GoF,&nbsp;frame,&nbsp;framesize).</span><br>
+<span class="lineno"></span><span class="comment" id="1471255">//&nbsp;(The&nbsp;reason&nbsp;for&nbsp;having&nbsp;_cgoexp_GoF&nbsp;instead&nbsp;of&nbsp;writing&nbsp;a&nbsp;crosscall3</span><br>
+<span class="lineno"></span><span class="comment" id="1471325">//&nbsp;to&nbsp;make&nbsp;this&nbsp;call&nbsp;directly&nbsp;is&nbsp;that&nbsp;_cgoexp_GoF,&nbsp;because&nbsp;it&nbsp;is&nbsp;compiled</span><br>
+<span class="lineno">50</span><span class="comment" id="1471399">//&nbsp;with&nbsp;6c&nbsp;instead&nbsp;of&nbsp;gcc,&nbsp;can&nbsp;refer&nbsp;to&nbsp;dotted&nbsp;names&nbsp;like</span><br>
+<span class="lineno"></span><span class="comment" id="1471457">//&nbsp;runtime.cgocallback&nbsp;and&nbsp;p.GoF.)</span><br>
+<span class="lineno"></span><span class="comment" id="1471492">//</span><br>
+<span class="lineno"></span><span class="comment" id="1471495">//&nbsp;runtime.cgocallback&nbsp;(in&nbsp;asm_$GOARCH.s)&nbsp;switches&nbsp;from&nbsp;m-&gt;g0&#39;s</span><br>
+<span class="lineno"></span><span class="comment" id="1471559">//&nbsp;stack&nbsp;to&nbsp;the&nbsp;original&nbsp;g&nbsp;(m-&gt;curg)&#39;s&nbsp;stack,&nbsp;on&nbsp;which&nbsp;it&nbsp;calls</span><br>
+<span class="lineno">55</span><span class="comment" id="1471623">//&nbsp;runtime.cgocallbackg(p.GoF,&nbsp;frame,&nbsp;framesize).</span><br>
+<span class="lineno"></span><span class="comment" id="1471673">//&nbsp;As&nbsp;part&nbsp;of&nbsp;the&nbsp;stack&nbsp;switch,&nbsp;runtime.cgocallback&nbsp;saves&nbsp;the&nbsp;current</span><br>
+<span class="lineno"></span><span class="comment" id="1471743">//&nbsp;SP&nbsp;as&nbsp;m-&gt;g0-&gt;sched.sp,&nbsp;so&nbsp;that&nbsp;any&nbsp;use&nbsp;of&nbsp;m-&gt;g0&#39;s&nbsp;stack&nbsp;during&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment" id="1471813">//&nbsp;execution&nbsp;of&nbsp;the&nbsp;callback&nbsp;will&nbsp;be&nbsp;done&nbsp;below&nbsp;the&nbsp;existing&nbsp;stack&nbsp;frames.</span><br>
+<span class="lineno"></span><span class="comment" id="1471888">//&nbsp;Before&nbsp;overwriting&nbsp;m-&gt;g0-&gt;sched.sp,&nbsp;it&nbsp;pushes&nbsp;the&nbsp;old&nbsp;value&nbsp;on&nbsp;the</span><br>
+<span class="lineno">60</span><span class="comment" id="1471958">//&nbsp;m-&gt;g0&nbsp;stack,&nbsp;so&nbsp;that&nbsp;it&nbsp;can&nbsp;be&nbsp;restored&nbsp;later.</span><br>
+<span class="lineno"></span><span class="comment" id="1472008">//</span><br>
+<span class="lineno"></span><span class="comment" id="1472011">//&nbsp;runtime.cgocallbackg&nbsp;(below)&nbsp;is&nbsp;now&nbsp;running&nbsp;on&nbsp;a&nbsp;real&nbsp;goroutine</span><br>
+<span class="lineno"></span><span class="comment" id="1472078">//&nbsp;stack&nbsp;(not&nbsp;an&nbsp;m-&gt;g0&nbsp;stack).&nbsp;&nbsp;First&nbsp;it&nbsp;calls&nbsp;runtime.exitsyscall,&nbsp;which&nbsp;will</span><br>
+<span class="lineno"></span><span class="comment" id="1472157">//&nbsp;block&nbsp;until&nbsp;the&nbsp;$GOMAXPROCS&nbsp;limit&nbsp;allows&nbsp;running&nbsp;this&nbsp;goroutine.</span><br>
+<span class="lineno">65</span><span class="comment" id="1472225">//&nbsp;Once&nbsp;exitsyscall&nbsp;has&nbsp;returned,&nbsp;it&nbsp;is&nbsp;safe&nbsp;to&nbsp;do&nbsp;things&nbsp;like&nbsp;call&nbsp;the&nbsp;memory</span><br>
+<span class="lineno"></span><span class="comment" id="1472304">//&nbsp;allocator&nbsp;or&nbsp;invoke&nbsp;the&nbsp;Go&nbsp;callback&nbsp;function&nbsp;p.GoF.&nbsp;&nbsp;runtime.cgocallbackg</span><br>
+<span class="lineno"></span><span class="comment" id="1472381">//&nbsp;first&nbsp;defers&nbsp;a&nbsp;function&nbsp;to&nbsp;unwind&nbsp;m-&gt;g0.sched.sp,&nbsp;so&nbsp;that&nbsp;if&nbsp;p.GoF</span><br>
+<span class="lineno"></span><span class="comment" id="1472451">//&nbsp;panics,&nbsp;m-&gt;g0.sched.sp&nbsp;will&nbsp;be&nbsp;restored&nbsp;to&nbsp;its&nbsp;old&nbsp;value:&nbsp;the&nbsp;m-&gt;g0&nbsp;stack</span><br>
+<span class="lineno"></span><span class="comment" id="1472528">//&nbsp;and&nbsp;the&nbsp;m-&gt;curg&nbsp;stack&nbsp;will&nbsp;be&nbsp;unwound&nbsp;in&nbsp;lock&nbsp;step.</span><br>
+<span class="lineno">70</span><span class="comment" id="1472583">//&nbsp;Then&nbsp;it&nbsp;calls&nbsp;p.GoF.&nbsp;&nbsp;Finally&nbsp;it&nbsp;pops&nbsp;but&nbsp;does&nbsp;not&nbsp;execute&nbsp;the&nbsp;deferred</span><br>
+<span class="lineno"></span><span class="comment" id="1472658">//&nbsp;function,&nbsp;calls&nbsp;runtime.entersyscall,&nbsp;and&nbsp;returns&nbsp;to&nbsp;runtime.cgocallback.</span><br>
+<span class="lineno"></span><span class="comment" id="1472735">//</span><br>
+<span class="lineno"></span><span class="comment" id="1472738">//&nbsp;After&nbsp;it&nbsp;regains&nbsp;control,&nbsp;runtime.cgocallback&nbsp;switches&nbsp;back&nbsp;to</span><br>
+<span class="lineno"></span><span class="comment" id="1472804">//&nbsp;m-&gt;g0&#39;s&nbsp;stack&nbsp;(the&nbsp;pointer&nbsp;is&nbsp;still&nbsp;in&nbsp;m-&gt;g0.sched.sp),&nbsp;restores&nbsp;the&nbsp;old</span><br>
+<span class="lineno">75</span><span class="comment" id="1472880">//&nbsp;m-&gt;g0.sched.sp&nbsp;value&nbsp;from&nbsp;the&nbsp;stack,&nbsp;and&nbsp;returns&nbsp;to&nbsp;_cgoexp_GoF.</span><br>
+<span class="lineno"></span><span class="comment" id="1472948">//</span><br>
+<span class="lineno"></span><span class="comment" id="1472951">//&nbsp;_cgoexp_GoF&nbsp;immediately&nbsp;returns&nbsp;to&nbsp;crosscall2,&nbsp;which&nbsp;restores&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment" id="1473020">//&nbsp;callee-save&nbsp;registers&nbsp;for&nbsp;gcc&nbsp;and&nbsp;returns&nbsp;to&nbsp;GoF,&nbsp;which&nbsp;returns&nbsp;to&nbsp;f.</span><br>
 <span class="lineno"></span><br>
-<span class="lineno">80</span><span class="keyword">package</span>&nbsp;<span class="ident">runtime</span><br>
+<span class="lineno">80</span><span class="keyword" id="1473094">package</span>&nbsp;<span class="ident" id="1473102">runtime</span><br>
 <span class="lineno"></span><br>
-<span class="lineno"></span><span class="keyword">import</span>&nbsp;<span class="string">&#34;unsafe&#34;</span><br>
+<span class="lineno"></span><span class="keyword" id="1473111">import</span>&nbsp;<span class="string" id="1473118">&#34;unsafe&#34;</span><br>
 <span class="lineno"></span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;Call&nbsp;from&nbsp;Go&nbsp;to&nbsp;C.</span><br>
-<span class="lineno">85</span><span class="comment">//go:nosplit</span><br>
-<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">cgocall</span><span class="op">(</span><span class="ident">fn</span><span class="op">,</span>&nbsp;<span class="ident">arg</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">cgocall_errno</span><span class="op">(</span><span class="ident">fn</span><span class="op">,</span>&nbsp;<span class="ident">arg</span><span class="op">)</span><br>
-<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><span class="comment" id="1473128">//&nbsp;Call&nbsp;from&nbsp;Go&nbsp;to&nbsp;C.</span><br>
+<span class="lineno">85</span><span class="comment" id="1473150">//go:nosplit</span><br>
+<span class="lineno"></span><span class="keyword" id="1473163">func</span>&nbsp;<span class="ident" id="1473168">cgocall</span><span class="op" id="1473175">(</span><span class="ident" id="1473176">fn</span><span class="op" id="1473178">,</span>&nbsp;<span class="ident" id="1473180">arg</span>&nbsp;<span class="ident" id="1473184">unsafe</span><span class="op" id="1473190">.</span><span class="ident" id="1473191">Pointer</span><span class="op" id="1473198">)</span>&nbsp;<span class="op" id="1473200">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1473203">cgocall_errno</span><span class="op" id="1473216">(</span><span class="ident" id="1473217">fn</span><span class="op" id="1473219">,</span>&nbsp;<span class="ident" id="1473221">arg</span><span class="op" id="1473224">)</span><br>
+<span class="lineno"></span><span class="op" id="1473226">}</span><br>
 <span class="lineno"></span><br>
-<span class="lineno">90</span><span class="comment">//go:nosplit</span><br>
-<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">cgocall_errno</span><span class="op">(</span><span class="ident">fn</span><span class="op">,</span>&nbsp;<span class="ident">arg</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">)</span>&nbsp;<span class="builtintype">int32</span>&nbsp;<span class="op">{</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="ident">iscgo</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">GOOS</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="string">&#34;solaris&#34;</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">GOOS</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="string">&#34;windows&#34;</span>&nbsp;<span class="op">{</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gothrow</span><span class="op">(</span><span class="string">&#34;cgocall&nbsp;unavailable&#34;</span><span class="op">)</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">90</span><span class="comment" id="1473229">//go:nosplit</span><br>
+<span class="lineno"></span><span class="keyword" id="1473242">func</span>&nbsp;<span class="ident" id="1473247">cgocall_errno</span><span class="op" id="1473260">(</span><span class="ident" id="1473261">fn</span><span class="op" id="1473263">,</span>&nbsp;<span class="ident" id="1473265">arg</span>&nbsp;<span class="ident" id="1473269">unsafe</span><span class="op" id="1473275">.</span><span class="ident" id="1473276">Pointer</span><span class="op" id="1473283">)</span>&nbsp;<span class="builtintype" id="1473285">int32</span>&nbsp;<span class="op" id="1473291">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1473294">if</span>&nbsp;<span class="op" id="1473297">!</span><span class="ident" id="1473298">iscgo</span>&nbsp;<span class="op" id="1473304">&amp;&amp;</span>&nbsp;<span class="ident" id="1473307">GOOS</span>&nbsp;<span class="op" id="1473312">!=</span>&nbsp;<span class="string" id="1473315">&#34;solaris&#34;</span>&nbsp;<span class="op" id="1473325">&amp;&amp;</span>&nbsp;<span class="ident" id="1473328">GOOS</span>&nbsp;<span class="op" id="1473333">!=</span>&nbsp;<span class="string" id="1473336">&#34;windows&#34;</span>&nbsp;<span class="op" id="1473346">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1473350">gothrow</span><span class="op" id="1473357">(</span><span class="string" id="1473358">&#34;cgocall&nbsp;unavailable&#34;</span><span class="op" id="1473379">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1473382">}</span><br>
 <span class="lineno">95</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">fn</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gothrow</span><span class="op">(</span><span class="string">&#34;cgocall&nbsp;nil&#34;</span><span class="op">)</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1473386">if</span>&nbsp;<span class="ident" id="1473389">fn</span>&nbsp;<span class="op" id="1473392">==</span>&nbsp;<span class="ident" id="1473395">nil</span>&nbsp;<span class="op" id="1473399">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1473403">gothrow</span><span class="op" id="1473410">(</span><span class="string" id="1473411">&#34;cgocall&nbsp;nil&#34;</span><span class="op" id="1473424">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1473427">}</span><br>
 <span class="lineno"></span><br>
-<span class="lineno">100</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">raceenabled</span>&nbsp;<span class="op">{</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">racereleasemerge</span><span class="op">(</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">racecgosync</span><span class="op">)</span><span class="op">)</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">100</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1473431">if</span>&nbsp;<span class="ident" id="1473434">raceenabled</span>&nbsp;<span class="op" id="1473446">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1473450">racereleasemerge</span><span class="op" id="1473466">(</span><span class="ident" id="1473467">unsafe</span><span class="op" id="1473473">.</span><span class="ident" id="1473474">Pointer</span><span class="op" id="1473481">(</span><span class="op" id="1473482">&amp;</span><span class="ident" id="1473483">racecgosync</span><span class="op" id="1473494">)</span><span class="op" id="1473495">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1473498">}</span><br>
 <span class="lineno"></span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Create&nbsp;an&nbsp;extra&nbsp;M&nbsp;for&nbsp;callbacks&nbsp;on&nbsp;threads&nbsp;not&nbsp;created&nbsp;by&nbsp;Go&nbsp;on&nbsp;first&nbsp;cgo&nbsp;call.</span><br>
-<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">needextram</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">1</span>&nbsp;<span class="op">&amp;&amp;</span>&nbsp;<span class="ident">cas</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">needextram</span><span class="op">,</span>&nbsp;<span class="num">1</span><span class="op">,</span>&nbsp;<span class="num">0</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">onM</span><span class="op">(</span><span class="ident">newextram</span><span class="op">)</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1473502">//&nbsp;Create&nbsp;an&nbsp;extra&nbsp;M&nbsp;for&nbsp;callbacks&nbsp;on&nbsp;threads&nbsp;not&nbsp;created&nbsp;by&nbsp;Go&nbsp;on&nbsp;first&nbsp;cgo&nbsp;call.</span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1473586">if</span>&nbsp;<span class="ident" id="1473589">needextram</span>&nbsp;<span class="op" id="1473600">==</span>&nbsp;<span class="num" id="1473603">1</span>&nbsp;<span class="op" id="1473605">&amp;&amp;</span>&nbsp;<span class="ident" id="1473608">cas</span><span class="op" id="1473611">(</span><span class="op" id="1473612">&amp;</span><span class="ident" id="1473613">needextram</span><span class="op" id="1473623">,</span>&nbsp;<span class="num" id="1473625">1</span><span class="op" id="1473626">,</span>&nbsp;<span class="num" id="1473628">0</span><span class="op" id="1473629">)</span>&nbsp;<span class="op" id="1473631">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1473635">onM</span><span class="op" id="1473638">(</span><span class="ident" id="1473639">newextram</span><span class="op" id="1473648">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1473651">}</span><br>
 <span class="lineno"></span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">/*<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1473655">/*<br>
 <span class="lineno">110</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;*&nbsp;Lock&nbsp;g&nbsp;to&nbsp;m&nbsp;to&nbsp;ensure&nbsp;we&nbsp;stay&nbsp;on&nbsp;the&nbsp;same&nbsp;stack&nbsp;if&nbsp;we&nbsp;do&nbsp;a<br>
 <span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;*&nbsp;cgo&nbsp;callback.&nbsp;Add&nbsp;entry&nbsp;to&nbsp;defer&nbsp;stack&nbsp;in&nbsp;case&nbsp;of&nbsp;panic.<br>
 <span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;*/</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">lockOSThread</span><span class="op">(</span><span class="op">)</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">getg</span><span class="op">(</span><span class="op">)</span><span class="op">.</span><span class="ident">m</span><br>
-<span class="lineno">115</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mp</span><span class="op">.</span><span class="ident">ncgocall</span><span class="op">++</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mp</span><span class="op">.</span><span class="ident">ncgo</span><span class="op">++</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">defer</span>&nbsp;<span class="ident">endcgo</span><span class="op">(</span><span class="ident">mp</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1473788">lockOSThread</span><span class="op" id="1473800">(</span><span class="op" id="1473801">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1473804">mp</span>&nbsp;<span class="op" id="1473807">:=</span>&nbsp;<span class="ident" id="1473810">getg</span><span class="op" id="1473814">(</span><span class="op" id="1473815">)</span><span class="op" id="1473816">.</span><span class="ident" id="1473817">m</span><br>
+<span class="lineno">115</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1473820">mp</span><span class="op" id="1473822">.</span><span class="ident" id="1473823">ncgocall</span><span class="op" id="1473831">++</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1473835">mp</span><span class="op" id="1473837">.</span><span class="ident" id="1473838">ncgo</span><span class="op" id="1473842">++</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1473846">defer</span>&nbsp;<span class="ident" id="1473852">endcgo</span><span class="op" id="1473858">(</span><span class="ident" id="1473859">mp</span><span class="op" id="1473861">)</span><br>
 <span class="lineno"></span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">/*<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1473865">/*<br>
 <span class="lineno">120</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;*&nbsp;Announce&nbsp;we&nbsp;are&nbsp;entering&nbsp;a&nbsp;system&nbsp;call<br>
 <span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;*&nbsp;so&nbsp;that&nbsp;the&nbsp;scheduler&nbsp;knows&nbsp;to&nbsp;create&nbsp;another<br>
 <span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;*&nbsp;M&nbsp;to&nbsp;run&nbsp;goroutines&nbsp;while&nbsp;we&nbsp;are&nbsp;in&nbsp;the<br>
@@ -139,156 +139,156 @@
 <span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;*&nbsp;so&nbsp;it&nbsp;is&nbsp;safe&nbsp;to&nbsp;call&nbsp;while&nbsp;&#34;in&nbsp;a&nbsp;system&nbsp;call&#34;,&nbsp;outside<br>
 <span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;*&nbsp;the&nbsp;$GOMAXPROCS&nbsp;accounting.<br>
 <span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;*/</span><br>
-<span class="lineno">130</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">entersyscall</span><span class="op">(</span><span class="op">)</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">errno</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">asmcgocall_errno</span><span class="op">(</span><span class="ident">fn</span><span class="op">,</span>&nbsp;<span class="ident">arg</span><span class="op">)</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">exitsyscall</span><span class="op">(</span><span class="op">)</span><br>
+<span class="lineno">130</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1474223">entersyscall</span><span class="op" id="1474235">(</span><span class="op" id="1474236">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1474239">errno</span>&nbsp;<span class="op" id="1474245">:=</span>&nbsp;<span class="ident" id="1474248">asmcgocall_errno</span><span class="op" id="1474264">(</span><span class="ident" id="1474265">fn</span><span class="op" id="1474267">,</span>&nbsp;<span class="ident" id="1474269">arg</span><span class="op" id="1474272">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1474275">exitsyscall</span><span class="op" id="1474286">(</span><span class="op" id="1474287">)</span><br>
 <span class="lineno"></span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">errno</span><br>
-<span class="lineno">135</span><span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1474291">return</span>&nbsp;<span class="ident" id="1474298">errno</span><br>
+<span class="lineno">135</span><span class="op" id="1474304">}</span><br>
 <span class="lineno"></span><br>
-<span class="lineno"></span><span class="comment">//go:nosplit</span><br>
-<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">endcgo</span><span class="op">(</span><span class="ident">mp</span>&nbsp;<span class="op">*</span><span class="ident">m</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mp</span><span class="op">.</span><span class="ident">ncgo</span><span class="op">--</span><br>
-<span class="lineno">140</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">mp</span><span class="op">.</span><span class="ident">ncgo</span>&nbsp;<span class="op">==</span>&nbsp;<span class="num">0</span>&nbsp;<span class="op">{</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;We&nbsp;are&nbsp;going&nbsp;back&nbsp;to&nbsp;Go&nbsp;and&nbsp;are&nbsp;not&nbsp;in&nbsp;a&nbsp;recursive</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;call.&nbsp;&nbsp;Let&nbsp;the&nbsp;GC&nbsp;collect&nbsp;any&nbsp;memory&nbsp;allocated&nbsp;via</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;_cgo_allocate&nbsp;that&nbsp;is&nbsp;no&nbsp;longer&nbsp;referenced.</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mp</span><span class="op">.</span><span class="ident">cgomal</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">nil</span><br>
-<span class="lineno">145</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="comment" id="1474307">//go:nosplit</span><br>
+<span class="lineno"></span><span class="keyword" id="1474320">func</span>&nbsp;<span class="ident" id="1474325">endcgo</span><span class="op" id="1474331">(</span><span class="ident" id="1474332">mp</span>&nbsp;<span class="op" id="1474335">*</span><span class="ident" id="1474336">m</span><span class="op" id="1474337">)</span>&nbsp;<span class="op" id="1474339">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1474342">mp</span><span class="op" id="1474344">.</span><span class="ident" id="1474345">ncgo</span><span class="op" id="1474349">--</span><br>
+<span class="lineno">140</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1474353">if</span>&nbsp;<span class="ident" id="1474356">mp</span><span class="op" id="1474358">.</span><span class="ident" id="1474359">ncgo</span>&nbsp;<span class="op" id="1474364">==</span>&nbsp;<span class="num" id="1474367">0</span>&nbsp;<span class="op" id="1474369">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1474373">//&nbsp;We&nbsp;are&nbsp;going&nbsp;back&nbsp;to&nbsp;Go&nbsp;and&nbsp;are&nbsp;not&nbsp;in&nbsp;a&nbsp;recursive</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1474429">//&nbsp;call.&nbsp;&nbsp;Let&nbsp;the&nbsp;GC&nbsp;collect&nbsp;any&nbsp;memory&nbsp;allocated&nbsp;via</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1474485">//&nbsp;_cgo_allocate&nbsp;that&nbsp;is&nbsp;no&nbsp;longer&nbsp;referenced.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1474534">mp</span><span class="op" id="1474536">.</span><span class="ident" id="1474537">cgomal</span>&nbsp;<span class="op" id="1474544">=</span>&nbsp;<span class="ident" id="1474546">nil</span><br>
+<span class="lineno">145</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1474551">}</span><br>
 <span class="lineno"></span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">raceenabled</span>&nbsp;<span class="op">{</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">raceacquire</span><span class="op">(</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">racecgosync</span><span class="op">)</span><span class="op">)</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1474555">if</span>&nbsp;<span class="ident" id="1474558">raceenabled</span>&nbsp;<span class="op" id="1474570">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1474574">raceacquire</span><span class="op" id="1474585">(</span><span class="ident" id="1474586">unsafe</span><span class="op" id="1474592">.</span><span class="ident" id="1474593">Pointer</span><span class="op" id="1474600">(</span><span class="op" id="1474601">&amp;</span><span class="ident" id="1474602">racecgosync</span><span class="op" id="1474613">)</span><span class="op" id="1474614">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1474617">}</span><br>
 <span class="lineno">150</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">unlockOSThread</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="comment">//&nbsp;invalidates&nbsp;mp</span><br>
-<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1474621">unlockOSThread</span><span class="op" id="1474635">(</span><span class="op" id="1474636">)</span>&nbsp;<span class="comment" id="1474638">//&nbsp;invalidates&nbsp;mp</span><br>
+<span class="lineno"></span><span class="op" id="1474656">}</span><br>
 <span class="lineno"></span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;Helper&nbsp;functions&nbsp;for&nbsp;cgo&nbsp;code.</span><br>
+<span class="lineno"></span><span class="comment" id="1474659">//&nbsp;Helper&nbsp;functions&nbsp;for&nbsp;cgo&nbsp;code.</span><br>
 <span class="lineno">155</span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;Filled&nbsp;by&nbsp;schedinit&nbsp;from&nbsp;corresponding&nbsp;C&nbsp;variables,</span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;which&nbsp;are&nbsp;in&nbsp;turn&nbsp;filled&nbsp;in&nbsp;by&nbsp;dynamic&nbsp;linker&nbsp;when&nbsp;Cgo&nbsp;is&nbsp;available.</span><br>
-<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">cgoMalloc</span><span class="op">,</span>&nbsp;<span class="ident">cgoFree</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><br>
+<span class="lineno"></span><span class="comment" id="1474694">//&nbsp;Filled&nbsp;by&nbsp;schedinit&nbsp;from&nbsp;corresponding&nbsp;C&nbsp;variables,</span><br>
+<span class="lineno"></span><span class="comment" id="1474749">//&nbsp;which&nbsp;are&nbsp;in&nbsp;turn&nbsp;filled&nbsp;in&nbsp;by&nbsp;dynamic&nbsp;linker&nbsp;when&nbsp;Cgo&nbsp;is&nbsp;available.</span><br>
+<span class="lineno"></span><span class="keyword" id="1474821">var</span>&nbsp;<span class="ident" id="1474825">cgoMalloc</span><span class="op" id="1474834">,</span>&nbsp;<span class="ident" id="1474836">cgoFree</span>&nbsp;<span class="ident" id="1474844">unsafe</span><span class="op" id="1474850">.</span><span class="ident" id="1474851">Pointer</span><br>
 <span class="lineno"></span><br>
-<span class="lineno">160</span><span class="keyword">func</span>&nbsp;<span class="ident">cmalloc</span><span class="op">(</span><span class="ident">n</span>&nbsp;<span class="builtintype">uintptr</span><span class="op">)</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span>&nbsp;<span class="op">{</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">args</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">n</span>&nbsp;&nbsp;&nbsp;<span class="ident">uint64</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">ret</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
-<span class="lineno">165</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">args</span><span class="op">.</span><span class="ident">n</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">uint64</span><span class="op">(</span><span class="ident">n</span><span class="op">)</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">cgocall</span><span class="op">(</span><span class="ident">cgoMalloc</span><span class="op">,</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">args</span><span class="op">)</span><span class="op">)</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">args</span><span class="op">.</span><span class="ident">ret</span>&nbsp;<span class="op">==</span>&nbsp;<span class="ident">nil</span>&nbsp;<span class="op">{</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gothrow</span><span class="op">(</span><span class="string">&#34;C&nbsp;malloc&nbsp;failed&#34;</span><span class="op">)</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
-<span class="lineno">170</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span>&nbsp;<span class="ident">args</span><span class="op">.</span><span class="ident">ret</span><br>
-<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">160</span><span class="keyword" id="1474860">func</span>&nbsp;<span class="ident" id="1474865">cmalloc</span><span class="op" id="1474872">(</span><span class="ident" id="1474873">n</span>&nbsp;<span class="builtintype" id="1474875">uintptr</span><span class="op" id="1474882">)</span>&nbsp;<span class="ident" id="1474884">unsafe</span><span class="op" id="1474890">.</span><span class="ident" id="1474891">Pointer</span>&nbsp;<span class="op" id="1474899">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1474902">var</span>&nbsp;<span class="ident" id="1474906">args</span>&nbsp;<span class="keyword" id="1474911">struct</span>&nbsp;<span class="op" id="1474918">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1474922">n</span>&nbsp;&nbsp;&nbsp;<span class="ident" id="1474926">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1474935">ret</span>&nbsp;<span class="ident" id="1474939">unsafe</span><span class="op" id="1474945">.</span><span class="ident" id="1474946">Pointer</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1474955">}</span><br>
+<span class="lineno">165</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1474958">args</span><span class="op" id="1474962">.</span><span class="ident" id="1474963">n</span>&nbsp;<span class="op" id="1474965">=</span>&nbsp;<span class="ident" id="1474967">uint64</span><span class="op" id="1474973">(</span><span class="ident" id="1474974">n</span><span class="op" id="1474975">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1474978">cgocall</span><span class="op" id="1474985">(</span><span class="ident" id="1474986">cgoMalloc</span><span class="op" id="1474995">,</span>&nbsp;<span class="ident" id="1474997">unsafe</span><span class="op" id="1475003">.</span><span class="ident" id="1475004">Pointer</span><span class="op" id="1475011">(</span><span class="op" id="1475012">&amp;</span><span class="ident" id="1475013">args</span><span class="op" id="1475017">)</span><span class="op" id="1475018">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1475021">if</span>&nbsp;<span class="ident" id="1475024">args</span><span class="op" id="1475028">.</span><span class="ident" id="1475029">ret</span>&nbsp;<span class="op" id="1475033">==</span>&nbsp;<span class="ident" id="1475036">nil</span>&nbsp;<span class="op" id="1475040">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1475044">gothrow</span><span class="op" id="1475051">(</span><span class="string" id="1475052">&#34;C&nbsp;malloc&nbsp;failed&#34;</span><span class="op" id="1475069">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1475072">}</span><br>
+<span class="lineno">170</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1475075">return</span>&nbsp;<span class="ident" id="1475082">args</span><span class="op" id="1475086">.</span><span class="ident" id="1475087">ret</span><br>
+<span class="lineno"></span><span class="op" id="1475091">}</span><br>
 <span class="lineno"></span><br>
-<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">cfree</span><span class="op">(</span><span class="ident">p</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">cgocall</span><span class="op">(</span><span class="ident">cgoFree</span><span class="op">,</span>&nbsp;<span class="ident">p</span><span class="op">)</span><br>
-<span class="lineno">175</span><span class="op">}</span><br>
+<span class="lineno"></span><span class="keyword" id="1475094">func</span>&nbsp;<span class="ident" id="1475099">cfree</span><span class="op" id="1475104">(</span><span class="ident" id="1475105">p</span>&nbsp;<span class="ident" id="1475107">unsafe</span><span class="op" id="1475113">.</span><span class="ident" id="1475114">Pointer</span><span class="op" id="1475121">)</span>&nbsp;<span class="op" id="1475123">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1475126">cgocall</span><span class="op" id="1475133">(</span><span class="ident" id="1475134">cgoFree</span><span class="op" id="1475141">,</span>&nbsp;<span class="ident" id="1475143">p</span><span class="op" id="1475144">)</span><br>
+<span class="lineno">175</span><span class="op" id="1475146">}</span><br>
 <span class="lineno"></span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;Call&nbsp;from&nbsp;C&nbsp;back&nbsp;to&nbsp;Go.</span><br>
-<span class="lineno"></span><span class="comment">//go:nosplit</span><br>
-<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">cgocallbackg</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
-<span class="lineno">180</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">getg</span><span class="op">(</span><span class="op">)</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">gp</span>&nbsp;<span class="op">!=</span>&nbsp;<span class="ident">gp</span><span class="op">.</span><span class="ident">m</span><span class="op">.</span><span class="ident">curg</span>&nbsp;<span class="op">{</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc">println</span><span class="op">(</span><span class="string">&#34;runtime:&nbsp;bad&nbsp;g&nbsp;in&nbsp;cgocallback&#34;</span><span class="op">)</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">exit</span><span class="op">(</span><span class="num">2</span><span class="op">)</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="comment" id="1475149">//&nbsp;Call&nbsp;from&nbsp;C&nbsp;back&nbsp;to&nbsp;Go.</span><br>
+<span class="lineno"></span><span class="comment" id="1475176">//go:nosplit</span><br>
+<span class="lineno"></span><span class="keyword" id="1475189">func</span>&nbsp;<span class="ident" id="1475194">cgocallbackg</span><span class="op" id="1475206">(</span><span class="op" id="1475207">)</span>&nbsp;<span class="op" id="1475209">{</span><br>
+<span class="lineno">180</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1475212">gp</span>&nbsp;<span class="op" id="1475215">:=</span>&nbsp;<span class="ident" id="1475218">getg</span><span class="op" id="1475222">(</span><span class="op" id="1475223">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1475226">if</span>&nbsp;<span class="ident" id="1475229">gp</span>&nbsp;<span class="op" id="1475232">!=</span>&nbsp;<span class="ident" id="1475235">gp</span><span class="op" id="1475237">.</span><span class="ident" id="1475238">m</span><span class="op" id="1475239">.</span><span class="ident" id="1475240">curg</span>&nbsp;<span class="op" id="1475245">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc" id="1475249">println</span><span class="op" id="1475256">(</span><span class="string" id="1475257">&#34;runtime:&nbsp;bad&nbsp;g&nbsp;in&nbsp;cgocallback&#34;</span><span class="op" id="1475288">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1475292">exit</span><span class="op" id="1475296">(</span><span class="num" id="1475297">2</span><span class="op" id="1475298">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1475301">}</span><br>
 <span class="lineno">185</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;entersyscall&nbsp;saves&nbsp;the&nbsp;caller&#39;s&nbsp;SP&nbsp;to&nbsp;allow&nbsp;the&nbsp;GC&nbsp;to&nbsp;trace&nbsp;the&nbsp;Go</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;stack.&nbsp;However,&nbsp;since&nbsp;we&#39;re&nbsp;returning&nbsp;to&nbsp;an&nbsp;earlier&nbsp;stack&nbsp;frame&nbsp;and</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;need&nbsp;to&nbsp;pair&nbsp;with&nbsp;the&nbsp;entersyscall()&nbsp;call&nbsp;made&nbsp;by&nbsp;cgocall,&nbsp;we&nbsp;must</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;save&nbsp;syscall*&nbsp;and&nbsp;let&nbsp;reentersyscall&nbsp;restore&nbsp;them.</span><br>
-<span class="lineno">190</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">savedsp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="ident">gp</span><span class="op">.</span><span class="ident">syscallsp</span><span class="op">)</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">savedpc</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">gp</span><span class="op">.</span><span class="ident">syscallpc</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">exitsyscall</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="comment">//&nbsp;coming&nbsp;out&nbsp;of&nbsp;cgo&nbsp;call</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">cgocallbackg1</span><span class="op">(</span><span class="op">)</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;going&nbsp;back&nbsp;to&nbsp;cgo&nbsp;call</span><br>
-<span class="lineno">195</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">reentersyscall</span><span class="op">(</span><span class="ident">savedpc</span><span class="op">,</span>&nbsp;<span class="ident">savedsp</span><span class="op">)</span><br>
-<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1475305">//&nbsp;entersyscall&nbsp;saves&nbsp;the&nbsp;caller&#39;s&nbsp;SP&nbsp;to&nbsp;allow&nbsp;the&nbsp;GC&nbsp;to&nbsp;trace&nbsp;the&nbsp;Go</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1475376">//&nbsp;stack.&nbsp;However,&nbsp;since&nbsp;we&#39;re&nbsp;returning&nbsp;to&nbsp;an&nbsp;earlier&nbsp;stack&nbsp;frame&nbsp;and</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1475448">//&nbsp;need&nbsp;to&nbsp;pair&nbsp;with&nbsp;the&nbsp;entersyscall()&nbsp;call&nbsp;made&nbsp;by&nbsp;cgocall,&nbsp;we&nbsp;must</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1475519">//&nbsp;save&nbsp;syscall*&nbsp;and&nbsp;let&nbsp;reentersyscall&nbsp;restore&nbsp;them.</span><br>
+<span class="lineno">190</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1475574">savedsp</span>&nbsp;<span class="op" id="1475582">:=</span>&nbsp;<span class="ident" id="1475585">unsafe</span><span class="op" id="1475591">.</span><span class="ident" id="1475592">Pointer</span><span class="op" id="1475599">(</span><span class="ident" id="1475600">gp</span><span class="op" id="1475602">.</span><span class="ident" id="1475603">syscallsp</span><span class="op" id="1475612">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1475615">savedpc</span>&nbsp;<span class="op" id="1475623">:=</span>&nbsp;<span class="ident" id="1475626">gp</span><span class="op" id="1475628">.</span><span class="ident" id="1475629">syscallpc</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1475640">exitsyscall</span><span class="op" id="1475651">(</span><span class="op" id="1475652">)</span>&nbsp;<span class="comment" id="1475654">//&nbsp;coming&nbsp;out&nbsp;of&nbsp;cgo&nbsp;call</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1475681">cgocallbackg1</span><span class="op" id="1475694">(</span><span class="op" id="1475695">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1475698">//&nbsp;going&nbsp;back&nbsp;to&nbsp;cgo&nbsp;call</span><br>
+<span class="lineno">195</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1475725">reentersyscall</span><span class="op" id="1475739">(</span><span class="ident" id="1475740">savedpc</span><span class="op" id="1475747">,</span>&nbsp;<span class="ident" id="1475749">savedsp</span><span class="op" id="1475756">)</span><br>
+<span class="lineno"></span><span class="op" id="1475758">}</span><br>
 <span class="lineno"></span><br>
-<span class="lineno"></span><span class="keyword">func</span>&nbsp;<span class="ident">cgocallbackg1</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">getg</span><span class="op">(</span><span class="op">)</span><br>
-<span class="lineno">200</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">gp</span><span class="op">.</span><span class="ident">m</span><span class="op">.</span><span class="ident">needextram</span>&nbsp;<span class="op">{</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gp</span><span class="op">.</span><span class="ident">m</span><span class="op">.</span><span class="ident">needextram</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">false</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">onM</span><span class="op">(</span><span class="ident">newextram</span><span class="op">)</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span><span class="keyword" id="1475761">func</span>&nbsp;<span class="ident" id="1475766">cgocallbackg1</span><span class="op" id="1475779">(</span><span class="op" id="1475780">)</span>&nbsp;<span class="op" id="1475782">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1475785">gp</span>&nbsp;<span class="op" id="1475788">:=</span>&nbsp;<span class="ident" id="1475791">getg</span><span class="op" id="1475795">(</span><span class="op" id="1475796">)</span><br>
+<span class="lineno">200</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1475799">if</span>&nbsp;<span class="ident" id="1475802">gp</span><span class="op" id="1475804">.</span><span class="ident" id="1475805">m</span><span class="op" id="1475806">.</span><span class="ident" id="1475807">needextram</span>&nbsp;<span class="op" id="1475818">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1475822">gp</span><span class="op" id="1475824">.</span><span class="ident" id="1475825">m</span><span class="op" id="1475826">.</span><span class="ident" id="1475827">needextram</span>&nbsp;<span class="op" id="1475838">=</span>&nbsp;<span class="ident" id="1475840">false</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1475848">onM</span><span class="op" id="1475851">(</span><span class="ident" id="1475852">newextram</span><span class="op" id="1475861">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1475864">}</span><br>
 <span class="lineno"></span><br>
-<span class="lineno">205</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Add&nbsp;entry&nbsp;to&nbsp;defer&nbsp;stack&nbsp;in&nbsp;case&nbsp;of&nbsp;panic.</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">restore</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">true</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">defer</span>&nbsp;<span class="ident">unwindm</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">restore</span><span class="op">)</span><br>
+<span class="lineno">205</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1475868">//&nbsp;Add&nbsp;entry&nbsp;to&nbsp;defer&nbsp;stack&nbsp;in&nbsp;case&nbsp;of&nbsp;panic.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1475915">restore</span>&nbsp;<span class="op" id="1475923">:=</span>&nbsp;<span class="ident" id="1475926">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1475932">defer</span>&nbsp;<span class="ident" id="1475938">unwindm</span><span class="op" id="1475945">(</span><span class="op" id="1475946">&amp;</span><span class="ident" id="1475947">restore</span><span class="op" id="1475954">)</span><br>
 <span class="lineno"></span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">raceenabled</span>&nbsp;<span class="op">{</span><br>
-<span class="lineno">210</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">raceacquire</span><span class="op">(</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">racecgosync</span><span class="op">)</span><span class="op">)</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1475958">if</span>&nbsp;<span class="ident" id="1475961">raceenabled</span>&nbsp;<span class="op" id="1475973">{</span><br>
+<span class="lineno">210</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1475977">raceacquire</span><span class="op" id="1475988">(</span><span class="ident" id="1475989">unsafe</span><span class="op" id="1475995">.</span><span class="ident" id="1475996">Pointer</span><span class="op" id="1476003">(</span><span class="op" id="1476004">&amp;</span><span class="ident" id="1476005">racecgosync</span><span class="op" id="1476016">)</span><span class="op" id="1476017">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1476020">}</span><br>
 <span class="lineno"></span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">type</span>&nbsp;<span class="ident">args</span>&nbsp;<span class="keyword">struct</span>&nbsp;<span class="op">{</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">fn</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op">*</span><span class="ident">funcval</span><br>
-<span class="lineno">215</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">arg</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">argsize</span>&nbsp;<span class="builtintype">uintptr</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">var</span>&nbsp;<span class="ident">cb</span>&nbsp;<span class="op">*</span><span class="ident">args</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1476024">type</span>&nbsp;<span class="ident" id="1476029">args</span>&nbsp;<span class="keyword" id="1476034">struct</span>&nbsp;<span class="op" id="1476041">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1476045">fn</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op" id="1476053">*</span><span class="ident" id="1476054">funcval</span><br>
+<span class="lineno">215</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1476064">arg</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="1476072">unsafe</span><span class="op" id="1476078">.</span><span class="ident" id="1476079">Pointer</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1476089">argsize</span>&nbsp;<span class="builtintype" id="1476097">uintptr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1476106">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1476109">var</span>&nbsp;<span class="ident" id="1476113">cb</span>&nbsp;<span class="op" id="1476116">*</span><span class="ident" id="1476117">args</span><br>
 <span class="lineno"></span><br>
-<span class="lineno">220</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Location&nbsp;of&nbsp;callback&nbsp;arguments&nbsp;depends&nbsp;on&nbsp;stack&nbsp;frame&nbsp;layout</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;and&nbsp;size&nbsp;of&nbsp;stack&nbsp;frame&nbsp;of&nbsp;cgocallback_gofunc.</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">gp</span><span class="op">.</span><span class="ident">m</span><span class="op">.</span><span class="ident">g0</span><span class="op">.</span><span class="ident">sched</span><span class="op">.</span><span class="ident">sp</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="ident">GOARCH</span>&nbsp;<span class="op">{</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">default</span><span class="op">:</span><br>
-<span class="lineno">225</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gothrow</span><span class="op">(</span><span class="string">&#34;cgocallbackg&nbsp;is&nbsp;unimplemented&nbsp;on&nbsp;arch&#34;</span><span class="op">)</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="string">&#34;arm&#34;</span><span class="op">:</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;On&nbsp;arm,&nbsp;stack&nbsp;frame&nbsp;is&nbsp;two&nbsp;words&nbsp;and&nbsp;there&#39;s&nbsp;a&nbsp;saved&nbsp;LR&nbsp;between</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;SP&nbsp;and&nbsp;the&nbsp;stack&nbsp;frame&nbsp;and&nbsp;between&nbsp;the&nbsp;stack&nbsp;frame&nbsp;and&nbsp;the&nbsp;arguments.</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">cb</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">(</span><span class="op">*</span><span class="ident">args</span><span class="op">)</span><span class="op">(</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="ident">sp</span>&nbsp;<span class="op">+</span>&nbsp;<span class="num">4</span><span class="op">*</span><span class="ident">ptrSize</span><span class="op">)</span><span class="op">)</span><br>
-<span class="lineno">230</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="string">&#34;amd64&#34;</span><span class="op">:</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;On&nbsp;amd64,&nbsp;stack&nbsp;frame&nbsp;is&nbsp;one&nbsp;word,&nbsp;plus&nbsp;caller&nbsp;PC.</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">cb</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">(</span><span class="op">*</span><span class="ident">args</span><span class="op">)</span><span class="op">(</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="ident">sp</span>&nbsp;<span class="op">+</span>&nbsp;<span class="num">2</span><span class="op">*</span><span class="ident">ptrSize</span><span class="op">)</span><span class="op">)</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="string">&#34;386&#34;</span><span class="op">:</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;On&nbsp;386,&nbsp;stack&nbsp;frame&nbsp;is&nbsp;three&nbsp;words,&nbsp;plus&nbsp;caller&nbsp;PC.</span><br>
-<span class="lineno">235</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">cb</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">(</span><span class="op">*</span><span class="ident">args</span><span class="op">)</span><span class="op">(</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="ident">sp</span>&nbsp;<span class="op">+</span>&nbsp;<span class="num">4</span><span class="op">*</span><span class="ident">ptrSize</span><span class="op">)</span><span class="op">)</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno">220</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1476124">//&nbsp;Location&nbsp;of&nbsp;callback&nbsp;arguments&nbsp;depends&nbsp;on&nbsp;stack&nbsp;frame&nbsp;layout</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1476189">//&nbsp;and&nbsp;size&nbsp;of&nbsp;stack&nbsp;frame&nbsp;of&nbsp;cgocallback_gofunc.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1476240">sp</span>&nbsp;<span class="op" id="1476243">:=</span>&nbsp;<span class="ident" id="1476246">gp</span><span class="op" id="1476248">.</span><span class="ident" id="1476249">m</span><span class="op" id="1476250">.</span><span class="ident" id="1476251">g0</span><span class="op" id="1476253">.</span><span class="ident" id="1476254">sched</span><span class="op" id="1476259">.</span><span class="ident" id="1476260">sp</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1476264">switch</span>&nbsp;<span class="ident" id="1476271">GOARCH</span>&nbsp;<span class="op" id="1476278">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1476281">default</span><span class="op" id="1476288">:</span><br>
+<span class="lineno">225</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1476292">gothrow</span><span class="op" id="1476299">(</span><span class="string" id="1476300">&#34;cgocallbackg&nbsp;is&nbsp;unimplemented&nbsp;on&nbsp;arch&#34;</span><span class="op" id="1476339">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1476342">case</span>&nbsp;<span class="string" id="1476347">&#34;arm&#34;</span><span class="op" id="1476352">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1476356">//&nbsp;On&nbsp;arm,&nbsp;stack&nbsp;frame&nbsp;is&nbsp;two&nbsp;words&nbsp;and&nbsp;there&#39;s&nbsp;a&nbsp;saved&nbsp;LR&nbsp;between</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1476425">//&nbsp;SP&nbsp;and&nbsp;the&nbsp;stack&nbsp;frame&nbsp;and&nbsp;between&nbsp;the&nbsp;stack&nbsp;frame&nbsp;and&nbsp;the&nbsp;arguments.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1476500">cb</span>&nbsp;<span class="op" id="1476503">=</span>&nbsp;<span class="op" id="1476505">(</span><span class="op" id="1476506">*</span><span class="ident" id="1476507">args</span><span class="op" id="1476511">)</span><span class="op" id="1476512">(</span><span class="ident" id="1476513">unsafe</span><span class="op" id="1476519">.</span><span class="ident" id="1476520">Pointer</span><span class="op" id="1476527">(</span><span class="ident" id="1476528">sp</span>&nbsp;<span class="op" id="1476531">+</span>&nbsp;<span class="num" id="1476533">4</span><span class="op" id="1476534">*</span><span class="ident" id="1476535">ptrSize</span><span class="op" id="1476542">)</span><span class="op" id="1476543">)</span><br>
+<span class="lineno">230</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1476546">case</span>&nbsp;<span class="string" id="1476551">&#34;amd64&#34;</span><span class="op" id="1476558">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1476562">//&nbsp;On&nbsp;amd64,&nbsp;stack&nbsp;frame&nbsp;is&nbsp;one&nbsp;word,&nbsp;plus&nbsp;caller&nbsp;PC.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1476618">cb</span>&nbsp;<span class="op" id="1476621">=</span>&nbsp;<span class="op" id="1476623">(</span><span class="op" id="1476624">*</span><span class="ident" id="1476625">args</span><span class="op" id="1476629">)</span><span class="op" id="1476630">(</span><span class="ident" id="1476631">unsafe</span><span class="op" id="1476637">.</span><span class="ident" id="1476638">Pointer</span><span class="op" id="1476645">(</span><span class="ident" id="1476646">sp</span>&nbsp;<span class="op" id="1476649">+</span>&nbsp;<span class="num" id="1476651">2</span><span class="op" id="1476652">*</span><span class="ident" id="1476653">ptrSize</span><span class="op" id="1476660">)</span><span class="op" id="1476661">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1476664">case</span>&nbsp;<span class="string" id="1476669">&#34;386&#34;</span><span class="op" id="1476674">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1476678">//&nbsp;On&nbsp;386,&nbsp;stack&nbsp;frame&nbsp;is&nbsp;three&nbsp;words,&nbsp;plus&nbsp;caller&nbsp;PC.</span><br>
+<span class="lineno">235</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1476735">cb</span>&nbsp;<span class="op" id="1476738">=</span>&nbsp;<span class="op" id="1476740">(</span><span class="op" id="1476741">*</span><span class="ident" id="1476742">args</span><span class="op" id="1476746">)</span><span class="op" id="1476747">(</span><span class="ident" id="1476748">unsafe</span><span class="op" id="1476754">.</span><span class="ident" id="1476755">Pointer</span><span class="op" id="1476762">(</span><span class="ident" id="1476763">sp</span>&nbsp;<span class="op" id="1476766">+</span>&nbsp;<span class="num" id="1476768">4</span><span class="op" id="1476769">*</span><span class="ident" id="1476770">ptrSize</span><span class="op" id="1476777">)</span><span class="op" id="1476778">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1476781">}</span><br>
 <span class="lineno"></span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Invoke&nbsp;callback.</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">reflectcall</span><span class="op">(</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="ident">cb</span><span class="op">.</span><span class="ident">fn</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="ident">cb</span><span class="op">.</span><span class="ident">arg</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="builtintype">uint32</span><span class="op">(</span><span class="ident">cb</span><span class="op">.</span><span class="ident">argsize</span><span class="op">)</span><span class="op">,</span>&nbsp;<span class="num">0</span><span class="op">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1476785">//&nbsp;Invoke&nbsp;callback.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1476806">reflectcall</span><span class="op" id="1476817">(</span><span class="ident" id="1476818">unsafe</span><span class="op" id="1476824">.</span><span class="ident" id="1476825">Pointer</span><span class="op" id="1476832">(</span><span class="ident" id="1476833">cb</span><span class="op" id="1476835">.</span><span class="ident" id="1476836">fn</span><span class="op" id="1476838">)</span><span class="op" id="1476839">,</span>&nbsp;<span class="ident" id="1476841">unsafe</span><span class="op" id="1476847">.</span><span class="ident" id="1476848">Pointer</span><span class="op" id="1476855">(</span><span class="ident" id="1476856">cb</span><span class="op" id="1476858">.</span><span class="ident" id="1476859">arg</span><span class="op" id="1476862">)</span><span class="op" id="1476863">,</span>&nbsp;<span class="builtintype" id="1476865">uint32</span><span class="op" id="1476871">(</span><span class="ident" id="1476872">cb</span><span class="op" id="1476874">.</span><span class="ident" id="1476875">argsize</span><span class="op" id="1476882">)</span><span class="op" id="1476883">,</span>&nbsp;<span class="num" id="1476885">0</span><span class="op" id="1476886">)</span><br>
 <span class="lineno">240</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="ident">raceenabled</span>&nbsp;<span class="op">{</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">racereleasemerge</span><span class="op">(</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="op">&amp;</span><span class="ident">racecgosync</span><span class="op">)</span><span class="op">)</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1476890">if</span>&nbsp;<span class="ident" id="1476893">raceenabled</span>&nbsp;<span class="op" id="1476905">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1476909">racereleasemerge</span><span class="op" id="1476925">(</span><span class="ident" id="1476926">unsafe</span><span class="op" id="1476932">.</span><span class="ident" id="1476933">Pointer</span><span class="op" id="1476940">(</span><span class="op" id="1476941">&amp;</span><span class="ident" id="1476942">racecgosync</span><span class="op" id="1476953">)</span><span class="op" id="1476954">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1476957">}</span><br>
 <span class="lineno"></span><br>
-<span class="lineno">245</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Do&nbsp;not&nbsp;unwind&nbsp;m-&gt;g0-&gt;sched.sp.</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Our&nbsp;caller,&nbsp;cgocallback,&nbsp;will&nbsp;do&nbsp;that.</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">restore</span>&nbsp;<span class="op">=</span>&nbsp;<span class="ident">false</span><br>
-<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">245</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1476961">//&nbsp;Do&nbsp;not&nbsp;unwind&nbsp;m-&gt;g0-&gt;sched.sp.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1476996">//&nbsp;Our&nbsp;caller,&nbsp;cgocallback,&nbsp;will&nbsp;do&nbsp;that.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1477039">restore</span>&nbsp;<span class="op" id="1477047">=</span>&nbsp;<span class="ident" id="1477049">false</span><br>
+<span class="lineno"></span><span class="op" id="1477055">}</span><br>
 <span class="lineno"></span><br>
-<span class="lineno">250</span><span class="keyword">func</span>&nbsp;<span class="ident">unwindm</span><span class="op">(</span><span class="ident">restore</span>&nbsp;<span class="op">*</span><span class="builtintype">bool</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">if</span>&nbsp;<span class="op">!</span><span class="op">*</span><span class="ident">restore</span>&nbsp;<span class="op">{</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">return</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;Restore&nbsp;sp&nbsp;saved&nbsp;by&nbsp;cgocallback&nbsp;during</span><br>
-<span class="lineno">255</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment">//&nbsp;unwind&nbsp;of&nbsp;g&#39;s&nbsp;stack&nbsp;(see&nbsp;comment&nbsp;at&nbsp;top&nbsp;of&nbsp;file).</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">mp</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="ident">acquirem</span><span class="op">(</span><span class="op">)</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sched</span>&nbsp;<span class="op">:=</span>&nbsp;<span class="op">&amp;</span><span class="ident">mp</span><span class="op">.</span><span class="ident">g0</span><span class="op">.</span><span class="ident">sched</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">switch</span>&nbsp;<span class="ident">GOARCH</span>&nbsp;<span class="op">{</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">default</span><span class="op">:</span><br>
-<span class="lineno">260</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gothrow</span><span class="op">(</span><span class="string">&#34;unwindm&nbsp;not&nbsp;implemented&#34;</span><span class="op">)</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="string">&#34;386&#34;</span><span class="op">,</span>&nbsp;<span class="string">&#34;amd64&#34;</span><span class="op">:</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sched</span><span class="op">.</span><span class="ident">sp</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">*</span><span class="op">(</span><span class="op">*</span><span class="builtintype">uintptr</span><span class="op">)</span><span class="op">(</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="ident">sched</span><span class="op">.</span><span class="ident">sp</span><span class="op">)</span><span class="op">)</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword">case</span>&nbsp;<span class="string">&#34;arm&#34;</span><span class="op">:</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">sched</span><span class="op">.</span><span class="ident">sp</span>&nbsp;<span class="op">=</span>&nbsp;<span class="op">*</span><span class="op">(</span><span class="op">*</span><span class="builtintype">uintptr</span><span class="op">)</span><span class="op">(</span><span class="ident">unsafe</span><span class="op">.</span><span class="ident">Pointer</span><span class="op">(</span><span class="ident">sched</span><span class="op">.</span><span class="ident">sp</span>&nbsp;<span class="op">+</span>&nbsp;<span class="num">4</span><span class="op">)</span><span class="op">)</span><br>
-<span class="lineno">265</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op">}</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">releasem</span><span class="op">(</span><span class="ident">mp</span><span class="op">)</span><br>
-<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno">250</span><span class="keyword" id="1477058">func</span>&nbsp;<span class="ident" id="1477063">unwindm</span><span class="op" id="1477070">(</span><span class="ident" id="1477071">restore</span>&nbsp;<span class="op" id="1477079">*</span><span class="builtintype" id="1477080">bool</span><span class="op" id="1477084">)</span>&nbsp;<span class="op" id="1477086">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1477089">if</span>&nbsp;<span class="op" id="1477092">!</span><span class="op" id="1477093">*</span><span class="ident" id="1477094">restore</span>&nbsp;<span class="op" id="1477102">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1477106">return</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1477114">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1477117">//&nbsp;Restore&nbsp;sp&nbsp;saved&nbsp;by&nbsp;cgocallback&nbsp;during</span><br>
+<span class="lineno">255</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1477160">//&nbsp;unwind&nbsp;of&nbsp;g&#39;s&nbsp;stack&nbsp;(see&nbsp;comment&nbsp;at&nbsp;top&nbsp;of&nbsp;file).</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1477214">mp</span>&nbsp;<span class="op" id="1477217">:=</span>&nbsp;<span class="ident" id="1477220">acquirem</span><span class="op" id="1477228">(</span><span class="op" id="1477229">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1477232">sched</span>&nbsp;<span class="op" id="1477238">:=</span>&nbsp;<span class="op" id="1477241">&amp;</span><span class="ident" id="1477242">mp</span><span class="op" id="1477244">.</span><span class="ident" id="1477245">g0</span><span class="op" id="1477247">.</span><span class="ident" id="1477248">sched</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1477255">switch</span>&nbsp;<span class="ident" id="1477262">GOARCH</span>&nbsp;<span class="op" id="1477269">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1477272">default</span><span class="op" id="1477279">:</span><br>
+<span class="lineno">260</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1477283">gothrow</span><span class="op" id="1477290">(</span><span class="string" id="1477291">&#34;unwindm&nbsp;not&nbsp;implemented&#34;</span><span class="op" id="1477316">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1477319">case</span>&nbsp;<span class="string" id="1477324">&#34;386&#34;</span><span class="op" id="1477329">,</span>&nbsp;<span class="string" id="1477331">&#34;amd64&#34;</span><span class="op" id="1477338">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1477342">sched</span><span class="op" id="1477347">.</span><span class="ident" id="1477348">sp</span>&nbsp;<span class="op" id="1477351">=</span>&nbsp;<span class="op" id="1477353">*</span><span class="op" id="1477354">(</span><span class="op" id="1477355">*</span><span class="builtintype" id="1477356">uintptr</span><span class="op" id="1477363">)</span><span class="op" id="1477364">(</span><span class="ident" id="1477365">unsafe</span><span class="op" id="1477371">.</span><span class="ident" id="1477372">Pointer</span><span class="op" id="1477379">(</span><span class="ident" id="1477380">sched</span><span class="op" id="1477385">.</span><span class="ident" id="1477386">sp</span><span class="op" id="1477388">)</span><span class="op" id="1477389">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1477392">case</span>&nbsp;<span class="string" id="1477397">&#34;arm&#34;</span><span class="op" id="1477402">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1477406">sched</span><span class="op" id="1477411">.</span><span class="ident" id="1477412">sp</span>&nbsp;<span class="op" id="1477415">=</span>&nbsp;<span class="op" id="1477417">*</span><span class="op" id="1477418">(</span><span class="op" id="1477419">*</span><span class="builtintype" id="1477420">uintptr</span><span class="op" id="1477427">)</span><span class="op" id="1477428">(</span><span class="ident" id="1477429">unsafe</span><span class="op" id="1477435">.</span><span class="ident" id="1477436">Pointer</span><span class="op" id="1477443">(</span><span class="ident" id="1477444">sched</span><span class="op" id="1477449">.</span><span class="ident" id="1477450">sp</span>&nbsp;<span class="op" id="1477453">+</span>&nbsp;<span class="num" id="1477455">4</span><span class="op" id="1477456">)</span><span class="op" id="1477457">)</span><br>
+<span class="lineno">265</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1477460">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1477463">releasem</span><span class="op" id="1477471">(</span><span class="ident" id="1477472">mp</span><span class="op" id="1477474">)</span><br>
+<span class="lineno"></span><span class="op" id="1477476">}</span><br>
 <span class="lineno"></span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;called&nbsp;from&nbsp;assembly</span><br>
-<span class="lineno">270</span><span class="keyword">func</span>&nbsp;<span class="ident">badcgocallback</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gothrow</span><span class="op">(</span><span class="string">&#34;misaligned&nbsp;stack&nbsp;in&nbsp;cgocallback&#34;</span><span class="op">)</span><br>
-<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><span class="comment" id="1477479">//&nbsp;called&nbsp;from&nbsp;assembly</span><br>
+<span class="lineno">270</span><span class="keyword" id="1477503">func</span>&nbsp;<span class="ident" id="1477508">badcgocallback</span><span class="op" id="1477522">(</span><span class="op" id="1477523">)</span>&nbsp;<span class="op" id="1477525">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1477528">gothrow</span><span class="op" id="1477535">(</span><span class="string" id="1477536">&#34;misaligned&nbsp;stack&nbsp;in&nbsp;cgocallback&#34;</span><span class="op" id="1477569">)</span><br>
+<span class="lineno"></span><span class="op" id="1477571">}</span><br>
 <span class="lineno"></span><br>
-<span class="lineno"></span><span class="comment">//&nbsp;called&nbsp;from&nbsp;(incomplete)&nbsp;assembly</span><br>
-<span class="lineno">275</span><span class="keyword">func</span>&nbsp;<span class="ident">cgounimpl</span><span class="op">(</span><span class="op">)</span>&nbsp;<span class="op">{</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident">gothrow</span><span class="op">(</span><span class="string">&#34;cgo&nbsp;not&nbsp;implemented&#34;</span><span class="op">)</span><br>
-<span class="lineno"></span><span class="op">}</span><br>
+<span class="lineno"></span><span class="comment" id="1477574">//&nbsp;called&nbsp;from&nbsp;(incomplete)&nbsp;assembly</span><br>
+<span class="lineno">275</span><span class="keyword" id="1477611">func</span>&nbsp;<span class="ident" id="1477616">cgounimpl</span><span class="op" id="1477625">(</span><span class="op" id="1477626">)</span>&nbsp;<span class="op" id="1477628">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1477631">gothrow</span><span class="op" id="1477638">(</span><span class="string" id="1477639">&#34;cgo&nbsp;not&nbsp;implemented&#34;</span><span class="op" id="1477660">)</span><br>
+<span class="lineno"></span><span class="op" id="1477662">}</span><br>
 <span class="lineno"></span><br>
-<span class="lineno"></span><span class="keyword">var</span>&nbsp;<span class="ident">racecgosync</span>&nbsp;<span class="ident">uint64</span>&nbsp;<span class="comment">//&nbsp;represents&nbsp;possible&nbsp;synchronization&nbsp;in&nbsp;C&nbsp;code</span>
+<span class="lineno"></span><span class="keyword" id="1477665">var</span>&nbsp;<span class="ident" id="1477669">racecgosync</span>&nbsp;<span class="ident" id="1477681">uint64</span>&nbsp;<span class="comment" id="1477688">//&nbsp;represents&nbsp;possible&nbsp;synchronization&nbsp;in&nbsp;C&nbsp;code</span>
 </div>
 </body>
 </html>

@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"go/build"
+	"go/token"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -10,6 +11,7 @@ import (
 
 	"golang.org/x/tools/go/buildutil"
 	"golang.org/x/tools/go/loader"
+	"golang.org/x/tools/refactor/lexical"
 )
 
 func listPackages() []string {
@@ -47,7 +49,7 @@ func loadPackages(pkgs []string) (*loader.Program, error) {
 	return conf.Load()
 }
 
-func makePkgs() []*pkg {
+func makePkgs() ([]*pkg, *token.FileSet, map[int]*file) {
 	pkgs := listPackages()
 	pkgs = append(pkgs, 
 		"lonnie.io/e8vm",
@@ -63,14 +65,18 @@ func makePkgs() []*pkg {
 	fset := prog.Fset
 
 	var ps []*pkg
+	files := make(map[int]*file)
 
-	for _, pinfo := range prog.AllPackages {
+	for tpkg, pinfo := range prog.AllPackages {
 		if len(pinfo.Files) == 0 {
 			continue
 		}
 
 		p := new(pkg)
 		p.path = pinfo.Pkg.Path()
+		p.savePath = strings.TrimSuffix(p.path, "_test")
+		p.tpkg = tpkg
+		p.fileMap = make(map[int]*file)
 
 		for _, f := range pinfo.Files {
 			pos := fset.Position(f.Package)
@@ -81,11 +87,17 @@ func makePkgs() []*pkg {
 				continue
 			}
 
-			p.files = append(p.files, &file{
+			newFile := &file{
 				file: pfile,
 				name: base,
 				path: fname,
-			})
+				savePath: filepath.Join(p.savePath, base),
+				refs: make(map[int]int),
+			}
+
+			p.files = append(p.files, newFile)
+			p.fileMap[pfile.Base()] = newFile
+			files[pfile.Base()] = newFile
 		}
 
 		if len(p.files) == 0 {
@@ -95,15 +107,31 @@ func makePkgs() []*pkg {
 		ps = append(ps, p)
 	}
 
-	return ps
+	for tpkg, pinfo := range prog.AllPackages {
+		lex := lexical.Structure(fset, tpkg, &pinfo.Info, pinfo.Files)
+		for obj, refs := range lex.Refs {
+			defPos := obj.Pos()
+			for _, ref := range refs {
+				refPos := ref.Id.NamePos
+				refFile := fset.File(refPos)
+				f := files[refFile.Base()]
+				if f == nil {
+					panic("file not found")
+				}
+
+				f.refs[int(refPos)] = int(defPos)
+			}
+		}
+	}
+
+	return ps, fset, files
 }
 
 func main() {
-	ps := makePkgs()
+	ps, fset, files := makePkgs()
 	for _, p := range ps {
 		fmt.Printf("[%s]\n", p.path)
-		outPath := filepath.Join("www", p.path)
-		outPath = strings.TrimSuffix(outPath, "_test")
+		outPath := filepath.Join("www", p.savePath)
 		e := os.MkdirAll(outPath, 0700)
 		ne(e)
 
@@ -111,7 +139,7 @@ func main() {
 			fmt.Printf("   %s (%s)\n", f.name, f.path)
 			f.parseToks()
 
-			bs := f.html()
+			bs := f.html(fset, files)
 			pout := filepath.Join(outPath, f.name+".html")
 			e := ioutil.WriteFile(pout, bs, 0700)
 			ne(e)

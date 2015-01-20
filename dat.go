@@ -9,6 +9,9 @@ import (
 	"io"
 	"io/ioutil"
 	"log"
+	"path/filepath"
+	
+	"golang.org/x/tools/go/types"
 )
 
 type tok struct {
@@ -21,13 +24,19 @@ type file struct {
 	file *token.File
 	name string
 	path string
+	savePath string
 
 	toks []*tok
+
+	refs map[int]int
 }
 
 type pkg struct {
 	path  string
+	savePath string
+	tpkg  *types.Package
 	files []*file
+	fileMap map[int]*file
 }
 
 func (f *file) parseToks() {
@@ -145,7 +154,7 @@ func lineHeader(line int) string {
 	return fmt.Sprintf(`<span class="lineno"></span>`)
 }
 
-func (f *file) html() []byte {
+func (f *file) html(fset *token.FileSet, files map[int]*file) []byte {
 	out := new(bytes.Buffer)
 	base := f.file.Base()
 	size := f.file.Size()
@@ -220,6 +229,19 @@ func (f *file) html() []byte {
 		fmt.Fprintf(out, `<span class="%s" id="%d">`, 
 			tokClass(t.tok, lit), int(t.pos),
 		)
+
+		defPos := token.Pos(f.refs[int(t.pos)])
+		if defPos != 0 {
+			defFile := files[fset.File(defPos).Base()]
+			if defFile == nil {
+				panic("def file missing")
+			}
+			dest := filepath.Join("/", defFile.savePath+".html")
+			dest += fmt.Sprintf("#%d", int(defPos))
+
+			fmt.Fprintf(out, `<a href="%s">`, dest)
+		}
+		
 		for _, ch := range str {
 			fmt.Fprint(out, runeHtml(ch))
 			if ch == '\n' {
@@ -227,6 +249,11 @@ func (f *file) html() []byte {
 				fmt.Fprint(out, lineHeader(line))
 			}
 		}
+
+		if defPos != 0 {
+			fmt.Fprintf(out, `</a>`)
+		}
+
 		fmt.Fprintf(out, `</span>`)
 
 		off += nb

@@ -10,7 +10,7 @@ import (
 	"io/ioutil"
 	"log"
 	"path/filepath"
-	
+
 	"golang.org/x/tools/go/types"
 )
 
@@ -21,9 +21,9 @@ type tok struct {
 }
 
 type file struct {
-	file *token.File
-	name string
-	path string
+	file     *token.File
+	name     string
+	path     string
 	savePath string
 
 	toks []*tok
@@ -32,11 +32,11 @@ type file struct {
 }
 
 type pkg struct {
-	path  string
+	path     string
 	savePath string
-	tpkg  *types.Package
-	files []*file
-	fileMap map[int]*file
+	tpkg     *types.Package
+	files    []*file
+	fileMap  map[int]*file
 }
 
 func (f *file) parseToks() {
@@ -150,7 +150,7 @@ func tokClass(t token.Token, lit string) string {
 }
 
 func lineHeader(line int) string {
-	if line == 1 || line % 5 == 0 {
+	if line == 1 || line%5 == 0 {
 		return fmt.Sprintf(`<span class="lineno">%d</span>`, line)
 	}
 	return fmt.Sprintf(`<span class="lineno"></span>`)
@@ -228,7 +228,7 @@ func (f *file) html(fset *token.FileSet, files map[int]*file) []byte {
 			panic("lit unmatch")
 		}
 
-		fmt.Fprintf(out, `<span class="%s" id="%d">`, 
+		fmt.Fprintf(out, `<span class="%s" id="%d">`,
 			tokClass(t.tok, lit), int(t.pos),
 		)
 
@@ -243,7 +243,7 @@ func (f *file) html(fset *token.FileSet, files map[int]*file) []byte {
 
 			fmt.Fprintf(out, `<a href="%s">`, dest)
 		}
-		
+
 		for _, ch := range str {
 			fmt.Fprint(out, runeHtml(ch))
 			if ch == '\n' {

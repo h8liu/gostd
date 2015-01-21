@@ -51,7 +51,7 @@ func loadPackages(pkgs []string) (*loader.Program, error) {
 
 func makePkgs() ([]*pkg, *token.FileSet, map[int]*file) {
 	pkgs := listPackages()
-	pkgs = append(pkgs, 
+	pkgs = append(pkgs,
 		"lonnie.io/e8vm",
 		"lonnie.io/e8vm/arch8",
 		"lonnie.io/e8vm/dasm8",
@@ -88,11 +88,11 @@ func makePkgs() ([]*pkg, *token.FileSet, map[int]*file) {
 			}
 
 			newFile := &file{
-				file: pfile,
-				name: base,
-				path: fname,
+				file:     pfile,
+				name:     base,
+				path:     fname,
 				savePath: filepath.Join(p.savePath, base),
-				refs: make(map[int]int),
+				refs:     make(map[int]int),
 			}
 
 			p.files = append(p.files, newFile)

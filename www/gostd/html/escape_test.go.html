@@ -1,0 +1,130 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment" id="8076736">//&nbsp;Copyright&nbsp;2013&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment" id="8076791">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment" id="8076845">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword" id="8076896">package</span>&nbsp;<span class="ident" id="8076904">html</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="8076910">import</span>&nbsp;<span class="string" id="8076917">&#34;testing&#34;</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="8076928">type</span>&nbsp;<span class="ident" id="8076933">unescapeTest</span>&nbsp;<span class="keyword" id="8076946">struct</span>&nbsp;<span class="op" id="8076953">{</span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="8076956">//&nbsp;A&nbsp;short&nbsp;description&nbsp;of&nbsp;the&nbsp;test&nbsp;case.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="8076998">desc</span>&nbsp;<span class="builtintype" id="8077003">string</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="8077011">//&nbsp;The&nbsp;HTML&nbsp;text.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="8077030">html</span>&nbsp;<span class="builtintype" id="8077035">string</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="8077043">//&nbsp;The&nbsp;unescaped&nbsp;text.</span><br>
+<span class="lineno">15</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="8077067">unescaped</span>&nbsp;<span class="builtintype" id="8077077">string</span><br>
+<span class="lineno"></span><span class="op" id="8077084">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="8077087">var</span>&nbsp;<span class="ident" id="8077091">unescapeTests</span>&nbsp;<span class="op" id="8077105">=</span>&nbsp;<span class="op" id="8077107">[</span><span class="op" id="8077108">]</span><span class="ident" id="8077109">unescapeTest</span><span class="op" id="8077121">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="8077124">//&nbsp;Handle&nbsp;no&nbsp;entities.</span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="8077148">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="8077152">&#34;copy&#34;</span><span class="op" id="8077158">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="8077162">&#34;A\ttext\nstring&#34;</span><span class="op" id="8077179">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="8077183">&#34;A\ttext\nstring&#34;</span><span class="op" id="8077200">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="8077203">}</span><span class="op" id="8077204">,</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="8077207">//&nbsp;Handle&nbsp;simple&nbsp;named&nbsp;entities.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="8077241">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="8077245">&#34;simple&#34;</span><span class="op" id="8077253">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="8077257">&#34;&amp;amp;&nbsp;&amp;gt;&nbsp;&amp;lt;&#34;</span><span class="op" id="8077274">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="8077278">&#34;&amp;&nbsp;&gt;&nbsp;&lt;&#34;</span><span class="op" id="8077285">,</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="8077288">}</span><span class="op" id="8077289">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="8077292">//&nbsp;Handle&nbsp;hitting&nbsp;the&nbsp;end&nbsp;of&nbsp;the&nbsp;string.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="8077334">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="8077338">&#34;stringEnd&#34;</span><span class="op" id="8077349">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="8077353">&#34;&amp;amp&nbsp;&amp;amp&#34;</span><span class="op" id="8077364">,</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="8077368">&#34;&amp;&nbsp;&amp;&#34;</span><span class="op" id="8077373">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="8077376">}</span><span class="op" id="8077377">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="8077380">//&nbsp;Handle&nbsp;entities&nbsp;with&nbsp;two&nbsp;codepoints.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="8077421">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="8077425">&#34;multiCodepoint&#34;</span><span class="op" id="8077441">,</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="8077445">&#34;text&nbsp;&amp;gesl;&nbsp;blah&#34;</span><span class="op" id="8077463">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="8077467">&#34;text&nbsp;\u22db\ufe00&nbsp;blah&#34;</span><span class="op" id="8077491">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="8077494">}</span><span class="op" id="8077495">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="8077498">//&nbsp;Handle&nbsp;decimal&nbsp;numeric&nbsp;entities.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="8077535">{</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="8077539">&#34;decimalEntity&#34;</span><span class="op" id="8077554">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="8077558">&#34;Delta&nbsp;=&nbsp;&amp;#916;&nbsp;&#34;</span><span class="op" id="8077575">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="8077579">&#34;Delta&nbsp;=&nbsp;Δ&nbsp;&#34;</span><span class="op" id="8077592">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="8077595">}</span><span class="op" id="8077596">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="8077599">//&nbsp;Handle&nbsp;hexadecimal&nbsp;numeric&nbsp;entities.</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="8077640">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="8077644">&#34;hexadecimalEntity&#34;</span><span class="op" id="8077663">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="8077667">&#34;Lambda&nbsp;=&nbsp;&amp;#x3bb;&nbsp;=&nbsp;&amp;#X3Bb&nbsp;&#34;</span><span class="op" id="8077695">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="8077699">&#34;Lambda&nbsp;=&nbsp;λ&nbsp;=&nbsp;λ&nbsp;&#34;</span><span class="op" id="8077718">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="8077721">}</span><span class="op" id="8077722">,</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="8077725">//&nbsp;Handle&nbsp;numeric&nbsp;early&nbsp;termination.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="8077763">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="8077767">&#34;numericEnds&#34;</span><span class="op" id="8077780">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="8077784">&#34;&amp;#&nbsp;&amp;#x&nbsp;&amp;#128;43&nbsp;&amp;copy&nbsp;=&nbsp;&amp;#169f&nbsp;=&nbsp;&amp;#xa9&#34;</span><span class="op" id="8077824">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="8077828">&#34;&amp;#&nbsp;&amp;#x&nbsp;€43&nbsp;©&nbsp;=&nbsp;©f&nbsp;=&nbsp;©&#34;</span><span class="op" id="8077856">,</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="8077859">}</span><span class="op" id="8077860">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="8077863">//&nbsp;Handle&nbsp;numeric&nbsp;ISO-8859-1&nbsp;entity&nbsp;replacements.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="8077914">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="8077918">&#34;numericReplacements&#34;</span><span class="op" id="8077939">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="8077943">&#34;Footnote&amp;#x87;&#34;</span><span class="op" id="8077959">,</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="8077963">&#34;Footnote‡&#34;</span><span class="op" id="8077976">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="8077979">}</span><span class="op" id="8077980">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="8077983">//&nbsp;Handle&nbsp;single&nbsp;ampersand.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="8078012">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="8078016">&#34;copySingleAmpersand&#34;</span><span class="op" id="8078037">,</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="8078041">&#34;&amp;&#34;</span><span class="op" id="8078044">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="8078048">&#34;&amp;&#34;</span><span class="op" id="8078051">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="8078054">}</span><span class="op" id="8078055">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="8078058">//&nbsp;Handle&nbsp;ampersand&nbsp;followed&nbsp;by&nbsp;non-entity.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="8078103">{</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="8078107">&#34;copyAmpersandNonEntity&#34;</span><span class="op" id="8078131">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="8078135">&#34;text&nbsp;&amp;test&#34;</span><span class="op" id="8078147">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="8078151">&#34;text&nbsp;&amp;test&#34;</span><span class="op" id="8078163">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="8078166">}</span><span class="op" id="8078167">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="8078170">//&nbsp;Handle&nbsp;&#34;&amp;#&#34;.</span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="8078187">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="8078191">&#34;copyAmpersandHash&#34;</span><span class="op" id="8078210">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="8078214">&#34;text&nbsp;&amp;#&#34;</span><span class="op" id="8078223">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="8078227">&#34;text&nbsp;&amp;#&#34;</span><span class="op" id="8078236">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="8078239">}</span><span class="op" id="8078240">,</span><br>
+<span class="lineno">85</span><span class="op" id="8078242">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="8078245">func</span>&nbsp;<span class="ident" id="8078250">TestUnescape</span><span class="op" id="8078262">(</span><span class="ident" id="8078263">t</span>&nbsp;<span class="op" id="8078265">*</span><span class="ident" id="8078266">testing</span><span class="op" id="8078273">.</span><span class="ident" id="8078274">T</span><span class="op" id="8078275">)</span>&nbsp;<span class="op" id="8078277">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="8078280">for</span>&nbsp;<span class="ident" id="8078284">_</span><span class="op" id="8078285">,</span>&nbsp;<span class="ident" id="8078287">tt</span>&nbsp;<span class="op" id="8078290">:=</span>&nbsp;<span class="keyword" id="8078293">range</span>&nbsp;<span class="ident" id="8078299">unescapeTests</span>&nbsp;<span class="op" id="8078313">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="8078317">unescaped</span>&nbsp;<span class="op" id="8078327">:=</span>&nbsp;<span class="ident" id="8078330">UnescapeString</span><span class="op" id="8078344">(</span><span class="ident" id="8078345">tt</span><span class="op" id="8078347">.</span><span class="ident" id="8078348">html</span><span class="op" id="8078352">)</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="8078356">if</span>&nbsp;<span class="ident" id="8078359">unescaped</span>&nbsp;<span class="op" id="8078369">!=</span>&nbsp;<span class="ident" id="8078372">tt</span><span class="op" id="8078374">.</span><span class="ident" id="8078375">unescaped</span>&nbsp;<span class="op" id="8078385">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="8078390">t</span><span class="op" id="8078391">.</span><span class="ident" id="8078392">Errorf</span><span class="op" id="8078398">(</span><span class="string" id="8078399">&#34;TestUnescape&nbsp;%s:&nbsp;want&nbsp;%q,&nbsp;got&nbsp;%q&#34;</span><span class="op" id="8078433">,</span>&nbsp;<span class="ident" id="8078435">tt</span><span class="op" id="8078437">.</span><span class="ident" id="8078438">desc</span><span class="op" id="8078442">,</span>&nbsp;<span class="ident" id="8078444">tt</span><span class="op" id="8078446">.</span><span class="ident" id="8078447">unescaped</span><span class="op" id="8078456">,</span>&nbsp;<span class="ident" id="8078458">unescaped</span><span class="op" id="8078467">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="8078471">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="8078474">}</span><br>
+<span class="lineno"></span><span class="op" id="8078476">}</span><br>
+<span class="lineno">95</span><br>
+<span class="lineno"></span><span class="keyword" id="8078479">func</span>&nbsp;<span class="ident" id="8078484">TestUnescapeEscape</span><span class="op" id="8078502">(</span><span class="ident" id="8078503">t</span>&nbsp;<span class="op" id="8078505">*</span><span class="ident" id="8078506">testing</span><span class="op" id="8078513">.</span><span class="ident" id="8078514">T</span><span class="op" id="8078515">)</span>&nbsp;<span class="op" id="8078517">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="8078520">ss</span>&nbsp;<span class="op" id="8078523">:=</span>&nbsp;<span class="op" id="8078526">[</span><span class="op" id="8078527">]</span><span class="builtintype" id="8078528">string</span><span class="op" id="8078534">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="8078538">``</span><span class="op" id="8078540">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="8078544">`abc&nbsp;def`</span><span class="op" id="8078553">,</span><br>
+<span class="lineno">100</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="8078557">`a&nbsp;&amp;&nbsp;b`</span><span class="op" id="8078564">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="8078568">`a&amp;amp;b`</span><span class="op" id="8078577">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="8078581">`a&nbsp;&amp;amp&nbsp;b`</span><span class="op" id="8078591">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="8078595">`&amp;quot;`</span><span class="op" id="8078603">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="8078607">`&#34;`</span><span class="op" id="8078610">,</span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="8078614">`&#34;&lt;&amp;&gt;&#34;`</span><span class="op" id="8078621">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="8078625">`&amp;quot;&amp;lt;&amp;amp;&amp;gt;&amp;quot;`</span><span class="op" id="8078652">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="8078656">`3&amp;5==1&nbsp;&amp;&amp;&nbsp;0&lt;1,&nbsp;&#34;0&amp;lt;1&#34;,&nbsp;a+acute=&amp;aacute;`</span><span class="op" id="8078699">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="8078703">`The&nbsp;special&nbsp;characters&nbsp;are:&nbsp;&lt;,&nbsp;&gt;,&nbsp;&amp;,&nbsp;&#39;&nbsp;and&nbsp;&#34;`</span><span class="op" id="8078749">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="8078752">}</span><br>
+<span class="lineno">110</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="8078755">for</span>&nbsp;<span class="ident" id="8078759">_</span><span class="op" id="8078760">,</span>&nbsp;<span class="ident" id="8078762">s</span>&nbsp;<span class="op" id="8078764">:=</span>&nbsp;<span class="keyword" id="8078767">range</span>&nbsp;<span class="ident" id="8078773">ss</span>&nbsp;<span class="op" id="8078776">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="8078780">if</span>&nbsp;<span class="ident" id="8078783">got</span>&nbsp;<span class="op" id="8078787">:=</span>&nbsp;<span class="ident" id="8078790">UnescapeString</span><span class="op" id="8078804">(</span><span class="ident" id="8078805">EscapeString</span><span class="op" id="8078817">(</span><span class="ident" id="8078818">s</span><span class="op" id="8078819">)</span><span class="op" id="8078820">)</span><span class="op" id="8078821">;</span>&nbsp;<span class="ident" id="8078823">got</span>&nbsp;<span class="op" id="8078827">!=</span>&nbsp;<span class="ident" id="8078830">s</span>&nbsp;<span class="op" id="8078832">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="8078837">t</span><span class="op" id="8078838">.</span><span class="ident" id="8078839">Errorf</span><span class="op" id="8078845">(</span><span class="string" id="8078846">&#34;got&nbsp;%q&nbsp;want&nbsp;%q&#34;</span><span class="op" id="8078862">,</span>&nbsp;<span class="ident" id="8078864">got</span><span class="op" id="8078867">,</span>&nbsp;<span class="ident" id="8078869">s</span><span class="op" id="8078870">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="8078874">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="8078877">}</span><br>
+<span class="lineno">115</span><span class="op" id="8078879">}</span>
+</div>
+</body>
+</html>

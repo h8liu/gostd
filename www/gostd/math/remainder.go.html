@@ -1,0 +1,100 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment" id="1635047">//&nbsp;Copyright&nbsp;2010&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment" id="1635102">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment" id="1635156">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword" id="1635207">package</span>&nbsp;<span class="ident" id="1635215">math</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="1635221">//&nbsp;The&nbsp;original&nbsp;C&nbsp;code&nbsp;and&nbsp;the&nbsp;comment&nbsp;below&nbsp;are&nbsp;from</span><br>
+<span class="lineno"></span><span class="comment" id="1635275">//&nbsp;FreeBSD&#39;s&nbsp;/usr/src/lib/msun/src/e_remainder.c&nbsp;and&nbsp;came</span><br>
+<span class="lineno"></span><span class="comment" id="1635333">//&nbsp;with&nbsp;this&nbsp;notice.&nbsp;&nbsp;The&nbsp;go&nbsp;code&nbsp;is&nbsp;a&nbsp;simplified&nbsp;version&nbsp;of</span><br>
+<span class="lineno">10</span><span class="comment" id="1635394">//&nbsp;the&nbsp;original&nbsp;C.</span><br>
+<span class="lineno"></span><span class="comment" id="1635413">//</span><br>
+<span class="lineno"></span><span class="comment" id="1635416">//&nbsp;====================================================</span><br>
+<span class="lineno"></span><span class="comment" id="1635472">//&nbsp;Copyright&nbsp;(C)&nbsp;1993&nbsp;by&nbsp;Sun&nbsp;Microsystems,&nbsp;Inc.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment" id="1635541">//</span><br>
+<span class="lineno">15</span><span class="comment" id="1635544">//&nbsp;Developed&nbsp;at&nbsp;SunPro,&nbsp;a&nbsp;Sun&nbsp;Microsystems,&nbsp;Inc.&nbsp;business.</span><br>
+<span class="lineno"></span><span class="comment" id="1635603">//&nbsp;Permission&nbsp;to&nbsp;use,&nbsp;copy,&nbsp;modify,&nbsp;and&nbsp;distribute&nbsp;this</span><br>
+<span class="lineno"></span><span class="comment" id="1635659">//&nbsp;software&nbsp;is&nbsp;freely&nbsp;granted,&nbsp;provided&nbsp;that&nbsp;this&nbsp;notice</span><br>
+<span class="lineno"></span><span class="comment" id="1635716">//&nbsp;is&nbsp;preserved.</span><br>
+<span class="lineno"></span><span class="comment" id="1635733">//&nbsp;====================================================</span><br>
+<span class="lineno">20</span><span class="comment" id="1635789">//</span><br>
+<span class="lineno"></span><span class="comment" id="1635792">//&nbsp;__ieee754_remainder(x,y)</span><br>
+<span class="lineno"></span><span class="comment" id="1635820">//&nbsp;Return&nbsp;:</span><br>
+<span class="lineno"></span><span class="comment" id="1635832">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;returns&nbsp;&nbsp;x&nbsp;REM&nbsp;y&nbsp;&nbsp;=&nbsp;&nbsp;x&nbsp;-&nbsp;[x/y]*y&nbsp;&nbsp;as&nbsp;if&nbsp;in&nbsp;infinite</span><br>
+<span class="lineno"></span><span class="comment" id="1635892">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;precision&nbsp;arithmetic,&nbsp;where&nbsp;[x/y]&nbsp;is&nbsp;the&nbsp;(infinite&nbsp;bit)</span><br>
+<span class="lineno">25</span><span class="comment" id="1635956">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;integer&nbsp;nearest&nbsp;x/y&nbsp;(in&nbsp;half&nbsp;way&nbsp;cases,&nbsp;choose&nbsp;the&nbsp;even&nbsp;one).</span><br>
+<span class="lineno"></span><span class="comment" id="1636026">//&nbsp;Method&nbsp;:</span><br>
+<span class="lineno"></span><span class="comment" id="1636038">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Based&nbsp;on&nbsp;Mod()&nbsp;returning&nbsp;&nbsp;x&nbsp;-&nbsp;[x/y]chopped&nbsp;*&nbsp;y&nbsp;&nbsp;exactly.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="1636104">//&nbsp;Remainder&nbsp;returns&nbsp;the&nbsp;IEEE&nbsp;754&nbsp;floating-point&nbsp;remainder&nbsp;of&nbsp;x/y.</span><br>
+<span class="lineno">30</span><span class="comment" id="1636171">//</span><br>
+<span class="lineno"></span><span class="comment" id="1636174">//&nbsp;Special&nbsp;cases&nbsp;are:</span><br>
+<span class="lineno"></span><span class="comment" id="1636196">//&nbsp;&nbsp;&nbsp;&nbspRemainder(±Inf,&nbsp;y)&nbsp;=&nbsp;NaN</span><br>
+<span class="lineno"></span><span class="comment" id="1636225">//&nbsp;&nbsp;&nbsp;&nbspRemainder(NaN,&nbsp;y)&nbsp;=&nbsp;NaN</span><br>
+<span class="lineno"></span><span class="comment" id="1636252">//&nbsp;&nbsp;&nbsp;&nbspRemainder(x,&nbsp;0)&nbsp;=&nbsp;NaN</span><br>
+<span class="lineno">35</span><span class="comment" id="1636277">//&nbsp;&nbsp;&nbsp;&nbspRemainder(x,&nbsp;±Inf)&nbsp;=&nbsp;x</span><br>
+<span class="lineno"></span><span class="comment" id="1636304">//&nbsp;&nbsp;&nbsp;&nbspRemainder(x,&nbsp;NaN)&nbsp;=&nbsp;NaN</span><br>
+<span class="lineno"></span><span class="keyword" id="1636331">func</span>&nbsp;<span class="ident" id="1636336">Remainder</span><span class="op" id="1636345">(</span><span class="ident" id="1636346">x</span><span class="op" id="1636347">,</span>&nbsp;<span class="ident" id="1636349">y</span>&nbsp;<span class="builtintype" id="1636351">float64</span><span class="op" id="1636358">)</span>&nbsp;<span class="builtintype" id="1636360">float64</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="1636369">func</span>&nbsp;<span class="ident" id="1636374">remainder</span><span class="op" id="1636383">(</span><span class="ident" id="1636384">x</span><span class="op" id="1636385">,</span>&nbsp;<span class="ident" id="1636387">y</span>&nbsp;<span class="builtintype" id="1636389">float64</span><span class="op" id="1636396">)</span>&nbsp;<span class="builtintype" id="1636398">float64</span>&nbsp;<span class="op" id="1636406">{</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1636409">const</span>&nbsp;<span class="op" id="1636415">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1636419">Tiny</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="op" id="1636427">=</span>&nbsp;<span class="num" id="1636429">4.45014771701440276618e-308</span>&nbsp;<span class="comment" id="1636457">//&nbsp;0x0020000000000000</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1636481">HalfMax</span>&nbsp;<span class="op" id="1636489">=</span>&nbsp;<span class="ident" id="1636491">MaxFloat64</span>&nbsp;<span class="op" id="1636502">/</span>&nbsp;<span class="num" id="1636504">2</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1636507">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1636510">//&nbsp;special&nbsp;cases</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1636528">switch</span>&nbsp;<span class="op" id="1636535">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1636538">case</span>&nbsp;<span class="ident" id="1636543">IsNaN</span><span class="op" id="1636548">(</span><span class="ident" id="1636549">x</span><span class="op" id="1636550">)</span>&nbsp;<span class="op" id="1636552">||</span>&nbsp;<span class="ident" id="1636555">IsNaN</span><span class="op" id="1636560">(</span><span class="ident" id="1636561">y</span><span class="op" id="1636562">)</span>&nbsp;<span class="op" id="1636564">||</span>&nbsp;<span class="ident" id="1636567">IsInf</span><span class="op" id="1636572">(</span><span class="ident" id="1636573">x</span><span class="op" id="1636574">,</span>&nbsp;<span class="num" id="1636576">0</span><span class="op" id="1636577">)</span>&nbsp;<span class="op" id="1636579">||</span>&nbsp;<span class="ident" id="1636582">y</span>&nbsp;<span class="op" id="1636584">==</span>&nbsp;<span class="num" id="1636587">0</span><span class="op" id="1636588">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1636592">return</span>&nbsp;<span class="ident" id="1636599">NaN</span><span class="op" id="1636602">(</span><span class="op" id="1636603">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1636606">case</span>&nbsp;<span class="ident" id="1636611">IsInf</span><span class="op" id="1636616">(</span><span class="ident" id="1636617">y</span><span class="op" id="1636618">,</span>&nbsp;<span class="num" id="1636620">0</span><span class="op" id="1636621">)</span><span class="op" id="1636622">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1636626">return</span>&nbsp;<span class="ident" id="1636633">x</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1636636">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1636639">sign</span>&nbsp;<span class="op" id="1636644">:=</span>&nbsp;<span class="builtintype" id="1636647">false</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1636654">if</span>&nbsp;<span class="ident" id="1636657">x</span>&nbsp;<span class="op" id="1636659">&lt;</span>&nbsp;<span class="num" id="1636661">0</span>&nbsp;<span class="op" id="1636663">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1636667">x</span>&nbsp;<span class="op" id="1636669">=</span>&nbsp;<span class="op" id="1636671">-</span><span class="ident" id="1636672">x</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1636676">sign</span>&nbsp;<span class="op" id="1636681">=</span>&nbsp;<span class="builtintype" id="1636683">true</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1636689">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1636692">if</span>&nbsp;<span class="ident" id="1636695">y</span>&nbsp;<span class="op" id="1636697">&lt;</span>&nbsp;<span class="num" id="1636699">0</span>&nbsp;<span class="op" id="1636701">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1636705">y</span>&nbsp;<span class="op" id="1636707">=</span>&nbsp;<span class="op" id="1636709">-</span><span class="ident" id="1636710">y</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1636713">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1636716">if</span>&nbsp;<span class="ident" id="1636719">x</span>&nbsp;<span class="op" id="1636721">==</span>&nbsp;<span class="ident" id="1636724">y</span>&nbsp;<span class="op" id="1636726">{</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1636730">return</span>&nbsp;<span class="num" id="1636737">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1636740">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1636743">if</span>&nbsp;<span class="ident" id="1636746">y</span>&nbsp;<span class="op" id="1636748">&lt;=</span>&nbsp;<span class="ident" id="1636751">HalfMax</span>&nbsp;<span class="op" id="1636759">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1636763">x</span>&nbsp;<span class="op" id="1636765">=</span>&nbsp;<span class="ident" id="1636767">Mod</span><span class="op" id="1636770">(</span><span class="ident" id="1636771">x</span><span class="op" id="1636772">,</span>&nbsp;<span class="ident" id="1636774">y</span><span class="op" id="1636775">+</span><span class="ident" id="1636776">y</span><span class="op" id="1636777">)</span>&nbsp;<span class="comment" id="1636779">//&nbsp;now&nbsp;x&nbsp;&lt;&nbsp;2y</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1636794">}</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1636797">if</span>&nbsp;<span class="ident" id="1636800">y</span>&nbsp;<span class="op" id="1636802">&lt;</span>&nbsp;<span class="ident" id="1636804">Tiny</span>&nbsp;<span class="op" id="1636809">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1636813">if</span>&nbsp;<span class="ident" id="1636816">x</span><span class="op" id="1636817">+</span><span class="ident" id="1636818">x</span>&nbsp;<span class="op" id="1636820">&gt;</span>&nbsp;<span class="ident" id="1636822">y</span>&nbsp;<span class="op" id="1636824">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1636829">x</span>&nbsp;<span class="op" id="1636831">-=</span>&nbsp;<span class="ident" id="1636834">y</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1636839">if</span>&nbsp;<span class="ident" id="1636842">x</span><span class="op" id="1636843">+</span><span class="ident" id="1636844">x</span>&nbsp;<span class="op" id="1636846">&gt;=</span>&nbsp;<span class="ident" id="1636849">y</span>&nbsp;<span class="op" id="1636851">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1636857">x</span>&nbsp;<span class="op" id="1636859">-=</span>&nbsp;<span class="ident" id="1636862">y</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1636867">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1636871">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1636874">}</span>&nbsp;<span class="keyword" id="1636876">else</span>&nbsp;<span class="op" id="1636881">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1636885">yHalf</span>&nbsp;<span class="op" id="1636891">:=</span>&nbsp;<span class="num" id="1636894">0.5</span>&nbsp;<span class="op" id="1636898">*</span>&nbsp;<span class="ident" id="1636900">y</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1636904">if</span>&nbsp;<span class="ident" id="1636907">x</span>&nbsp;<span class="op" id="1636909">&gt;</span>&nbsp;<span class="ident" id="1636911">yHalf</span>&nbsp;<span class="op" id="1636917">{</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1636922">x</span>&nbsp;<span class="op" id="1636924">-=</span>&nbsp;<span class="ident" id="1636927">y</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1636932">if</span>&nbsp;<span class="ident" id="1636935">x</span>&nbsp;<span class="op" id="1636937">&gt;=</span>&nbsp;<span class="ident" id="1636940">yHalf</span>&nbsp;<span class="op" id="1636946">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1636952">x</span>&nbsp;<span class="op" id="1636954">-=</span>&nbsp;<span class="ident" id="1636957">y</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1636962">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1636966">}</span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1636969">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1636972">if</span>&nbsp;<span class="ident" id="1636975">sign</span>&nbsp;<span class="op" id="1636980">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1636984">x</span>&nbsp;<span class="op" id="1636986">=</span>&nbsp;<span class="op" id="1636988">-</span><span class="ident" id="1636989">x</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1636992">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1636995">return</span>&nbsp;<span class="ident" id="1637002">x</span><br>
+<span class="lineno">85</span><span class="op" id="1637004">}</span>
+</div>
+</body>
+</html>

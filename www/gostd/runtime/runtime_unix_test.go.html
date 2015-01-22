@@ -1,0 +1,71 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment" id="960809">//&nbsp;Copyright&nbsp;2013&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment" id="960865">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment" id="960919">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="comment" id="960970">//&nbsp;Only&nbsp;works&nbsp;on&nbsp;systems&nbsp;with&nbsp;syscall.Close.</span><br>
+<span class="lineno"></span><span class="comment" id="961015">//&nbsp;We&nbsp;need&nbsp;a&nbsp;fast&nbsp;system&nbsp;call&nbsp;to&nbsp;provoke&nbsp;the&nbsp;race,</span><br>
+<span class="lineno"></span><span class="comment" id="961066">//&nbsp;and&nbsp;Close(-1)&nbsp;is&nbsp;nearly&nbsp;universally&nbsp;fast.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="961112">//&nbsp;+build&nbsp;darwin&nbsp;dragonfly&nbsp;freebsd&nbsp;linux&nbsp;netbsd&nbsp;openbsd&nbsp;plan9</span><br>
+<span class="lineno">10</span><br>
+<span class="lineno"></span><span class="keyword" id="961175">package</span>&nbsp;<span class="ident" id="961183">runtime_test</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="961197">import</span>&nbsp;<span class="op" id="961204">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="961207">&#34;runtime&#34;</span><br>
+<span class="lineno">15</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="961218">&#34;sync&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="961226">&#34;sync/atomic&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="961241">&#34;syscall&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="961252">&#34;testing&#34;</span><br>
+<span class="lineno"></span><span class="op" id="961262">)</span><br>
+<span class="lineno">20</span><br>
+<span class="lineno"></span><span class="keyword" id="961265">func</span>&nbsp;<span class="ident" id="961270">TestGoroutineProfile</span><span class="op" id="961290">(</span><span class="ident" id="961291">t</span>&nbsp;<span class="op" id="961293">*</span><span class="ident" id="961294">testing</span><span class="op" id="961301">.</span><span class="ident" id="961302">T</span><span class="op" id="961303">)</span>&nbsp;<span class="op" id="961305">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="961308">//&nbsp;GoroutineProfile&nbsp;used&nbsp;to&nbsp;use&nbsp;the&nbsp;wrong&nbsp;starting&nbsp;sp&nbsp;for</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="961367">//&nbsp;goroutines&nbsp;coming&nbsp;out&nbsp;of&nbsp;system&nbsp;calls,&nbsp;causing&nbsp;possible</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="961427">//&nbsp;crashes.</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="961440">defer</span>&nbsp;<span class="ident" id="961446">runtime</span><span class="op" id="961453">.</span><span class="ident" id="961454">GOMAXPROCS</span><span class="op" id="961464">(</span><span class="ident" id="961465">runtime</span><span class="op" id="961472">.</span><span class="ident" id="961473">GOMAXPROCS</span><span class="op" id="961483">(</span><span class="num" id="961484">100</span><span class="op" id="961487">)</span><span class="op" id="961488">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="961492">var</span>&nbsp;<span class="ident" id="961496">stop</span>&nbsp;<span class="builtintype" id="961501">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="961509">defer</span>&nbsp;<span class="ident" id="961515">atomic</span><span class="op" id="961521">.</span><span class="ident" id="961522">StoreUint32</span><span class="op" id="961533">(</span><span class="op" id="961534">&amp;</span><span class="ident" id="961535">stop</span><span class="op" id="961539">,</span>&nbsp;<span class="num" id="961541">1</span><span class="op" id="961542">)</span>&nbsp;<span class="comment" id="961544">//&nbsp;in&nbsp;case&nbsp;of&nbsp;panic</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="961566">var</span>&nbsp;<span class="ident" id="961570">wg</span>&nbsp;<span class="ident" id="961573">sync</span><span class="op" id="961577">.</span><span class="ident" id="961578">WaitGroup</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="961589">for</span>&nbsp;<span class="ident" id="961593">i</span>&nbsp;<span class="op" id="961595">:=</span>&nbsp;<span class="num" id="961598">0</span><span class="op" id="961599">;</span>&nbsp;<span class="ident" id="961601">i</span>&nbsp;<span class="op" id="961603">&lt;</span>&nbsp;<span class="num" id="961605">4</span><span class="op" id="961606">;</span>&nbsp;<span class="ident" id="961608">i</span><span class="op" id="961609">++</span>&nbsp;<span class="op" id="961612">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="961616">wg</span><span class="op" id="961618">.</span><span class="ident" id="961619">Add</span><span class="op" id="961622">(</span><span class="num" id="961623">1</span><span class="op" id="961624">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="961628">go</span>&nbsp;<span class="keyword" id="961631">func</span><span class="op" id="961635">(</span><span class="op" id="961636">)</span>&nbsp;<span class="op" id="961638">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="961643">for</span>&nbsp;<span class="ident" id="961647">atomic</span><span class="op" id="961653">.</span><span class="ident" id="961654">LoadUint32</span><span class="op" id="961664">(</span><span class="op" id="961665">&amp;</span><span class="ident" id="961666">stop</span><span class="op" id="961670">)</span>&nbsp;<span class="op" id="961672">==</span>&nbsp;<span class="num" id="961675">0</span>&nbsp;<span class="op" id="961677">{</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="961683">syscall</span><span class="op" id="961690">.</span><span class="ident" id="961691">Close</span><span class="op" id="961696">(</span><span class="op" id="961697">-</span><span class="num" id="961698">1</span><span class="op" id="961699">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="961704">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="961709">wg</span><span class="op" id="961711">.</span><span class="ident" id="961712">Done</span><span class="op" id="961716">(</span><span class="op" id="961717">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="961721">}</span><span class="op" id="961722">(</span><span class="op" id="961723">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="961726">}</span><br>
+<span class="lineno">40</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="961730">max</span>&nbsp;<span class="op" id="961734">:=</span>&nbsp;<span class="num" id="961737">10000</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="961744">if</span>&nbsp;<span class="ident" id="961747">testing</span><span class="op" id="961754">.</span><span class="ident" id="961755">Short</span><span class="op" id="961760">(</span><span class="op" id="961761">)</span>&nbsp;<span class="op" id="961763">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="961767">max</span>&nbsp;<span class="op" id="961771">=</span>&nbsp;<span class="num" id="961773">100</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="961778">}</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="961781">stk</span>&nbsp;<span class="op" id="961785">:=</span>&nbsp;<span class="builtinfunc" id="961788">make</span><span class="op" id="961792">(</span><span class="op" id="961793">[</span><span class="op" id="961794">]</span><span class="ident" id="961795">runtime</span><span class="op" id="961802">.</span><span class="ident" id="961803">StackRecord</span><span class="op" id="961814">,</span>&nbsp;<span class="num" id="961816">100</span><span class="op" id="961819">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="961822">for</span>&nbsp;<span class="ident" id="961826">n</span>&nbsp;<span class="op" id="961828">:=</span>&nbsp;<span class="num" id="961831">0</span><span class="op" id="961832">;</span>&nbsp;<span class="ident" id="961834">n</span>&nbsp;<span class="op" id="961836">&lt;</span>&nbsp;<span class="ident" id="961838">max</span><span class="op" id="961841">;</span>&nbsp;<span class="ident" id="961843">n</span><span class="op" id="961844">++</span>&nbsp;<span class="op" id="961847">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="961851">_</span><span class="op" id="961852">,</span>&nbsp;<span class="ident" id="961854">ok</span>&nbsp;<span class="op" id="961857">:=</span>&nbsp;<span class="ident" id="961860">runtime</span><span class="op" id="961867">.</span><span class="ident" id="961868">GoroutineProfile</span><span class="op" id="961884">(</span><span class="ident" id="961885">stk</span><span class="op" id="961888">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="961892">if</span>&nbsp;<span class="op" id="961895">!</span><span class="ident" id="961896">ok</span>&nbsp;<span class="op" id="961899">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="961904">t</span><span class="op" id="961905">.</span><span class="ident" id="961906">Fatalf</span><span class="op" id="961912">(</span><span class="string" id="961913">&#34;GoroutineProfile&nbsp;failed&#34;</span><span class="op" id="961938">)</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="961942">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="961945">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="961949">//&nbsp;If&nbsp;the&nbsp;program&nbsp;didn&#39;t&nbsp;crash,&nbsp;we&nbsp;passed.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="961993">atomic</span><span class="op" id="961999">.</span><span class="ident" id="962000">StoreUint32</span><span class="op" id="962011">(</span><span class="op" id="962012">&amp;</span><span class="ident" id="962013">stop</span><span class="op" id="962017">,</span>&nbsp;<span class="num" id="962019">1</span><span class="op" id="962020">)</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="962023">wg</span><span class="op" id="962025">.</span><span class="ident" id="962026">Wait</span><span class="op" id="962030">(</span><span class="op" id="962031">)</span><br>
+<span class="lineno"></span><span class="op" id="962033">}</span>
+</div>
+</body>
+</html>

@@ -1,0 +1,133 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment" id="1773277">//&nbsp;Copyright&nbsp;2011&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment" id="1773332">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment" id="1773386">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword" id="1773437">package</span>&nbsp;<span class="ident" id="1773445">sync</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="1773451">import</span>&nbsp;<span class="op" id="1773458">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="1773461">&#34;sync/atomic&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="1773476">&#34;unsafe&#34;</span><br>
+<span class="lineno">10</span><span class="op" id="1773485">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="1773488">//&nbsp;Cond&nbsp;implements&nbsp;a&nbsp;condition&nbsp;variable,&nbsp;a&nbsp;rendezvous&nbsp;point</span><br>
+<span class="lineno"></span><span class="comment" id="1773548">//&nbsp;for&nbsp;goroutines&nbsp;waiting&nbsp;for&nbsp;or&nbsp;announcing&nbsp;the&nbsp;occurrence</span><br>
+<span class="lineno"></span><span class="comment" id="1773607">//&nbsp;of&nbsp;an&nbsp;event.</span><br>
+<span class="lineno">15</span><span class="comment" id="1773623">//</span><br>
+<span class="lineno"></span><span class="comment" id="1773626">//&nbsp;Each&nbsp;Cond&nbsp;has&nbsp;an&nbsp;associated&nbsp;Locker&nbsp;L&nbsp;(often&nbsp;a&nbsp;*Mutex&nbsp;or&nbsp;*RWMutex),</span><br>
+<span class="lineno"></span><span class="comment" id="1773696">//&nbsp;which&nbsp;must&nbsp;be&nbsp;held&nbsp;when&nbsp;changing&nbsp;the&nbsp;condition&nbsp;and</span><br>
+<span class="lineno"></span><span class="comment" id="1773750">//&nbsp;when&nbsp;calling&nbsp;the&nbsp;Wait&nbsp;method.</span><br>
+<span class="lineno"></span><span class="comment" id="1773783">//</span><br>
+<span class="lineno">20</span><span class="comment" id="1773786">//&nbsp;A&nbsp;Cond&nbsp;can&nbsp;be&nbsp;created&nbsp;as&nbsp;part&nbsp;of&nbsp;other&nbsp;structures.</span><br>
+<span class="lineno"></span><span class="comment" id="1773840">//&nbsp;A&nbsp;Cond&nbsp;must&nbsp;not&nbsp;be&nbsp;copied&nbsp;after&nbsp;first&nbsp;use.</span><br>
+<span class="lineno"></span><span class="keyword" id="1773886">type</span>&nbsp;<span class="ident" id="1773891">Cond</span>&nbsp;<span class="keyword" id="1773896">struct</span>&nbsp;<span class="op" id="1773903">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1773906">//&nbsp;L&nbsp;is&nbsp;held&nbsp;while&nbsp;observing&nbsp;or&nbsp;changing&nbsp;the&nbsp;condition</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1773962">L</span>&nbsp;<span class="ident" id="1773964">Locker</span><br>
+<span class="lineno">25</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1773973">sema</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="1773981">syncSema</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1773991">waiters</span>&nbsp;<span class="builtintype" id="1773999">uint32</span>&nbsp;<span class="comment" id="1774006">//&nbsp;number&nbsp;of&nbsp;waiters</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1774028">checker</span>&nbsp;<span class="ident" id="1774036">copyChecker</span><br>
+<span class="lineno"></span><span class="op" id="1774048">}</span><br>
+<span class="lineno">30</span><br>
+<span class="lineno"></span><span class="comment" id="1774051">//&nbsp;NewCond&nbsp;returns&nbsp;a&nbsp;new&nbsp;Cond&nbsp;with&nbsp;Locker&nbsp;l.</span><br>
+<span class="lineno"></span><span class="keyword" id="1774096">func</span>&nbsp;<span class="ident" id="1774101">NewCond</span><span class="op" id="1774108">(</span><span class="ident" id="1774109">l</span>&nbsp;<span class="ident" id="1774111">Locker</span><span class="op" id="1774117">)</span>&nbsp;<span class="op" id="1774119">*</span><span class="ident" id="1774120">Cond</span>&nbsp;<span class="op" id="1774125">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1774128">return</span>&nbsp;<span class="op" id="1774135">&amp;</span><span class="ident" id="1774136">Cond</span><span class="op" id="1774140">{</span><span class="ident" id="1774141">L</span><span class="op" id="1774142">:</span>&nbsp;<span class="ident" id="1774144">l</span><span class="op" id="1774145">}</span><br>
+<span class="lineno"></span><span class="op" id="1774147">}</span><br>
+<span class="lineno">35</span><br>
+<span class="lineno"></span><span class="comment" id="1774150">//&nbsp;Wait&nbsp;atomically&nbsp;unlocks&nbsp;c.L&nbsp;and&nbsp;suspends&nbsp;execution</span><br>
+<span class="lineno"></span><span class="comment" id="1774204">//&nbsp;of&nbsp;the&nbsp;calling&nbsp;goroutine.&nbsp;&nbsp;After&nbsp;later&nbsp;resuming&nbsp;execution,</span><br>
+<span class="lineno"></span><span class="comment" id="1774266">//&nbsp;Wait&nbsp;locks&nbsp;c.L&nbsp;before&nbsp;returning.&nbsp;&nbsp;Unlike&nbsp;in&nbsp;other&nbsp;systems,</span><br>
+<span class="lineno"></span><span class="comment" id="1774328">//&nbsp;Wait&nbsp;cannot&nbsp;return&nbsp;unless&nbsp;awoken&nbsp;by&nbsp;Broadcast&nbsp;or&nbsp;Signal.</span><br>
+<span class="lineno">40</span><span class="comment" id="1774388">//</span><br>
+<span class="lineno"></span><span class="comment" id="1774391">//&nbsp;Because&nbsp;c.L&nbsp;is&nbsp;not&nbsp;locked&nbsp;when&nbsp;Wait&nbsp;first&nbsp;resumes,&nbsp;the&nbsp;caller</span><br>
+<span class="lineno"></span><span class="comment" id="1774456">//&nbsp;typically&nbsp;cannot&nbsp;assume&nbsp;that&nbsp;the&nbsp;condition&nbsp;is&nbsp;true&nbsp;when</span><br>
+<span class="lineno"></span><span class="comment" id="1774515">//&nbsp;Wait&nbsp;returns.&nbsp;&nbsp;Instead,&nbsp;the&nbsp;caller&nbsp;should&nbsp;Wait&nbsp;in&nbsp;a&nbsp;loop:</span><br>
+<span class="lineno"></span><span class="comment" id="1774576">//</span><br>
+<span class="lineno">45</span><span class="comment" id="1774579">//&nbsp;&nbsp;&nbsp;&nbsp;c.L.Lock()</span><br>
+<span class="lineno"></span><span class="comment" id="1774596">//&nbsp;&nbsp;&nbsp;&nbsp;for&nbsp;!condition()&nbsp;{</span><br>
+<span class="lineno"></span><span class="comment" id="1774621">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;c.Wait()</span><br>
+<span class="lineno"></span><span class="comment" id="1774640">//&nbsp;&nbsp;&nbsp;&nbsp;}</span><br>
+<span class="lineno"></span><span class="comment" id="1774648">//&nbsp;&nbsp;&nbsp;&nbsp;...&nbsp;make&nbsp;use&nbsp;of&nbsp;condition&nbsp;...</span><br>
+<span class="lineno">50</span><span class="comment" id="1774684">//&nbsp;&nbsp;&nbsp;&nbsp;c.L.Unlock()</span><br>
+<span class="lineno"></span><span class="comment" id="1774703">//</span><br>
+<span class="lineno"></span><span class="keyword" id="1774706">func</span>&nbsp;<span class="op" id="1774711">(</span><span class="ident" id="1774712">c</span>&nbsp;<span class="op" id="1774714">*</span><span class="ident" id="1774715">Cond</span><span class="op" id="1774719">)</span>&nbsp;<span class="ident" id="1774721">Wait</span><span class="op" id="1774725">(</span><span class="op" id="1774726">)</span>&nbsp;<span class="op" id="1774728">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1774731">c</span><span class="op" id="1774732">.</span><span class="ident" id="1774733">checker</span><span class="op" id="1774740">.</span><span class="ident" id="1774741">check</span><span class="op" id="1774746">(</span><span class="op" id="1774747">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1774750">if</span>&nbsp;<span class="ident" id="1774753">raceenabled</span>&nbsp;<span class="op" id="1774765">{</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1774769">raceDisable</span><span class="op" id="1774780">(</span><span class="op" id="1774781">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1774784">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1774787">atomic</span><span class="op" id="1774793">.</span><span class="ident" id="1774794">AddUint32</span><span class="op" id="1774803">(</span><span class="op" id="1774804">&amp;</span><span class="ident" id="1774805">c</span><span class="op" id="1774806">.</span><span class="ident" id="1774807">waiters</span><span class="op" id="1774814">,</span>&nbsp;<span class="num" id="1774816">1</span><span class="op" id="1774817">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1774820">if</span>&nbsp;<span class="ident" id="1774823">raceenabled</span>&nbsp;<span class="op" id="1774835">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1774839">raceEnable</span><span class="op" id="1774849">(</span><span class="op" id="1774850">)</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1774853">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1774856">c</span><span class="op" id="1774857">.</span><span class="ident" id="1774858">L</span><span class="op" id="1774859">.</span><span class="ident" id="1774860">Unlock</span><span class="op" id="1774866">(</span><span class="op" id="1774867">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1774870">runtime_Syncsemacquire</span><span class="op" id="1774892">(</span><span class="op" id="1774893">&amp;</span><span class="ident" id="1774894">c</span><span class="op" id="1774895">.</span><span class="ident" id="1774896">sema</span><span class="op" id="1774900">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1774903">c</span><span class="op" id="1774904">.</span><span class="ident" id="1774905">L</span><span class="op" id="1774906">.</span><span class="ident" id="1774907">Lock</span><span class="op" id="1774911">(</span><span class="op" id="1774912">)</span><br>
+<span class="lineno"></span><span class="op" id="1774914">}</span><br>
+<span class="lineno">65</span><br>
+<span class="lineno"></span><span class="comment" id="1774917">//&nbsp;Signal&nbsp;wakes&nbsp;one&nbsp;goroutine&nbsp;waiting&nbsp;on&nbsp;c,&nbsp;if&nbsp;there&nbsp;is&nbsp;any.</span><br>
+<span class="lineno"></span><span class="comment" id="1774978">//</span><br>
+<span class="lineno"></span><span class="comment" id="1774981">//&nbsp;It&nbsp;is&nbsp;allowed&nbsp;but&nbsp;not&nbsp;required&nbsp;for&nbsp;the&nbsp;caller&nbsp;to&nbsp;hold&nbsp;c.L</span><br>
+<span class="lineno"></span><span class="comment" id="1775042">//&nbsp;during&nbsp;the&nbsp;call.</span><br>
+<span class="lineno">70</span><span class="keyword" id="1775062">func</span>&nbsp;<span class="op" id="1775067">(</span><span class="ident" id="1775068">c</span>&nbsp;<span class="op" id="1775070">*</span><span class="ident" id="1775071">Cond</span><span class="op" id="1775075">)</span>&nbsp;<span class="ident" id="1775077">Signal</span><span class="op" id="1775083">(</span><span class="op" id="1775084">)</span>&nbsp;<span class="op" id="1775086">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1775089">c</span><span class="op" id="1775090">.</span><span class="ident" id="1775091">signalImpl</span><span class="op" id="1775101">(</span><span class="builtintype" id="1775102">false</span><span class="op" id="1775107">)</span><br>
+<span class="lineno"></span><span class="op" id="1775109">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="1775112">//&nbsp;Broadcast&nbsp;wakes&nbsp;all&nbsp;goroutines&nbsp;waiting&nbsp;on&nbsp;c.</span><br>
+<span class="lineno">75</span><span class="comment" id="1775160">//</span><br>
+<span class="lineno"></span><span class="comment" id="1775163">//&nbsp;It&nbsp;is&nbsp;allowed&nbsp;but&nbsp;not&nbsp;required&nbsp;for&nbsp;the&nbsp;caller&nbsp;to&nbsp;hold&nbsp;c.L</span><br>
+<span class="lineno"></span><span class="comment" id="1775224">//&nbsp;during&nbsp;the&nbsp;call.</span><br>
+<span class="lineno"></span><span class="keyword" id="1775244">func</span>&nbsp;<span class="op" id="1775249">(</span><span class="ident" id="1775250">c</span>&nbsp;<span class="op" id="1775252">*</span><span class="ident" id="1775253">Cond</span><span class="op" id="1775257">)</span>&nbsp;<span class="ident" id="1775259">Broadcast</span><span class="op" id="1775268">(</span><span class="op" id="1775269">)</span>&nbsp;<span class="op" id="1775271">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1775274">c</span><span class="op" id="1775275">.</span><span class="ident" id="1775276">signalImpl</span><span class="op" id="1775286">(</span><span class="builtintype" id="1775287">true</span><span class="op" id="1775291">)</span><br>
+<span class="lineno">80</span><span class="op" id="1775293">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="1775296">func</span>&nbsp;<span class="op" id="1775301">(</span><span class="ident" id="1775302">c</span>&nbsp;<span class="op" id="1775304">*</span><span class="ident" id="1775305">Cond</span><span class="op" id="1775309">)</span>&nbsp;<span class="ident" id="1775311">signalImpl</span><span class="op" id="1775321">(</span><span class="ident" id="1775322">all</span>&nbsp;<span class="builtintype" id="1775326">bool</span><span class="op" id="1775330">)</span>&nbsp;<span class="op" id="1775332">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1775335">c</span><span class="op" id="1775336">.</span><span class="ident" id="1775337">checker</span><span class="op" id="1775344">.</span><span class="ident" id="1775345">check</span><span class="op" id="1775350">(</span><span class="op" id="1775351">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1775354">if</span>&nbsp;<span class="ident" id="1775357">raceenabled</span>&nbsp;<span class="op" id="1775369">{</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1775373">raceDisable</span><span class="op" id="1775384">(</span><span class="op" id="1775385">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1775388">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1775391">for</span>&nbsp;<span class="op" id="1775395">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1775399">old</span>&nbsp;<span class="op" id="1775403">:=</span>&nbsp;<span class="ident" id="1775406">atomic</span><span class="op" id="1775412">.</span><span class="ident" id="1775413">LoadUint32</span><span class="op" id="1775423">(</span><span class="op" id="1775424">&amp;</span><span class="ident" id="1775425">c</span><span class="op" id="1775426">.</span><span class="ident" id="1775427">waiters</span><span class="op" id="1775434">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1775438">if</span>&nbsp;<span class="ident" id="1775441">old</span>&nbsp;<span class="op" id="1775445">==</span>&nbsp;<span class="num" id="1775448">0</span>&nbsp;<span class="op" id="1775450">{</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1775455">if</span>&nbsp;<span class="ident" id="1775458">raceenabled</span>&nbsp;<span class="op" id="1775470">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1775476">raceEnable</span><span class="op" id="1775486">(</span><span class="op" id="1775487">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1775492">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1775497">return</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1775506">}</span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc" id="1775510">new</span>&nbsp;<span class="op" id="1775514">:=</span>&nbsp;<span class="ident" id="1775517">old</span>&nbsp;<span class="op" id="1775521">-</span>&nbsp;<span class="num" id="1775523">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1775527">if</span>&nbsp;<span class="ident" id="1775530">all</span>&nbsp;<span class="op" id="1775534">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc" id="1775539">new</span>&nbsp;<span class="op" id="1775543">=</span>&nbsp;<span class="num" id="1775545">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1775549">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1775553">if</span>&nbsp;<span class="ident" id="1775556">atomic</span><span class="op" id="1775562">.</span><span class="ident" id="1775563">CompareAndSwapUint32</span><span class="op" id="1775583">(</span><span class="op" id="1775584">&amp;</span><span class="ident" id="1775585">c</span><span class="op" id="1775586">.</span><span class="ident" id="1775587">waiters</span><span class="op" id="1775594">,</span>&nbsp;<span class="ident" id="1775596">old</span><span class="op" id="1775599">,</span>&nbsp;<span class="builtinfunc" id="1775601">new</span><span class="op" id="1775604">)</span>&nbsp;<span class="op" id="1775606">{</span><br>
+<span class="lineno">100</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1775611">if</span>&nbsp;<span class="ident" id="1775614">raceenabled</span>&nbsp;<span class="op" id="1775626">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1775632">raceEnable</span><span class="op" id="1775642">(</span><span class="op" id="1775643">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1775648">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1775653">runtime_Syncsemrelease</span><span class="op" id="1775675">(</span><span class="op" id="1775676">&amp;</span><span class="ident" id="1775677">c</span><span class="op" id="1775678">.</span><span class="ident" id="1775679">sema</span><span class="op" id="1775683">,</span>&nbsp;<span class="ident" id="1775685">old</span><span class="op" id="1775688">-</span><span class="builtinfunc" id="1775689">new</span><span class="op" id="1775692">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1775697">return</span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1775706">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1775709">}</span><br>
+<span class="lineno"></span><span class="op" id="1775711">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="1775714">//&nbsp;copyChecker&nbsp;holds&nbsp;back&nbsp;pointer&nbsp;to&nbsp;itself&nbsp;to&nbsp;detect&nbsp;object&nbsp;copying.</span><br>
+<span class="lineno">110</span><span class="keyword" id="1775784">type</span>&nbsp;<span class="ident" id="1775789">copyChecker</span>&nbsp;<span class="builtintype" id="1775801">uintptr</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="1775810">func</span>&nbsp;<span class="op" id="1775815">(</span><span class="ident" id="1775816">c</span>&nbsp;<span class="op" id="1775818">*</span><span class="ident" id="1775819">copyChecker</span><span class="op" id="1775830">)</span>&nbsp;<span class="ident" id="1775832">check</span><span class="op" id="1775837">(</span><span class="op" id="1775838">)</span>&nbsp;<span class="op" id="1775840">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1775843">if</span>&nbsp;<span class="builtintype" id="1775846">uintptr</span><span class="op" id="1775853">(</span><span class="op" id="1775854">*</span><span class="ident" id="1775855">c</span><span class="op" id="1775856">)</span>&nbsp;<span class="op" id="1775858">!=</span>&nbsp;<span class="builtintype" id="1775861">uintptr</span><span class="op" id="1775868">(</span><span class="ident" id="1775869">unsafe</span><span class="op" id="1775875">.</span><span class="ident" id="1775876">Pointer</span><span class="op" id="1775883">(</span><span class="ident" id="1775884">c</span><span class="op" id="1775885">)</span><span class="op" id="1775886">)</span>&nbsp;<span class="op" id="1775888">&amp;&amp;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1775893">!</span><span class="ident" id="1775894">atomic</span><span class="op" id="1775900">.</span><span class="ident" id="1775901">CompareAndSwapUintptr</span><span class="op" id="1775922">(</span><span class="op" id="1775923">(</span><span class="op" id="1775924">*</span><span class="builtintype" id="1775925">uintptr</span><span class="op" id="1775932">)</span><span class="op" id="1775933">(</span><span class="ident" id="1775934">c</span><span class="op" id="1775935">)</span><span class="op" id="1775936">,</span>&nbsp;<span class="num" id="1775938">0</span><span class="op" id="1775939">,</span>&nbsp;<span class="builtintype" id="1775941">uintptr</span><span class="op" id="1775948">(</span><span class="ident" id="1775949">unsafe</span><span class="op" id="1775955">.</span><span class="ident" id="1775956">Pointer</span><span class="op" id="1775963">(</span><span class="ident" id="1775964">c</span><span class="op" id="1775965">)</span><span class="op" id="1775966">)</span><span class="op" id="1775967">)</span>&nbsp;<span class="op" id="1775969">&amp;&amp;</span><br>
+<span class="lineno">115</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtintype" id="1775974">uintptr</span><span class="op" id="1775981">(</span><span class="op" id="1775982">*</span><span class="ident" id="1775983">c</span><span class="op" id="1775984">)</span>&nbsp;<span class="op" id="1775986">!=</span>&nbsp;<span class="builtintype" id="1775989">uintptr</span><span class="op" id="1775996">(</span><span class="ident" id="1775997">unsafe</span><span class="op" id="1776003">.</span><span class="ident" id="1776004">Pointer</span><span class="op" id="1776011">(</span><span class="ident" id="1776012">c</span><span class="op" id="1776013">)</span><span class="op" id="1776014">)</span>&nbsp;<span class="op" id="1776016">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc" id="1776020">panic</span><span class="op" id="1776025">(</span><span class="string" id="1776026">&#34;sync.Cond&nbsp;is&nbsp;copied&#34;</span><span class="op" id="1776047">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1776050">}</span><br>
+<span class="lineno"></span><span class="op" id="1776052">}</span>
+</div>
+</body>
+</html>

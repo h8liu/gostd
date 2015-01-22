@@ -1,0 +1,132 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment" id="3537926">//&nbsp;Copyright&nbsp;2010&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment" id="3537982">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment" id="3538036">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword" id="3538087">package</span>&nbsp;<span class="ident" id="3538095">textproto</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="3538106">import</span>&nbsp;<span class="op" id="3538113">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="3538116">&#34;sync&#34;</span><br>
+<span class="lineno"></span><span class="op" id="3538123">)</span><br>
+<span class="lineno">10</span><br>
+<span class="lineno"></span><span class="comment" id="3538126">//&nbsp;A&nbsp;Pipeline&nbsp;manages&nbsp;a&nbsp;pipelined&nbsp;in-order&nbsp;request/response&nbsp;sequence.</span><br>
+<span class="lineno"></span><span class="comment" id="3538196">//</span><br>
+<span class="lineno"></span><span class="comment" id="3538199">//&nbsp;To&nbsp;use&nbsp;a&nbsp;Pipeline&nbsp;p&nbsp;to&nbsp;manage&nbsp;multiple&nbsp;clients&nbsp;on&nbsp;a&nbsp;connection,</span><br>
+<span class="lineno"></span><span class="comment" id="3538266">//&nbsp;each&nbsp;client&nbsp;should&nbsp;run:</span><br>
+<span class="lineno">15</span><span class="comment" id="3538293">//</span><br>
+<span class="lineno"></span><span class="comment" id="3538296">//&nbsp;&nbsp;&nbsp;&nbspid&nbsp;:=&nbsp;p.Next()&nbsp;&nbsp;&nbsp;&nbsp//&nbsp;take&nbsp;a&nbsp;number</span><br>
+<span class="lineno"></span><span class="comment" id="3538331">//</span><br>
+<span class="lineno"></span><span class="comment" id="3538334">//&nbsp;&nbsp;&nbsp;&nbspp.StartRequest(id)&nbsp;&nbsp;&nbsp;&nbsp//&nbsp;wait&nbsp;for&nbsp;turn&nbsp;to&nbsp;send&nbsp;request</span><br>
+<span class="lineno"></span><span class="comment" id="3538389">//&nbsp;&nbsp;&nbsp;&nbsp«send&nbsp;request»</span><br>
+<span class="lineno">20</span><span class="comment" id="3538409">//&nbsp;&nbsp;&nbsp;&nbspp.EndRequest(id)&nbsp;&nbsp;&nbsp;&nbsp//&nbsp;notify&nbsp;Pipeline&nbsp;that&nbsp;request&nbsp;is&nbsp;sent</span><br>
+<span class="lineno"></span><span class="comment" id="3538469">//</span><br>
+<span class="lineno"></span><span class="comment" id="3538472">//&nbsp;&nbsp;&nbsp;&nbspp.StartResponse(id)&nbsp;&nbsp;&nbsp;&nbsp//&nbsp;wait&nbsp;for&nbsp;turn&nbsp;to&nbsp;read&nbsp;response</span><br>
+<span class="lineno"></span><span class="comment" id="3538529">//&nbsp;&nbsp;&nbsp;&nbsp«read&nbsp;response»</span><br>
+<span class="lineno"></span><span class="comment" id="3538550">//&nbsp;&nbsp;&nbsp;&nbspp.EndResponse(id)&nbsp;&nbsp;&nbsp;&nbsp//&nbsp;notify&nbsp;Pipeline&nbsp;that&nbsp;response&nbsp;is&nbsp;read</span><br>
+<span class="lineno">25</span><span class="comment" id="3538612">//</span><br>
+<span class="lineno"></span><span class="comment" id="3538615">//&nbsp;A&nbsp;pipelined&nbsp;server&nbsp;can&nbsp;use&nbsp;the&nbsp;same&nbsp;calls&nbsp;to&nbsp;ensure&nbsp;that</span><br>
+<span class="lineno"></span><span class="comment" id="3538675">//&nbsp;responses&nbsp;computed&nbsp;in&nbsp;parallel&nbsp;are&nbsp;written&nbsp;in&nbsp;the&nbsp;correct&nbsp;order.</span><br>
+<span class="lineno"></span><span class="keyword" id="3538743">type</span>&nbsp;<span class="ident" id="3538748">Pipeline</span>&nbsp;<span class="keyword" id="3538757">struct</span>&nbsp;<span class="op" id="3538764">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="3538767">mu</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="3538776">sync</span><span class="op" id="3538780">.</span><span class="ident" id="3538781">Mutex</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="3538788">id</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="3538797">uint</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="3538803">request</span>&nbsp;&nbsp;<span class="ident" id="3538812">sequencer</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="3538823">response</span>&nbsp;<span class="ident" id="3538832">sequencer</span><br>
+<span class="lineno"></span><span class="op" id="3538842">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">35</span><span class="comment" id="3538845">//&nbsp;Next&nbsp;returns&nbsp;the&nbsp;next&nbsp;id&nbsp;for&nbsp;a&nbsp;request/response&nbsp;pair.</span><br>
+<span class="lineno"></span><span class="keyword" id="3538902">func</span>&nbsp;<span class="op" id="3538907">(</span><span class="ident" id="3538908">p</span>&nbsp;<span class="op" id="3538910">*</span><span class="ident" id="3538911">Pipeline</span><span class="op" id="3538919">)</span>&nbsp;<span class="ident" id="3538921">Next</span><span class="op" id="3538925">(</span><span class="op" id="3538926">)</span>&nbsp;<span class="builtintype" id="3538928">uint</span>&nbsp;<span class="op" id="3538933">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="3538936">p</span><span class="op" id="3538937">.</span><span class="ident" id="3538938">mu</span><span class="op" id="3538940">.</span><span class="ident" id="3538941">Lock</span><span class="op" id="3538945">(</span><span class="op" id="3538946">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="3538949">id</span>&nbsp;<span class="op" id="3538952">:=</span>&nbsp;<span class="ident" id="3538955">p</span><span class="op" id="3538956">.</span><span class="ident" id="3538957">id</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="3538961">p</span><span class="op" id="3538962">.</span><span class="ident" id="3538963">id</span><span class="op" id="3538965">++</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="3538969">p</span><span class="op" id="3538970">.</span><span class="ident" id="3538971">mu</span><span class="op" id="3538973">.</span><span class="ident" id="3538974">Unlock</span><span class="op" id="3538980">(</span><span class="op" id="3538981">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="3538984">return</span>&nbsp;<span class="ident" id="3538991">id</span><br>
+<span class="lineno"></span><span class="op" id="3538994">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="3538997">//&nbsp;StartRequest&nbsp;blocks&nbsp;until&nbsp;it&nbsp;is&nbsp;time&nbsp;to&nbsp;send&nbsp;(or,&nbsp;if&nbsp;this&nbsp;is&nbsp;a&nbsp;server,&nbsp;receive)</span><br>
+<span class="lineno">45</span><span class="comment" id="3539080">//&nbsp;the&nbsp;request&nbsp;with&nbsp;the&nbsp;given&nbsp;id.</span><br>
+<span class="lineno"></span><span class="keyword" id="3539114">func</span>&nbsp;<span class="op" id="3539119">(</span><span class="ident" id="3539120">p</span>&nbsp;<span class="op" id="3539122">*</span><span class="ident" id="3539123">Pipeline</span><span class="op" id="3539131">)</span>&nbsp;<span class="ident" id="3539133">StartRequest</span><span class="op" id="3539145">(</span><span class="ident" id="3539146">id</span>&nbsp;<span class="builtintype" id="3539149">uint</span><span class="op" id="3539153">)</span>&nbsp;<span class="op" id="3539155">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="3539158">p</span><span class="op" id="3539159">.</span><span class="ident" id="3539160">request</span><span class="op" id="3539167">.</span><span class="ident" id="3539168">Start</span><span class="op" id="3539173">(</span><span class="ident" id="3539174">id</span><span class="op" id="3539176">)</span><br>
+<span class="lineno"></span><span class="op" id="3539178">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">50</span><span class="comment" id="3539181">//&nbsp;EndRequest&nbsp;notifies&nbsp;p&nbsp;that&nbsp;the&nbsp;request&nbsp;with&nbsp;the&nbsp;given&nbsp;id&nbsp;has&nbsp;been&nbsp;sent</span><br>
+<span class="lineno"></span><span class="comment" id="3539255">//&nbsp;(or,&nbsp;if&nbsp;this&nbsp;is&nbsp;a&nbsp;server,&nbsp;received).</span><br>
+<span class="lineno"></span><span class="keyword" id="3539295">func</span>&nbsp;<span class="op" id="3539300">(</span><span class="ident" id="3539301">p</span>&nbsp;<span class="op" id="3539303">*</span><span class="ident" id="3539304">Pipeline</span><span class="op" id="3539312">)</span>&nbsp;<span class="ident" id="3539314">EndRequest</span><span class="op" id="3539324">(</span><span class="ident" id="3539325">id</span>&nbsp;<span class="builtintype" id="3539328">uint</span><span class="op" id="3539332">)</span>&nbsp;<span class="op" id="3539334">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="3539337">p</span><span class="op" id="3539338">.</span><span class="ident" id="3539339">request</span><span class="op" id="3539346">.</span><span class="ident" id="3539347">End</span><span class="op" id="3539350">(</span><span class="ident" id="3539351">id</span><span class="op" id="3539353">)</span><br>
+<span class="lineno"></span><span class="op" id="3539355">}</span><br>
+<span class="lineno">55</span><br>
+<span class="lineno"></span><span class="comment" id="3539358">//&nbsp;StartResponse&nbsp;blocks&nbsp;until&nbsp;it&nbsp;is&nbsp;time&nbsp;to&nbsp;receive&nbsp;(or,&nbsp;if&nbsp;this&nbsp;is&nbsp;a&nbsp;server,&nbsp;send)</span><br>
+<span class="lineno"></span><span class="comment" id="3539442">//&nbsp;the&nbsp;request&nbsp;with&nbsp;the&nbsp;given&nbsp;id.</span><br>
+<span class="lineno"></span><span class="keyword" id="3539476">func</span>&nbsp;<span class="op" id="3539481">(</span><span class="ident" id="3539482">p</span>&nbsp;<span class="op" id="3539484">*</span><span class="ident" id="3539485">Pipeline</span><span class="op" id="3539493">)</span>&nbsp;<span class="ident" id="3539495">StartResponse</span><span class="op" id="3539508">(</span><span class="ident" id="3539509">id</span>&nbsp;<span class="builtintype" id="3539512">uint</span><span class="op" id="3539516">)</span>&nbsp;<span class="op" id="3539518">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="3539521">p</span><span class="op" id="3539522">.</span><span class="ident" id="3539523">response</span><span class="op" id="3539531">.</span><span class="ident" id="3539532">Start</span><span class="op" id="3539537">(</span><span class="ident" id="3539538">id</span><span class="op" id="3539540">)</span><br>
+<span class="lineno">60</span><span class="op" id="3539542">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="3539545">//&nbsp;EndResponse&nbsp;notifies&nbsp;p&nbsp;that&nbsp;the&nbsp;response&nbsp;with&nbsp;the&nbsp;given&nbsp;id&nbsp;has&nbsp;been&nbsp;received</span><br>
+<span class="lineno"></span><span class="comment" id="3539625">//&nbsp;(or,&nbsp;if&nbsp;this&nbsp;is&nbsp;a&nbsp;server,&nbsp;sent).</span><br>
+<span class="lineno"></span><span class="keyword" id="3539661">func</span>&nbsp;<span class="op" id="3539666">(</span><span class="ident" id="3539667">p</span>&nbsp;<span class="op" id="3539669">*</span><span class="ident" id="3539670">Pipeline</span><span class="op" id="3539678">)</span>&nbsp;<span class="ident" id="3539680">EndResponse</span><span class="op" id="3539691">(</span><span class="ident" id="3539692">id</span>&nbsp;<span class="builtintype" id="3539695">uint</span><span class="op" id="3539699">)</span>&nbsp;<span class="op" id="3539701">{</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="3539704">p</span><span class="op" id="3539705">.</span><span class="ident" id="3539706">response</span><span class="op" id="3539714">.</span><span class="ident" id="3539715">End</span><span class="op" id="3539718">(</span><span class="ident" id="3539719">id</span><span class="op" id="3539721">)</span><br>
+<span class="lineno"></span><span class="op" id="3539723">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="3539726">//&nbsp;A&nbsp;sequencer&nbsp;schedules&nbsp;a&nbsp;sequence&nbsp;of&nbsp;numbered&nbsp;events&nbsp;that&nbsp;must</span><br>
+<span class="lineno"></span><span class="comment" id="3539791">//&nbsp;happen&nbsp;in&nbsp;order,&nbsp;one&nbsp;after&nbsp;the&nbsp;other.&nbsp;&nbsp;The&nbsp;event&nbsp;numbering&nbsp;must&nbsp;start</span><br>
+<span class="lineno">70</span><span class="comment" id="3539864">//&nbsp;at&nbsp;0&nbsp;and&nbsp;increment&nbsp;without&nbsp;skipping.&nbsp;&nbsp;The&nbsp;event&nbsp;number&nbsp;wraps&nbsp;around</span><br>
+<span class="lineno"></span><span class="comment" id="3539935">//&nbsp;safely&nbsp;as&nbsp;long&nbsp;as&nbsp;there&nbsp;are&nbsp;not&nbsp;2^32&nbsp;simultaneous&nbsp;events&nbsp;pending.</span><br>
+<span class="lineno"></span><span class="keyword" id="3540004">type</span>&nbsp;<span class="ident" id="3540009">sequencer</span>&nbsp;<span class="keyword" id="3540019">struct</span>&nbsp;<span class="op" id="3540026">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="3540029">mu</span>&nbsp;&nbsp;&nbsp;<span class="ident" id="3540034">sync</span><span class="op" id="3540038">.</span><span class="ident" id="3540039">Mutex</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="3540046">id</span>&nbsp;&nbsp;&nbsp;<span class="builtintype" id="3540051">uint</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="3540057">wait</span>&nbsp;<span class="keyword" id="3540062">map</span><span class="op" id="3540065">[</span><span class="builtintype" id="3540066">uint</span><span class="op" id="3540070">]</span><span class="keyword" id="3540071">chan</span>&nbsp;<span class="builtintype" id="3540076">uint</span><br>
+<span class="lineno"></span><span class="op" id="3540081">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="3540084">//&nbsp;Start&nbsp;waits&nbsp;until&nbsp;it&nbsp;is&nbsp;time&nbsp;for&nbsp;the&nbsp;event&nbsp;numbered&nbsp;id&nbsp;to&nbsp;begin.</span><br>
+<span class="lineno"></span><span class="comment" id="3540152">//&nbsp;That&nbsp;is,&nbsp;except&nbsp;for&nbsp;the&nbsp;first&nbsp;event,&nbsp;it&nbsp;waits&nbsp;until&nbsp;End(id-1)&nbsp;has</span><br>
+<span class="lineno">80</span><span class="comment" id="3540221">//&nbsp;been&nbsp;called.</span><br>
+<span class="lineno"></span><span class="keyword" id="3540237">func</span>&nbsp;<span class="op" id="3540242">(</span><span class="ident" id="3540243">s</span>&nbsp;<span class="op" id="3540245">*</span><span class="ident" id="3540246">sequencer</span><span class="op" id="3540255">)</span>&nbsp;<span class="ident" id="3540257">Start</span><span class="op" id="3540262">(</span><span class="ident" id="3540263">id</span>&nbsp;<span class="builtintype" id="3540266">uint</span><span class="op" id="3540270">)</span>&nbsp;<span class="op" id="3540272">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="3540275">s</span><span class="op" id="3540276">.</span><span class="ident" id="3540277">mu</span><span class="op" id="3540279">.</span><span class="ident" id="3540280">Lock</span><span class="op" id="3540284">(</span><span class="op" id="3540285">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="3540288">if</span>&nbsp;<span class="ident" id="3540291">s</span><span class="op" id="3540292">.</span><span class="ident" id="3540293">id</span>&nbsp;<span class="op" id="3540296">==</span>&nbsp;<span class="ident" id="3540299">id</span>&nbsp;<span class="op" id="3540302">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="3540306">s</span><span class="op" id="3540307">.</span><span class="ident" id="3540308">mu</span><span class="op" id="3540310">.</span><span class="ident" id="3540311">Unlock</span><span class="op" id="3540317">(</span><span class="op" id="3540318">)</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="3540322">return</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="3540330">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="3540333">c</span>&nbsp;<span class="op" id="3540335">:=</span>&nbsp;<span class="builtinfunc" id="3540338">make</span><span class="op" id="3540342">(</span><span class="keyword" id="3540343">chan</span>&nbsp;<span class="builtintype" id="3540348">uint</span><span class="op" id="3540352">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="3540355">if</span>&nbsp;<span class="ident" id="3540358">s</span><span class="op" id="3540359">.</span><span class="ident" id="3540360">wait</span>&nbsp;<span class="op" id="3540365">==</span>&nbsp;<span class="ident" id="3540368">nil</span>&nbsp;<span class="op" id="3540372">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="3540376">s</span><span class="op" id="3540377">.</span><span class="ident" id="3540378">wait</span>&nbsp;<span class="op" id="3540383">=</span>&nbsp;<span class="builtinfunc" id="3540385">make</span><span class="op" id="3540389">(</span><span class="keyword" id="3540390">map</span><span class="op" id="3540393">[</span><span class="builtintype" id="3540394">uint</span><span class="op" id="3540398">]</span><span class="keyword" id="3540399">chan</span>&nbsp;<span class="builtintype" id="3540404">uint</span><span class="op" id="3540408">)</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="3540411">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="3540414">s</span><span class="op" id="3540415">.</span><span class="ident" id="3540416">wait</span><span class="op" id="3540420">[</span><span class="ident" id="3540421">id</span><span class="op" id="3540423">]</span>&nbsp;<span class="op" id="3540425">=</span>&nbsp;<span class="ident" id="3540427">c</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="3540430">s</span><span class="op" id="3540431">.</span><span class="ident" id="3540432">mu</span><span class="op" id="3540434">.</span><span class="ident" id="3540435">Unlock</span><span class="op" id="3540441">(</span><span class="op" id="3540442">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="3540445">&lt;-</span><span class="ident" id="3540447">c</span><br>
+<span class="lineno"></span><span class="op" id="3540449">}</span><br>
+<span class="lineno">95</span><br>
+<span class="lineno"></span><span class="comment" id="3540452">//&nbsp;End&nbsp;notifies&nbsp;the&nbsp;sequencer&nbsp;that&nbsp;the&nbsp;event&nbsp;numbered&nbsp;id&nbsp;has&nbsp;completed,</span><br>
+<span class="lineno"></span><span class="comment" id="3540524">//&nbsp;allowing&nbsp;it&nbsp;to&nbsp;schedule&nbsp;the&nbsp;event&nbsp;numbered&nbsp;id+1.&nbsp;&nbsp;It&nbsp;is&nbsp;a&nbsp;run-time&nbsp;error</span><br>
+<span class="lineno"></span><span class="comment" id="3540600">//&nbsp;to&nbsp;call&nbsp;End&nbsp;with&nbsp;an&nbsp;id&nbsp;that&nbsp;is&nbsp;not&nbsp;the&nbsp;number&nbsp;of&nbsp;the&nbsp;active&nbsp;event.</span><br>
+<span class="lineno"></span><span class="keyword" id="3540670">func</span>&nbsp;<span class="op" id="3540675">(</span><span class="ident" id="3540676">s</span>&nbsp;<span class="op" id="3540678">*</span><span class="ident" id="3540679">sequencer</span><span class="op" id="3540688">)</span>&nbsp;<span class="ident" id="3540690">End</span><span class="op" id="3540693">(</span><span class="ident" id="3540694">id</span>&nbsp;<span class="builtintype" id="3540697">uint</span><span class="op" id="3540701">)</span>&nbsp;<span class="op" id="3540703">{</span><br>
+<span class="lineno">100</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="3540706">s</span><span class="op" id="3540707">.</span><span class="ident" id="3540708">mu</span><span class="op" id="3540710">.</span><span class="ident" id="3540711">Lock</span><span class="op" id="3540715">(</span><span class="op" id="3540716">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="3540719">if</span>&nbsp;<span class="ident" id="3540722">s</span><span class="op" id="3540723">.</span><span class="ident" id="3540724">id</span>&nbsp;<span class="op" id="3540727">!=</span>&nbsp;<span class="ident" id="3540730">id</span>&nbsp;<span class="op" id="3540733">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc" id="3540737">panic</span><span class="op" id="3540742">(</span><span class="string" id="3540743">&#34;out&nbsp;of&nbsp;sync&#34;</span><span class="op" id="3540756">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="3540759">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="3540762">id</span><span class="op" id="3540764">++</span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="3540768">s</span><span class="op" id="3540769">.</span><span class="ident" id="3540770">id</span>&nbsp;<span class="op" id="3540773">=</span>&nbsp;<span class="ident" id="3540775">id</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="3540779">if</span>&nbsp;<span class="ident" id="3540782">s</span><span class="op" id="3540783">.</span><span class="ident" id="3540784">wait</span>&nbsp;<span class="op" id="3540789">==</span>&nbsp;<span class="ident" id="3540792">nil</span>&nbsp;<span class="op" id="3540796">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="3540800">s</span><span class="op" id="3540801">.</span><span class="ident" id="3540802">wait</span>&nbsp;<span class="op" id="3540807">=</span>&nbsp;<span class="builtinfunc" id="3540809">make</span><span class="op" id="3540813">(</span><span class="keyword" id="3540814">map</span><span class="op" id="3540817">[</span><span class="builtintype" id="3540818">uint</span><span class="op" id="3540822">]</span><span class="keyword" id="3540823">chan</span>&nbsp;<span class="builtintype" id="3540828">uint</span><span class="op" id="3540832">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="3540835">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="3540838">c</span><span class="op" id="3540839">,</span>&nbsp;<span class="ident" id="3540841">ok</span>&nbsp;<span class="op" id="3540844">:=</span>&nbsp;<span class="ident" id="3540847">s</span><span class="op" id="3540848">.</span><span class="ident" id="3540849">wait</span><span class="op" id="3540853">[</span><span class="ident" id="3540854">id</span><span class="op" id="3540856">]</span><br>
+<span class="lineno">110</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="3540859">if</span>&nbsp;<span class="ident" id="3540862">ok</span>&nbsp;<span class="op" id="3540865">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc" id="3540869">delete</span><span class="op" id="3540875">(</span><span class="ident" id="3540876">s</span><span class="op" id="3540877">.</span><span class="ident" id="3540878">wait</span><span class="op" id="3540882">,</span>&nbsp;<span class="ident" id="3540884">id</span><span class="op" id="3540886">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="3540889">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="3540892">s</span><span class="op" id="3540893">.</span><span class="ident" id="3540894">mu</span><span class="op" id="3540896">.</span><span class="ident" id="3540897">Unlock</span><span class="op" id="3540903">(</span><span class="op" id="3540904">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="3540907">if</span>&nbsp;<span class="ident" id="3540910">ok</span>&nbsp;<span class="op" id="3540913">{</span><br>
+<span class="lineno">115</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="3540917">c</span>&nbsp;<span class="op" id="3540919">&lt;-</span>&nbsp;<span class="num" id="3540922">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="3540925">}</span><br>
+<span class="lineno"></span><span class="op" id="3540927">}</span>
+</div>
+</body>
+</html>

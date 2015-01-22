@@ -1,0 +1,241 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment" id="6956289">//&nbsp;Copyright&nbsp;2012&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment" id="6956345">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment" id="6956399">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword" id="6956450">package</span>&nbsp;<span class="ident" id="6956458">build</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="6956465">import</span>&nbsp;<span class="op" id="6956472">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6956475">&#34;io&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6956481">&#34;strings&#34;</span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6956492">&#34;testing&#34;</span><br>
+<span class="lineno"></span><span class="op" id="6956502">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="6956505">const</span>&nbsp;<span class="ident" id="6956511">quote</span>&nbsp;<span class="op" id="6956517">=</span>&nbsp;<span class="string" id="6956519">&#34;`&#34;</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">15</span><span class="keyword" id="6956524">type</span>&nbsp;<span class="ident" id="6956529">readTest</span>&nbsp;<span class="keyword" id="6956538">struct</span>&nbsp;<span class="op" id="6956545">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="6956548">//&nbsp;Test&nbsp;input&nbsp;contains&nbsp;ℙ&nbsp;where&nbsp;readImports&nbsp;should&nbsp;stop.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6956607">in</span>&nbsp;&nbsp;<span class="builtintype" id="6956611">string</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6956619">err</span>&nbsp;<span class="builtintype" id="6956623">string</span><br>
+<span class="lineno"></span><span class="op" id="6956630">}</span><br>
+<span class="lineno">20</span><br>
+<span class="lineno"></span><span class="keyword" id="6956633">var</span>&nbsp;<span class="ident" id="6956637">readImportsTests</span>&nbsp;<span class="op" id="6956654">=</span>&nbsp;<span class="op" id="6956656">[</span><span class="op" id="6956657">]</span><span class="ident" id="6956658">readTest</span><span class="op" id="6956666">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6956669">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6956673">`package&nbsp;p`</span><span class="op" id="6956684">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6956688">&#34;&#34;</span><span class="op" id="6956690">,</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6956693">}</span><span class="op" id="6956694">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6956697">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6956701">`package&nbsp;p;&nbsp;import&nbsp;&#34;x&#34;`</span><span class="op" id="6956724">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6956728">&#34;&#34;</span><span class="op" id="6956730">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6956733">}</span><span class="op" id="6956734">,</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6956737">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6956741">`package&nbsp;p;&nbsp;import&nbsp;.&nbsp;&#34;x&#34;`</span><span class="op" id="6956766">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6956770">&#34;&#34;</span><span class="op" id="6956772">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6956775">}</span><span class="op" id="6956776">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6956779">{</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6956783">`package&nbsp;p;&nbsp;import&nbsp;&#34;x&#34;;ℙvar&nbsp;x&nbsp;=&nbsp;1`</span><span class="op" id="6956819">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6956823">&#34;&#34;</span><span class="op" id="6956825">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6956828">}</span><span class="op" id="6956829">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6956832">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6956836">`package&nbsp;p<br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp//&nbsp;comment<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspimport&nbsp;&#34;x&#34;<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspimport&nbsp;_&nbsp;&#34;x&#34;<br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspimport&nbsp;a&nbsp;&#34;x&#34;<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp/*&nbsp;comment&nbsp;*/<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspimport&nbsp;(<br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&#34;x&#34;&nbsp;/*&nbsp;comment&nbsp;*/<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp_&nbsp;&#34;x&#34;<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspa&nbsp;&#34;x&#34;&nbsp;//&nbsp;comment<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp`</span>&nbsp;<span class="op" id="6956997">+</span>&nbsp;<span class="ident" id="6956999">quote</span>&nbsp;<span class="op" id="6957005">+</span>&nbsp;<span class="string" id="6957007">`x`</span>&nbsp;<span class="op" id="6957011">+</span>&nbsp;<span class="ident" id="6957013">quote</span>&nbsp;<span class="op" id="6957019">+</span>&nbsp;<span class="string" id="6957021">`<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp_&nbsp;/*comment*/&nbsp;`</span>&nbsp;<span class="op" id="6957042">+</span>&nbsp;<span class="ident" id="6957044">quote</span>&nbsp;<span class="op" id="6957050">+</span>&nbsp;<span class="string" id="6957052">`x`</span>&nbsp;<span class="op" id="6957056">+</span>&nbsp;<span class="ident" id="6957058">quote</span>&nbsp;<span class="op" id="6957064">+</span>&nbsp;<span class="string" id="6957066">`<br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspa&nbsp;`</span>&nbsp;<span class="op" id="6957075">+</span>&nbsp;<span class="ident" id="6957077">quote</span>&nbsp;<span class="op" id="6957083">+</span>&nbsp;<span class="string" id="6957085">`x`</span>&nbsp;<span class="op" id="6957089">+</span>&nbsp;<span class="ident" id="6957091">quote</span>&nbsp;<span class="op" id="6957097">+</span>&nbsp;<span class="string" id="6957099">`<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp)<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspimport&nbsp;(<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp)<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspimport&nbsp;()<br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspimport()import()import()<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspimport();import();import()<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspℙvar&nbsp;x&nbsp;=&nbsp;1<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp`</span><span class="op" id="6957209">,</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6957213">&#34;&#34;</span><span class="op" id="6957215">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6957218">}</span><span class="op" id="6957219">,</span><br>
+<span class="lineno"></span><span class="op" id="6957221">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="6957224">var</span>&nbsp;<span class="ident" id="6957228">readCommentsTests</span>&nbsp;<span class="op" id="6957246">=</span>&nbsp;<span class="op" id="6957248">[</span><span class="op" id="6957249">]</span><span class="ident" id="6957250">readTest</span><span class="op" id="6957258">{</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6957261">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6957265">`ℙpackage&nbsp;p`</span><span class="op" id="6957279">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6957283">&#34;&#34;</span><span class="op" id="6957285">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6957288">}</span><span class="op" id="6957289">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6957292">{</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6957296">`ℙpackage&nbsp;p;&nbsp;import&nbsp;&#34;x&#34;`</span><span class="op" id="6957322">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6957326">&#34;&#34;</span><span class="op" id="6957328">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6957331">}</span><span class="op" id="6957332">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6957335">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6957339">`ℙpackage&nbsp;p;&nbsp;import&nbsp;.&nbsp;&#34;x&#34;`</span><span class="op" id="6957367">,</span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6957371">&#34;&#34;</span><span class="op" id="6957373">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6957376">}</span><span class="op" id="6957377">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6957380">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6957384">`//&nbsp;foo<br>
+<span class="lineno"></span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp/*&nbsp;bar&nbsp;*/<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp/*&nbsp;quux&nbsp;*/&nbsp;//&nbsp;baz<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp/*/&nbsp;zot&nbsp;*/<br>
+<span class="lineno">90</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp//&nbsp;asdf<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbspℙHello,&nbsp;world`</span><span class="op" id="6957471">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6957475">&#34;&#34;</span><span class="op" id="6957477">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6957480">}</span><span class="op" id="6957481">,</span><br>
+<span class="lineno">95</span><span class="op" id="6957483">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="6957486">func</span>&nbsp;<span class="ident" id="6957491">testRead</span><span class="op" id="6957499">(</span><span class="ident" id="6957500">t</span>&nbsp;<span class="op" id="6957502">*</span><span class="ident" id="6957503">testing</span><span class="op" id="6957510">.</span><span class="ident" id="6957511">T</span><span class="op" id="6957512">,</span>&nbsp;<span class="ident" id="6957514">tests</span>&nbsp;<span class="op" id="6957520">[</span><span class="op" id="6957521">]</span><span class="ident" id="6957522">readTest</span><span class="op" id="6957530">,</span>&nbsp;<span class="ident" id="6957532">read</span>&nbsp;<span class="keyword" id="6957537">func</span><span class="op" id="6957541">(</span><span class="ident" id="6957542">io</span><span class="op" id="6957544">.</span><span class="ident" id="6957545">Reader</span><span class="op" id="6957551">)</span>&nbsp;<span class="op" id="6957553">(</span><span class="op" id="6957554">[</span><span class="op" id="6957555">]</span><span class="builtintype" id="6957556">byte</span><span class="op" id="6957560">,</span>&nbsp;<span class="builtintype" id="6957562">error</span><span class="op" id="6957567">)</span><span class="op" id="6957568">)</span>&nbsp;<span class="op" id="6957570">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="6957573">for</span>&nbsp;<span class="ident" id="6957577">i</span><span class="op" id="6957578">,</span>&nbsp;<span class="ident" id="6957580">tt</span>&nbsp;<span class="op" id="6957583">:=</span>&nbsp;<span class="keyword" id="6957586">range</span>&nbsp;<span class="ident" id="6957592">tests</span>&nbsp;<span class="op" id="6957598">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="6957602">var</span>&nbsp;<span class="ident" id="6957606">in</span><span class="op" id="6957608">,</span>&nbsp;<span class="ident" id="6957610">testOut</span>&nbsp;<span class="builtintype" id="6957618">string</span><br>
+<span class="lineno">100</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6957627">j</span>&nbsp;<span class="op" id="6957629">:=</span>&nbsp;<span class="ident" id="6957632">strings</span><span class="op" id="6957639">.</span><span class="ident" id="6957640">Index</span><span class="op" id="6957645">(</span><span class="ident" id="6957646">tt</span><span class="op" id="6957648">.</span><span class="ident" id="6957649">in</span><span class="op" id="6957651">,</span>&nbsp;<span class="string" id="6957653">&#34;ℙ&#34;</span><span class="op" id="6957658">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="6957662">if</span>&nbsp;<span class="ident" id="6957665">j</span>&nbsp;<span class="op" id="6957667">&lt;</span>&nbsp;<span class="num" id="6957669">0</span>&nbsp;<span class="op" id="6957671">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6957676">in</span>&nbsp;<span class="op" id="6957679">=</span>&nbsp;<span class="ident" id="6957681">tt</span><span class="op" id="6957683">.</span><span class="ident" id="6957684">in</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6957690">testOut</span>&nbsp;<span class="op" id="6957698">=</span>&nbsp;<span class="ident" id="6957700">tt</span><span class="op" id="6957702">.</span><span class="ident" id="6957703">in</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6957708">}</span>&nbsp;<span class="keyword" id="6957710">else</span>&nbsp;<span class="op" id="6957715">{</span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6957720">in</span>&nbsp;<span class="op" id="6957723">=</span>&nbsp;<span class="ident" id="6957725">tt</span><span class="op" id="6957727">.</span><span class="ident" id="6957728">in</span><span class="op" id="6957730">[</span><span class="op" id="6957731">:</span><span class="ident" id="6957732">j</span><span class="op" id="6957733">]</span>&nbsp;<span class="op" id="6957735">+</span>&nbsp;<span class="ident" id="6957737">tt</span><span class="op" id="6957739">.</span><span class="ident" id="6957740">in</span><span class="op" id="6957742">[</span><span class="ident" id="6957743">j</span><span class="op" id="6957744">+</span><span class="builtinfunc" id="6957745">len</span><span class="op" id="6957748">(</span><span class="string" id="6957749">&#34;ℙ&#34;</span><span class="op" id="6957754">)</span><span class="op" id="6957755">:</span><span class="op" id="6957756">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6957761">testOut</span>&nbsp;<span class="op" id="6957769">=</span>&nbsp;<span class="ident" id="6957771">tt</span><span class="op" id="6957773">.</span><span class="ident" id="6957774">in</span><span class="op" id="6957776">[</span><span class="op" id="6957777">:</span><span class="ident" id="6957778">j</span><span class="op" id="6957779">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6957783">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6957787">r</span>&nbsp;<span class="op" id="6957789">:=</span>&nbsp;<span class="ident" id="6957792">strings</span><span class="op" id="6957799">.</span><span class="ident" id="6957800">NewReader</span><span class="op" id="6957809">(</span><span class="ident" id="6957810">in</span><span class="op" id="6957812">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6957816">buf</span><span class="op" id="6957819">,</span>&nbsp;<span class="ident" id="6957821">err</span>&nbsp;<span class="op" id="6957825">:=</span>&nbsp;<span class="ident" id="6957828">read</span><span class="op" id="6957832">(</span><span class="ident" id="6957833">r</span><span class="op" id="6957834">)</span><br>
+<span class="lineno">110</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="6957838">if</span>&nbsp;<span class="ident" id="6957841">err</span>&nbsp;<span class="op" id="6957845">!=</span>&nbsp;<span class="ident" id="6957848">nil</span>&nbsp;<span class="op" id="6957852">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="6957857">if</span>&nbsp;<span class="ident" id="6957860">tt</span><span class="op" id="6957862">.</span><span class="ident" id="6957863">err</span>&nbsp;<span class="op" id="6957867">==</span>&nbsp;<span class="string" id="6957870">&#34;&#34;</span>&nbsp;<span class="op" id="6957873">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6957879">t</span><span class="op" id="6957880">.</span><span class="ident" id="6957881">Errorf</span><span class="op" id="6957887">(</span><span class="string" id="6957888">&#34;#%d:&nbsp;err=%q,&nbsp;expected&nbsp;success&nbsp;(%q)&#34;</span><span class="op" id="6957924">,</span>&nbsp;<span class="ident" id="6957926">i</span><span class="op" id="6957927">,</span>&nbsp;<span class="ident" id="6957929">err</span><span class="op" id="6957932">,</span>&nbsp;<span class="builtintype" id="6957934">string</span><span class="op" id="6957940">(</span><span class="ident" id="6957941">buf</span><span class="op" id="6957944">)</span><span class="op" id="6957945">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="6957951">continue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6957963">}</span><br>
+<span class="lineno">115</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="6957968">if</span>&nbsp;<span class="op" id="6957971">!</span><span class="ident" id="6957972">strings</span><span class="op" id="6957979">.</span><span class="ident" id="6957980">Contains</span><span class="op" id="6957988">(</span><span class="ident" id="6957989">err</span><span class="op" id="6957992">.</span><span class="ident" id="6957993">Error</span><span class="op" id="6957998">(</span><span class="op" id="6957999">)</span><span class="op" id="6958000">,</span>&nbsp;<span class="ident" id="6958002">tt</span><span class="op" id="6958004">.</span><span class="ident" id="6958005">err</span><span class="op" id="6958008">)</span>&nbsp;<span class="op" id="6958010">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6958016">t</span><span class="op" id="6958017">.</span><span class="ident" id="6958018">Errorf</span><span class="op" id="6958024">(</span><span class="string" id="6958025">&#34;#%d:&nbsp;err=%q,&nbsp;expected&nbsp;%q&#34;</span><span class="op" id="6958051">,</span>&nbsp;<span class="ident" id="6958053">i</span><span class="op" id="6958054">,</span>&nbsp;<span class="ident" id="6958056">err</span><span class="op" id="6958059">,</span>&nbsp;<span class="ident" id="6958061">tt</span><span class="op" id="6958063">.</span><span class="ident" id="6958064">err</span><span class="op" id="6958067">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="6958073">continue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6958085">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="6958090">continue</span><br>
+<span class="lineno">120</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6958101">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="6958105">if</span>&nbsp;<span class="ident" id="6958108">err</span>&nbsp;<span class="op" id="6958112">==</span>&nbsp;<span class="ident" id="6958115">nil</span>&nbsp;<span class="op" id="6958119">&amp;&amp;</span>&nbsp;<span class="ident" id="6958122">tt</span><span class="op" id="6958124">.</span><span class="ident" id="6958125">err</span>&nbsp;<span class="op" id="6958129">!=</span>&nbsp;<span class="string" id="6958132">&#34;&#34;</span>&nbsp;<span class="op" id="6958135">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6958140">t</span><span class="op" id="6958141">.</span><span class="ident" id="6958142">Errorf</span><span class="op" id="6958148">(</span><span class="string" id="6958149">&#34;#%d:&nbsp;success,&nbsp;expected&nbsp;%q&#34;</span><span class="op" id="6958176">,</span>&nbsp;<span class="ident" id="6958178">i</span><span class="op" id="6958179">,</span>&nbsp;<span class="ident" id="6958181">tt</span><span class="op" id="6958183">.</span><span class="ident" id="6958184">err</span><span class="op" id="6958187">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="6958192">continue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6958203">}</span><br>
+<span class="lineno">125</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6958208">out</span>&nbsp;<span class="op" id="6958212">:=</span>&nbsp;<span class="builtintype" id="6958215">string</span><span class="op" id="6958221">(</span><span class="ident" id="6958222">buf</span><span class="op" id="6958225">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="6958229">if</span>&nbsp;<span class="ident" id="6958232">out</span>&nbsp;<span class="op" id="6958236">!=</span>&nbsp;<span class="ident" id="6958239">testOut</span>&nbsp;<span class="op" id="6958247">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6958252">t</span><span class="op" id="6958253">.</span><span class="ident" id="6958254">Errorf</span><span class="op" id="6958260">(</span><span class="string" id="6958261">&#34;#%d:&nbsp;wrong&nbsp;output:\nhave&nbsp;%q\nwant&nbsp;%q\n&#34;</span><span class="op" id="6958301">,</span>&nbsp;<span class="ident" id="6958303">i</span><span class="op" id="6958304">,</span>&nbsp;<span class="ident" id="6958306">out</span><span class="op" id="6958309">,</span>&nbsp;<span class="ident" id="6958311">testOut</span><span class="op" id="6958318">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6958322">}</span><br>
+<span class="lineno">130</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6958325">}</span><br>
+<span class="lineno"></span><span class="op" id="6958327">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="6958330">func</span>&nbsp;<span class="ident" id="6958335">TestReadImports</span><span class="op" id="6958350">(</span><span class="ident" id="6958351">t</span>&nbsp;<span class="op" id="6958353">*</span><span class="ident" id="6958354">testing</span><span class="op" id="6958361">.</span><span class="ident" id="6958362">T</span><span class="op" id="6958363">)</span>&nbsp;<span class="op" id="6958365">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6958368">testRead</span><span class="op" id="6958376">(</span><span class="ident" id="6958377">t</span><span class="op" id="6958378">,</span>&nbsp;<span class="ident" id="6958380">readImportsTests</span><span class="op" id="6958396">,</span>&nbsp;<span class="keyword" id="6958398">func</span><span class="op" id="6958402">(</span><span class="ident" id="6958403">r</span>&nbsp;<span class="ident" id="6958405">io</span><span class="op" id="6958407">.</span><span class="ident" id="6958408">Reader</span><span class="op" id="6958414">)</span>&nbsp;<span class="op" id="6958416">(</span><span class="op" id="6958417">[</span><span class="op" id="6958418">]</span><span class="builtintype" id="6958419">byte</span><span class="op" id="6958423">,</span>&nbsp;<span class="builtintype" id="6958425">error</span><span class="op" id="6958430">)</span>&nbsp;<span class="op" id="6958432">{</span>&nbsp;<span class="keyword" id="6958434">return</span>&nbsp;<span class="ident" id="6958441">readImports</span><span class="op" id="6958452">(</span><span class="ident" id="6958453">r</span><span class="op" id="6958454">,</span>&nbsp;<span class="builtintype" id="6958456">true</span><span class="op" id="6958460">)</span>&nbsp;<span class="op" id="6958462">}</span><span class="op" id="6958463">)</span><br>
+<span class="lineno">135</span><span class="op" id="6958465">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="6958468">func</span>&nbsp;<span class="ident" id="6958473">TestReadComments</span><span class="op" id="6958489">(</span><span class="ident" id="6958490">t</span>&nbsp;<span class="op" id="6958492">*</span><span class="ident" id="6958493">testing</span><span class="op" id="6958500">.</span><span class="ident" id="6958501">T</span><span class="op" id="6958502">)</span>&nbsp;<span class="op" id="6958504">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6958507">testRead</span><span class="op" id="6958515">(</span><span class="ident" id="6958516">t</span><span class="op" id="6958517">,</span>&nbsp;<span class="ident" id="6958519">readCommentsTests</span><span class="op" id="6958536">,</span>&nbsp;<span class="ident" id="6958538">readComments</span><span class="op" id="6958550">)</span><br>
+<span class="lineno"></span><span class="op" id="6958552">}</span><br>
+<span class="lineno">140</span><br>
+<span class="lineno"></span><span class="keyword" id="6958555">var</span>&nbsp;<span class="ident" id="6958559">readFailuresTests</span>&nbsp;<span class="op" id="6958577">=</span>&nbsp;<span class="op" id="6958579">[</span><span class="op" id="6958580">]</span><span class="ident" id="6958581">readTest</span><span class="op" id="6958589">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6958592">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6958596">`package`</span><span class="op" id="6958605">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6958609">&#34;syntax&nbsp;error&#34;</span><span class="op" id="6958623">,</span><br>
+<span class="lineno">145</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6958626">}</span><span class="op" id="6958627">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6958630">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6958634">&#34;package&nbsp;p\n\x00\nimport&nbsp;`math`\n&#34;</span><span class="op" id="6958668">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6958672">&#34;unexpected&nbsp;NUL&nbsp;in&nbsp;input&#34;</span><span class="op" id="6958697">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6958700">}</span><span class="op" id="6958701">,</span><br>
+<span class="lineno">150</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6958704">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6958708">`package&nbsp;p;&nbsp;import`</span><span class="op" id="6958727">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6958731">&#34;syntax&nbsp;error&#34;</span><span class="op" id="6958745">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6958748">}</span><span class="op" id="6958749">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6958752">{</span><br>
+<span class="lineno">155</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6958756">`package&nbsp;p;&nbsp;import&nbsp;&#34;`</span><span class="op" id="6958777">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6958781">&#34;syntax&nbsp;error&#34;</span><span class="op" id="6958795">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6958798">}</span><span class="op" id="6958799">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6958802">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6958806">&#34;package&nbsp;p;&nbsp;import&nbsp;`&nbsp;\n\n&#34;</span><span class="op" id="6958832">,</span><br>
+<span class="lineno">160</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6958836">&#34;syntax&nbsp;error&#34;</span><span class="op" id="6958850">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6958853">}</span><span class="op" id="6958854">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6958857">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6958861">`package&nbsp;p;&nbsp;import&nbsp;&#34;x`</span><span class="op" id="6958883">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6958887">&#34;syntax&nbsp;error&#34;</span><span class="op" id="6958901">,</span><br>
+<span class="lineno">165</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6958904">}</span><span class="op" id="6958905">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6958908">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6958912">`package&nbsp;p;&nbsp;import&nbsp;_`</span><span class="op" id="6958933">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6958937">&#34;syntax&nbsp;error&#34;</span><span class="op" id="6958951">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6958954">}</span><span class="op" id="6958955">,</span><br>
+<span class="lineno">170</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6958958">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6958962">`package&nbsp;p;&nbsp;import&nbsp;_&nbsp;&#34;`</span><span class="op" id="6958985">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6958989">&#34;syntax&nbsp;error&#34;</span><span class="op" id="6959003">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6959006">}</span><span class="op" id="6959007">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6959010">{</span><br>
+<span class="lineno">175</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6959014">`package&nbsp;p;&nbsp;import&nbsp;_&nbsp;&#34;x`</span><span class="op" id="6959038">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6959042">&#34;syntax&nbsp;error&#34;</span><span class="op" id="6959056">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6959059">}</span><span class="op" id="6959060">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6959063">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6959067">`package&nbsp;p;&nbsp;import&nbsp;.`</span><span class="op" id="6959088">,</span><br>
+<span class="lineno">180</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6959092">&#34;syntax&nbsp;error&#34;</span><span class="op" id="6959106">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6959109">}</span><span class="op" id="6959110">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6959113">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6959117">`package&nbsp;p;&nbsp;import&nbsp;.&nbsp;&#34;`</span><span class="op" id="6959140">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6959144">&#34;syntax&nbsp;error&#34;</span><span class="op" id="6959158">,</span><br>
+<span class="lineno">185</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6959161">}</span><span class="op" id="6959162">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6959165">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6959169">`package&nbsp;p;&nbsp;import&nbsp;.&nbsp;&#34;x`</span><span class="op" id="6959193">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6959197">&#34;syntax&nbsp;error&#34;</span><span class="op" id="6959211">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6959214">}</span><span class="op" id="6959215">,</span><br>
+<span class="lineno">190</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6959218">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6959222">`package&nbsp;p;&nbsp;import&nbsp;(`</span><span class="op" id="6959243">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6959247">&#34;syntax&nbsp;error&#34;</span><span class="op" id="6959261">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6959264">}</span><span class="op" id="6959265">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6959268">{</span><br>
+<span class="lineno">195</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6959272">`package&nbsp;p;&nbsp;import&nbsp;(&#34;`</span><span class="op" id="6959294">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6959298">&#34;syntax&nbsp;error&#34;</span><span class="op" id="6959312">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6959315">}</span><span class="op" id="6959316">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6959319">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6959323">`package&nbsp;p;&nbsp;import&nbsp;(&#34;x`</span><span class="op" id="6959346">,</span><br>
+<span class="lineno">200</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6959350">&#34;syntax&nbsp;error&#34;</span><span class="op" id="6959364">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6959367">}</span><span class="op" id="6959368">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6959371">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6959375">`package&nbsp;p;&nbsp;import&nbsp;(&#34;x&#34;`</span><span class="op" id="6959399">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6959403">&#34;syntax&nbsp;error&#34;</span><span class="op" id="6959417">,</span><br>
+<span class="lineno">205</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6959420">}</span><span class="op" id="6959421">,</span><br>
+<span class="lineno"></span><span class="op" id="6959423">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="6959426">func</span>&nbsp;<span class="ident" id="6959431">TestReadFailures</span><span class="op" id="6959447">(</span><span class="ident" id="6959448">t</span>&nbsp;<span class="op" id="6959450">*</span><span class="ident" id="6959451">testing</span><span class="op" id="6959458">.</span><span class="ident" id="6959459">T</span><span class="op" id="6959460">)</span>&nbsp;<span class="op" id="6959462">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="6959465">//&nbsp;Errors&nbsp;should&nbsp;be&nbsp;reported&nbsp;(true&nbsp;arg&nbsp;to&nbsp;readImports).</span><br>
+<span class="lineno">210</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6959522">testRead</span><span class="op" id="6959530">(</span><span class="ident" id="6959531">t</span><span class="op" id="6959532">,</span>&nbsp;<span class="ident" id="6959534">readFailuresTests</span><span class="op" id="6959551">,</span>&nbsp;<span class="keyword" id="6959553">func</span><span class="op" id="6959557">(</span><span class="ident" id="6959558">r</span>&nbsp;<span class="ident" id="6959560">io</span><span class="op" id="6959562">.</span><span class="ident" id="6959563">Reader</span><span class="op" id="6959569">)</span>&nbsp;<span class="op" id="6959571">(</span><span class="op" id="6959572">[</span><span class="op" id="6959573">]</span><span class="builtintype" id="6959574">byte</span><span class="op" id="6959578">,</span>&nbsp;<span class="builtintype" id="6959580">error</span><span class="op" id="6959585">)</span>&nbsp;<span class="op" id="6959587">{</span>&nbsp;<span class="keyword" id="6959589">return</span>&nbsp;<span class="ident" id="6959596">readImports</span><span class="op" id="6959607">(</span><span class="ident" id="6959608">r</span><span class="op" id="6959609">,</span>&nbsp;<span class="builtintype" id="6959611">true</span><span class="op" id="6959615">)</span>&nbsp;<span class="op" id="6959617">}</span><span class="op" id="6959618">)</span><br>
+<span class="lineno"></span><span class="op" id="6959620">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="6959623">func</span>&nbsp;<span class="ident" id="6959628">TestReadFailuresIgnored</span><span class="op" id="6959651">(</span><span class="ident" id="6959652">t</span>&nbsp;<span class="op" id="6959654">*</span><span class="ident" id="6959655">testing</span><span class="op" id="6959662">.</span><span class="ident" id="6959663">T</span><span class="op" id="6959664">)</span>&nbsp;<span class="op" id="6959666">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="6959669">//&nbsp;Syntax&nbsp;errors&nbsp;should&nbsp;not&nbsp;be&nbsp;reported&nbsp;(false&nbsp;arg&nbsp;to&nbsp;readImports).</span><br>
+<span class="lineno">215</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="6959738">//&nbsp;Instead,&nbsp;entire&nbsp;file&nbsp;should&nbsp;be&nbsp;the&nbsp;output&nbsp;and&nbsp;no&nbsp;error.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="6959798">//&nbsp;Convert&nbsp;tests&nbsp;not&nbsp;to&nbsp;return&nbsp;syntax&nbsp;errors.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6959845">tests</span>&nbsp;<span class="op" id="6959851">:=</span>&nbsp;<span class="builtinfunc" id="6959854">make</span><span class="op" id="6959858">(</span><span class="op" id="6959859">[</span><span class="op" id="6959860">]</span><span class="ident" id="6959861">readTest</span><span class="op" id="6959869">,</span>&nbsp;<span class="builtinfunc" id="6959871">len</span><span class="op" id="6959874">(</span><span class="ident" id="6959875">readFailuresTests</span><span class="op" id="6959892">)</span><span class="op" id="6959893">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc" id="6959896">copy</span><span class="op" id="6959900">(</span><span class="ident" id="6959901">tests</span><span class="op" id="6959906">,</span>&nbsp;<span class="ident" id="6959908">readFailuresTests</span><span class="op" id="6959925">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="6959928">for</span>&nbsp;<span class="ident" id="6959932">i</span>&nbsp;<span class="op" id="6959934">:=</span>&nbsp;<span class="keyword" id="6959937">range</span>&nbsp;<span class="ident" id="6959943">tests</span>&nbsp;<span class="op" id="6959949">{</span><br>
+<span class="lineno">220</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6959953">tt</span>&nbsp;<span class="op" id="6959956">:=</span>&nbsp;<span class="op" id="6959959">&amp;</span><span class="ident" id="6959960">tests</span><span class="op" id="6959965">[</span><span class="ident" id="6959966">i</span><span class="op" id="6959967">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="6959971">if</span>&nbsp;<span class="op" id="6959974">!</span><span class="ident" id="6959975">strings</span><span class="op" id="6959982">.</span><span class="ident" id="6959983">Contains</span><span class="op" id="6959991">(</span><span class="ident" id="6959992">tt</span><span class="op" id="6959994">.</span><span class="ident" id="6959995">err</span><span class="op" id="6959998">,</span>&nbsp;<span class="string" id="6960000">&#34;NUL&#34;</span><span class="op" id="6960005">)</span>&nbsp;<span class="op" id="6960007">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6960012">tt</span><span class="op" id="6960014">.</span><span class="ident" id="6960015">err</span>&nbsp;<span class="op" id="6960019">=</span>&nbsp;<span class="string" id="6960021">&#34;&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6960026">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6960029">}</span><br>
+<span class="lineno">225</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6960032">testRead</span><span class="op" id="6960040">(</span><span class="ident" id="6960041">t</span><span class="op" id="6960042">,</span>&nbsp;<span class="ident" id="6960044">tests</span><span class="op" id="6960049">,</span>&nbsp;<span class="keyword" id="6960051">func</span><span class="op" id="6960055">(</span><span class="ident" id="6960056">r</span>&nbsp;<span class="ident" id="6960058">io</span><span class="op" id="6960060">.</span><span class="ident" id="6960061">Reader</span><span class="op" id="6960067">)</span>&nbsp;<span class="op" id="6960069">(</span><span class="op" id="6960070">[</span><span class="op" id="6960071">]</span><span class="builtintype" id="6960072">byte</span><span class="op" id="6960076">,</span>&nbsp;<span class="builtintype" id="6960078">error</span><span class="op" id="6960083">)</span>&nbsp;<span class="op" id="6960085">{</span>&nbsp;<span class="keyword" id="6960087">return</span>&nbsp;<span class="ident" id="6960094">readImports</span><span class="op" id="6960105">(</span><span class="ident" id="6960106">r</span><span class="op" id="6960107">,</span>&nbsp;<span class="builtintype" id="6960109">false</span><span class="op" id="6960114">)</span>&nbsp;<span class="op" id="6960116">}</span><span class="op" id="6960117">)</span><br>
+<span class="lineno"></span><span class="op" id="6960119">}</span>
+</div>
+</body>
+</html>

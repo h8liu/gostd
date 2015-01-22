@@ -1,0 +1,70 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="keyword" id="5065320">package</span>&nbsp;<span class="ident" id="5065328">arch8</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="5065335">import</span>&nbsp;<span class="op" id="5065342">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="5065345">&#34;encoding/binary&#34;</span><br>
+<span class="lineno">5</span><span class="op" id="5065363">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="5065366">//&nbsp;PageSize&nbsp;is&nbsp;the&nbsp;number&nbsp;of&nbsp;bytes&nbsp;a&nbsp;page&nbsp;contains.</span><br>
+<span class="lineno"></span><span class="keyword" id="5065418">const</span>&nbsp;<span class="ident" id="5065424">PageSize</span>&nbsp;<span class="op" id="5065433">=</span>&nbsp;<span class="num" id="5065435">4096</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">10</span><span class="comment" id="5065441">//&nbsp;Page&nbsp;is&nbsp;a&nbsp;memory&nbsp;addressable&nbsp;area&nbsp;of&nbsp;PageSize&nbsp;bytes</span><br>
+<span class="lineno"></span><span class="keyword" id="5065496">type</span>&nbsp;<span class="ident" id="5065501">page</span>&nbsp;<span class="keyword" id="5065506">struct</span>&nbsp;<span class="op" id="5065513">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5065516">Bytes</span>&nbsp;<span class="op" id="5065522">[</span><span class="op" id="5065523">]</span><span class="builtintype" id="5065524">byte</span><br>
+<span class="lineno"></span><span class="op" id="5065529">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">15</span><span class="comment" id="5065532">//&nbsp;NewPage&nbsp;creates&nbsp;a&nbsp;new&nbsp;empty&nbsp;page.</span><br>
+<span class="lineno"></span><span class="keyword" id="5065569">func</span>&nbsp;<span class="ident" id="5065574">newPage</span><span class="op" id="5065581">(</span><span class="op" id="5065582">)</span>&nbsp;<span class="op" id="5065584">*</span><span class="ident" id="5065585">page</span>&nbsp;<span class="op" id="5065590">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="5065593">return</span>&nbsp;<span class="op" id="5065600">&amp;</span><span class="ident" id="5065601">page</span><span class="op" id="5065605">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5065609">Bytes</span><span class="op" id="5065614">:</span>&nbsp;<span class="builtinfunc" id="5065616">make</span><span class="op" id="5065620">(</span><span class="op" id="5065621">[</span><span class="op" id="5065622">]</span><span class="builtintype" id="5065623">byte</span><span class="op" id="5065627">,</span>&nbsp;<span class="ident" id="5065629">PageSize</span><span class="op" id="5065637">)</span><span class="op" id="5065638">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="5065641">}</span><br>
+<span class="lineno">20</span><span class="op" id="5065643">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="5065646">//&nbsp;ReadByte&nbsp;reads&nbsp;a&nbsp;byte&nbsp;at&nbsp;the&nbsp;particular&nbsp;offset.</span><br>
+<span class="lineno"></span><span class="comment" id="5065697">//&nbsp;When&nbsp;offset&nbsp;is&nbsp;larger&nbsp;than&nbsp;offset,&nbsp;it&nbsp;uses&nbsp;the&nbsp;modular.</span><br>
+<span class="lineno"></span><span class="keyword" id="5065756">func</span>&nbsp;<span class="op" id="5065761">(</span><span class="ident" id="5065762">p</span>&nbsp;<span class="op" id="5065764">*</span><span class="ident" id="5065765">page</span><span class="op" id="5065769">)</span>&nbsp;<span class="ident" id="5065771">ReadByte</span><span class="op" id="5065779">(</span><span class="ident" id="5065780">offset</span>&nbsp;<span class="builtintype" id="5065787">uint32</span><span class="op" id="5065793">)</span>&nbsp;<span class="builtintype" id="5065795">byte</span>&nbsp;<span class="op" id="5065800">{</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="5065803">return</span>&nbsp;<span class="ident" id="5065810">p</span><span class="op" id="5065811">.</span><span class="ident" id="5065812">Bytes</span><span class="op" id="5065817">[</span><span class="ident" id="5065818">offset</span><span class="op" id="5065824">%</span><span class="ident" id="5065825">PageSize</span><span class="op" id="5065833">]</span><br>
+<span class="lineno"></span><span class="op" id="5065835">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="5065838">//&nbsp;WriteByte&nbsp;writes&nbsp;a&nbsp;byte&nbsp;into&nbsp;the&nbsp;page&nbsp;at&nbsp;a&nbsp;particular&nbsp;offset.</span><br>
+<span class="lineno"></span><span class="comment" id="5065903">//&nbsp;When&nbsp;offset&nbsp;is&nbsp;larger&nbsp;than&nbsp;offset,&nbsp;it&nbsp;uses&nbsp;the&nbsp;modular.</span><br>
+<span class="lineno">30</span><span class="keyword" id="5065962">func</span>&nbsp;<span class="op" id="5065967">(</span><span class="ident" id="5065968">p</span>&nbsp;<span class="op" id="5065970">*</span><span class="ident" id="5065971">page</span><span class="op" id="5065975">)</span>&nbsp;<span class="ident" id="5065977">WriteByte</span><span class="op" id="5065986">(</span><span class="ident" id="5065987">offset</span>&nbsp;<span class="builtintype" id="5065994">uint32</span><span class="op" id="5066000">,</span>&nbsp;<span class="ident" id="5066002">b</span>&nbsp;<span class="builtintype" id="5066004">byte</span><span class="op" id="5066008">)</span>&nbsp;<span class="op" id="5066010">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5066013">p</span><span class="op" id="5066014">.</span><span class="ident" id="5066015">Bytes</span><span class="op" id="5066020">[</span><span class="ident" id="5066021">offset</span><span class="op" id="5066027">%</span><span class="ident" id="5066028">PageSize</span><span class="op" id="5066036">]</span>&nbsp;<span class="op" id="5066038">=</span>&nbsp;<span class="ident" id="5066040">b</span><br>
+<span class="lineno"></span><span class="op" id="5066042">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="5066045">//&nbsp;The&nbsp;machines&nbsp;endian.</span><br>
+<span class="lineno">35</span><span class="keyword" id="5066069">var</span>&nbsp;<span class="ident" id="5066073">Endian</span>&nbsp;<span class="op" id="5066080">=</span>&nbsp;<span class="ident" id="5066082">binary</span><span class="op" id="5066088">.</span><span class="ident" id="5066089">LittleEndian</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="5066103">func</span>&nbsp;<span class="ident" id="5066108">wordOff</span><span class="op" id="5066115">(</span><span class="ident" id="5066116">offset</span>&nbsp;<span class="builtintype" id="5066123">uint32</span><span class="op" id="5066129">)</span>&nbsp;<span class="builtintype" id="5066131">uint32</span>&nbsp;<span class="op" id="5066138">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="5066141">return</span>&nbsp;<span class="op" id="5066148">(</span><span class="ident" id="5066149">offset</span>&nbsp;<span class="op" id="5066156">%</span>&nbsp;<span class="ident" id="5066158">PageSize</span><span class="op" id="5066166">)</span>&nbsp;<span class="op" id="5066168">&amp;</span>&nbsp;<span class="op" id="5066170">^</span><span class="builtintype" id="5066171">uint32</span><span class="op" id="5066177">(</span><span class="num" id="5066178">0x3</span><span class="op" id="5066181">)</span><br>
+<span class="lineno"></span><span class="op" id="5066183">}</span><br>
+<span class="lineno">40</span><br>
+<span class="lineno"></span><span class="comment" id="5066186">//&nbsp;ReadWord&nbsp;reads&nbsp;the&nbsp;word&nbsp;at&nbsp;the&nbsp;particular&nbsp;offset.</span><br>
+<span class="lineno"></span><span class="comment" id="5066239">//&nbsp;When&nbsp;offset&nbsp;is&nbsp;larger&nbsp;than&nbsp;offset,&nbsp;it&nbsp;uses&nbsp;the&nbsp;modular.</span><br>
+<span class="lineno"></span><span class="comment" id="5066298">//&nbsp;When&nbsp;offset&nbsp;is&nbsp;not&nbsp;4-byte&nbsp;aligned,&nbsp;it&nbsp;aligns&nbsp;down.</span><br>
+<span class="lineno"></span><span class="keyword" id="5066352">func</span>&nbsp;<span class="op" id="5066357">(</span><span class="ident" id="5066358">p</span>&nbsp;<span class="op" id="5066360">*</span><span class="ident" id="5066361">page</span><span class="op" id="5066365">)</span>&nbsp;<span class="ident" id="5066367">ReadWord</span><span class="op" id="5066375">(</span><span class="ident" id="5066376">offset</span>&nbsp;<span class="builtintype" id="5066383">uint32</span><span class="op" id="5066389">)</span>&nbsp;<span class="builtintype" id="5066391">uint32</span>&nbsp;<span class="op" id="5066398">{</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5066401">offset</span>&nbsp;<span class="op" id="5066408">=</span>&nbsp;<span class="ident" id="5066410">wordOff</span><span class="op" id="5066417">(</span><span class="ident" id="5066418">offset</span><span class="op" id="5066424">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="5066427">return</span>&nbsp;<span class="ident" id="5066434">Endian</span><span class="op" id="5066440">.</span><span class="ident" id="5066441">Uint32</span><span class="op" id="5066447">(</span><span class="ident" id="5066448">p</span><span class="op" id="5066449">.</span><span class="ident" id="5066450">Bytes</span><span class="op" id="5066455">[</span><span class="ident" id="5066456">offset</span>&nbsp;<span class="op" id="5066463">:</span>&nbsp;<span class="ident" id="5066465">offset</span><span class="op" id="5066471">+</span><span class="num" id="5066472">4</span><span class="op" id="5066473">]</span><span class="op" id="5066474">)</span><br>
+<span class="lineno"></span><span class="op" id="5066476">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="5066479">//&nbsp;WriteWord&nbsp;writes&nbsp;the&nbsp;word&nbsp;at&nbsp;the&nbsp;particular&nbsp;offset.</span><br>
+<span class="lineno">50</span><span class="comment" id="5066534">//&nbsp;When&nbsp;offset&nbsp;is&nbsp;larger&nbsp;than&nbsp;offset,&nbsp;it&nbsp;uses&nbsp;the&nbsp;modular.</span><br>
+<span class="lineno"></span><span class="comment" id="5066593">//&nbsp;When&nbsp;offset&nbsp;is&nbsp;not&nbsp;4-byte&nbsp;aligned,&nbsp;it&nbsp;aligns&nbsp;down.</span><br>
+<span class="lineno"></span><span class="keyword" id="5066647">func</span>&nbsp;<span class="op" id="5066652">(</span><span class="ident" id="5066653">p</span>&nbsp;<span class="op" id="5066655">*</span><span class="ident" id="5066656">page</span><span class="op" id="5066660">)</span>&nbsp;<span class="ident" id="5066662">WriteWord</span><span class="op" id="5066671">(</span><span class="ident" id="5066672">offset</span>&nbsp;<span class="builtintype" id="5066679">uint32</span><span class="op" id="5066685">,</span>&nbsp;<span class="ident" id="5066687">w</span>&nbsp;<span class="builtintype" id="5066689">uint32</span><span class="op" id="5066695">)</span>&nbsp;<span class="op" id="5066697">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5066700">offset</span>&nbsp;<span class="op" id="5066707">=</span>&nbsp;<span class="ident" id="5066709">wordOff</span><span class="op" id="5066716">(</span><span class="ident" id="5066717">offset</span><span class="op" id="5066723">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5066726">Endian</span><span class="op" id="5066732">.</span><span class="ident" id="5066733">PutUint32</span><span class="op" id="5066742">(</span><span class="ident" id="5066743">p</span><span class="op" id="5066744">.</span><span class="ident" id="5066745">Bytes</span><span class="op" id="5066750">[</span><span class="ident" id="5066751">offset</span><span class="op" id="5066757">:</span><span class="ident" id="5066758">offset</span><span class="op" id="5066764">+</span><span class="num" id="5066765">4</span><span class="op" id="5066766">]</span><span class="op" id="5066767">,</span>&nbsp;<span class="ident" id="5066769">w</span><span class="op" id="5066770">)</span><br>
+<span class="lineno">55</span><span class="op" id="5066772">}</span>
+</div>
+</body>
+</html>

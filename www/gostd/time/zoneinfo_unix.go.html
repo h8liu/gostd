@@ -1,0 +1,99 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment" id="2486262">//&nbsp;Copyright&nbsp;2009&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment" id="2486317">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment" id="2486371">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="comment" id="2486422">//&nbsp;+build&nbsp;darwin&nbsp;dragonfly&nbsp;freebsd&nbsp;linux&nbsp;nacl&nbsp;netbsd&nbsp;openbsd&nbsp;solaris</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="2486492">//&nbsp;Parse&nbsp;&#34;zoneinfo&#34;&nbsp;time&nbsp;zone&nbsp;file.</span><br>
+<span class="lineno"></span><span class="comment" id="2486528">//&nbsp;This&nbsp;is&nbsp;a&nbsp;fairly&nbsp;standard&nbsp;file&nbsp;format&nbsp;used&nbsp;on&nbsp;OS&nbsp;X,&nbsp;Linux,&nbsp;BSD,&nbsp;Sun,&nbsp;and&nbsp;others.</span><br>
+<span class="lineno"></span><span class="comment" id="2486612">//&nbsp;See&nbsp;tzfile(5),&nbsp;http://en.wikipedia.org/wiki/Zoneinfo,</span><br>
+<span class="lineno">10</span><span class="comment" id="2486669">//&nbsp;and&nbsp;ftp://munnari.oz.au/pub/oldtz/</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="2486708">package</span>&nbsp;<span class="ident" id="2486716">time</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="2486722">import</span>&nbsp;<span class="op" id="2486729">(</span><br>
+<span class="lineno">15</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="2486732">&#34;errors&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="2486742">&#34;runtime&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="2486753">&#34;syscall&#34;</span><br>
+<span class="lineno"></span><span class="op" id="2486763">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">20</span><span class="keyword" id="2486766">func</span>&nbsp;<span class="ident" id="2486771">initTestingZone</span><span class="op" id="2486786">(</span><span class="op" id="2486787">)</span>&nbsp;<span class="op" id="2486789">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2486792">z</span><span class="op" id="2486793">,</span>&nbsp;<span class="ident" id="2486795">err</span>&nbsp;<span class="op" id="2486799">:=</span>&nbsp;<span class="ident" id="2486802">loadZoneFile</span><span class="op" id="2486814">(</span><span class="ident" id="2486815">runtime</span><span class="op" id="2486822">.</span><span class="ident" id="2486823">GOROOT</span><span class="op" id="2486829">(</span><span class="op" id="2486830">)</span><span class="op" id="2486831">+</span><span class="string" id="2486832">&#34;/lib/time/zoneinfo.zip&#34;</span><span class="op" id="2486856">,</span>&nbsp;<span class="string" id="2486858">&#34;America/Los_Angeles&#34;</span><span class="op" id="2486879">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="2486882">if</span>&nbsp;<span class="ident" id="2486885">err</span>&nbsp;<span class="op" id="2486889">!=</span>&nbsp;<span class="ident" id="2486892">nil</span>&nbsp;<span class="op" id="2486896">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc" id="2486900">panic</span><span class="op" id="2486905">(</span><span class="string" id="2486906">&#34;cannot&nbsp;load&nbsp;America/Los_Angeles&nbsp;for&nbsp;testing:&nbsp;&#34;</span>&nbsp;<span class="op" id="2486954">+</span>&nbsp;<span class="ident" id="2486956">err</span><span class="op" id="2486959">.</span><span class="ident" id="2486960">Error</span><span class="op" id="2486965">(</span><span class="op" id="2486966">)</span><span class="op" id="2486967">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="2486970">}</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2486973">z</span><span class="op" id="2486974">.</span><span class="ident" id="2486975">name</span>&nbsp;<span class="op" id="2486980">=</span>&nbsp;<span class="string" id="2486982">&#34;Local&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2486991">localLoc</span>&nbsp;<span class="op" id="2487000">=</span>&nbsp;<span class="op" id="2487002">*</span><span class="ident" id="2487003">z</span><br>
+<span class="lineno"></span><span class="op" id="2487005">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="2487008">//&nbsp;Many&nbsp;systems&nbsp;use&nbsp;/usr/share/zoneinfo,&nbsp;Solaris&nbsp;2&nbsp;has</span><br>
+<span class="lineno">30</span><span class="comment" id="2487063">//&nbsp;/usr/share/lib/zoneinfo,&nbsp;IRIX&nbsp;6&nbsp;has&nbsp;/usr/lib/locale/TZ.</span><br>
+<span class="lineno"></span><span class="keyword" id="2487122">var</span>&nbsp;<span class="ident" id="2487126">zoneDirs</span>&nbsp;<span class="op" id="2487135">=</span>&nbsp;<span class="op" id="2487137">[</span><span class="op" id="2487138">]</span><span class="builtintype" id="2487139">string</span><span class="op" id="2487145">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="2487148">&#34;/usr/share/zoneinfo/&#34;</span><span class="op" id="2487170">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="2487173">&#34;/usr/share/lib/zoneinfo/&#34;</span><span class="op" id="2487199">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="2487202">&#34;/usr/lib/locale/TZ/&#34;</span><span class="op" id="2487223">,</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2487226">runtime</span><span class="op" id="2487233">.</span><span class="ident" id="2487234">GOROOT</span><span class="op" id="2487240">(</span><span class="op" id="2487241">)</span>&nbsp;<span class="op" id="2487243">+</span>&nbsp;<span class="string" id="2487245">&#34;/lib/time/zoneinfo.zip&#34;</span><span class="op" id="2487269">,</span><br>
+<span class="lineno"></span><span class="op" id="2487271">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="2487274">var</span>&nbsp;<span class="ident" id="2487278">origZoneDirs</span>&nbsp;<span class="op" id="2487291">=</span>&nbsp;<span class="ident" id="2487293">zoneDirs</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">40</span><span class="keyword" id="2487303">func</span>&nbsp;<span class="ident" id="2487308">forceZipFileForTesting</span><span class="op" id="2487330">(</span><span class="ident" id="2487331">zipOnly</span>&nbsp;<span class="builtintype" id="2487339">bool</span><span class="op" id="2487343">)</span>&nbsp;<span class="op" id="2487345">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2487348">zoneDirs</span>&nbsp;<span class="op" id="2487357">=</span>&nbsp;<span class="builtinfunc" id="2487359">make</span><span class="op" id="2487363">(</span><span class="op" id="2487364">[</span><span class="op" id="2487365">]</span><span class="builtintype" id="2487366">string</span><span class="op" id="2487372">,</span>&nbsp;<span class="builtinfunc" id="2487374">len</span><span class="op" id="2487377">(</span><span class="ident" id="2487378">origZoneDirs</span><span class="op" id="2487390">)</span><span class="op" id="2487391">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc" id="2487394">copy</span><span class="op" id="2487398">(</span><span class="ident" id="2487399">zoneDirs</span><span class="op" id="2487407">,</span>&nbsp;<span class="ident" id="2487409">origZoneDirs</span><span class="op" id="2487421">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="2487424">if</span>&nbsp;<span class="ident" id="2487427">zipOnly</span>&nbsp;<span class="op" id="2487435">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="2487439">for</span>&nbsp;<span class="ident" id="2487443">i</span>&nbsp;<span class="op" id="2487445">:=</span>&nbsp;<span class="num" id="2487448">0</span><span class="op" id="2487449">;</span>&nbsp;<span class="ident" id="2487451">i</span>&nbsp;<span class="op" id="2487453">&lt;</span>&nbsp;<span class="builtinfunc" id="2487455">len</span><span class="op" id="2487458">(</span><span class="ident" id="2487459">zoneDirs</span><span class="op" id="2487467">)</span><span class="op" id="2487468">-</span><span class="num" id="2487469">1</span><span class="op" id="2487470">;</span>&nbsp;<span class="ident" id="2487472">i</span><span class="op" id="2487473">++</span>&nbsp;<span class="op" id="2487476">{</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2487481">zoneDirs</span><span class="op" id="2487489">[</span><span class="ident" id="2487490">i</span><span class="op" id="2487491">]</span>&nbsp;<span class="op" id="2487493">=</span>&nbsp;<span class="string" id="2487495">&#34;/XXXNOEXIST&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="2487511">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="2487514">}</span><br>
+<span class="lineno"></span><span class="op" id="2487516">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">50</span><span class="keyword" id="2487519">func</span>&nbsp;<span class="ident" id="2487524">initLocal</span><span class="op" id="2487533">(</span><span class="op" id="2487534">)</span>&nbsp;<span class="op" id="2487536">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="2487539">//&nbsp;consult&nbsp;$TZ&nbsp;to&nbsp;find&nbsp;the&nbsp;time&nbsp;zone&nbsp;to&nbsp;use.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="2487585">//&nbsp;no&nbsp;$TZ&nbsp;means&nbsp;use&nbsp;the&nbsp;system&nbsp;default&nbsp;/etc/localtime.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="2487641">//&nbsp;$TZ=&#34;&#34;&nbsp;means&nbsp;use&nbsp;UTC.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="2487667">//&nbsp;$TZ=&#34;foo&#34;&nbsp;means&nbsp;use&nbsp;/usr/share/zoneinfo/foo.</span><br>
+<span class="lineno">55</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2487717">tz</span><span class="op" id="2487719">,</span>&nbsp;<span class="ident" id="2487721">ok</span>&nbsp;<span class="op" id="2487724">:=</span>&nbsp;<span class="ident" id="2487727">syscall</span><span class="op" id="2487734">.</span><span class="ident" id="2487735">Getenv</span><span class="op" id="2487741">(</span><span class="string" id="2487742">&#34;TZ&#34;</span><span class="op" id="2487746">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="2487749">switch</span>&nbsp;<span class="op" id="2487756">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="2487759">case</span>&nbsp;<span class="op" id="2487764">!</span><span class="ident" id="2487765">ok</span><span class="op" id="2487767">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2487771">z</span><span class="op" id="2487772">,</span>&nbsp;<span class="ident" id="2487774">err</span>&nbsp;<span class="op" id="2487778">:=</span>&nbsp;<span class="ident" id="2487781">loadZoneFile</span><span class="op" id="2487793">(</span><span class="string" id="2487794">&#34;&#34;</span><span class="op" id="2487796">,</span>&nbsp;<span class="string" id="2487798">&#34;/etc/localtime&#34;</span><span class="op" id="2487814">)</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="2487818">if</span>&nbsp;<span class="ident" id="2487821">err</span>&nbsp;<span class="op" id="2487825">==</span>&nbsp;<span class="ident" id="2487828">nil</span>&nbsp;<span class="op" id="2487832">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2487837">localLoc</span>&nbsp;<span class="op" id="2487846">=</span>&nbsp;<span class="op" id="2487848">*</span><span class="ident" id="2487849">z</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2487854">localLoc</span><span class="op" id="2487862">.</span><span class="ident" id="2487863">name</span>&nbsp;<span class="op" id="2487868">=</span>&nbsp;<span class="string" id="2487870">&#34;Local&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="2487881">return</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="2487890">}</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="2487893">case</span>&nbsp;<span class="ident" id="2487898">tz</span>&nbsp;<span class="op" id="2487901">!=</span>&nbsp;<span class="string" id="2487904">&#34;&#34;</span>&nbsp;<span class="op" id="2487907">&amp;&amp;</span>&nbsp;<span class="ident" id="2487910">tz</span>&nbsp;<span class="op" id="2487913">!=</span>&nbsp;<span class="string" id="2487916">&#34;UTC&#34;</span><span class="op" id="2487921">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="2487925">if</span>&nbsp;<span class="ident" id="2487928">z</span><span class="op" id="2487929">,</span>&nbsp;<span class="ident" id="2487931">err</span>&nbsp;<span class="op" id="2487935">:=</span>&nbsp;<span class="ident" id="2487938">loadLocation</span><span class="op" id="2487950">(</span><span class="ident" id="2487951">tz</span><span class="op" id="2487953">)</span><span class="op" id="2487954">;</span>&nbsp;<span class="ident" id="2487956">err</span>&nbsp;<span class="op" id="2487960">==</span>&nbsp;<span class="ident" id="2487963">nil</span>&nbsp;<span class="op" id="2487967">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2487972">localLoc</span>&nbsp;<span class="op" id="2487981">=</span>&nbsp;<span class="op" id="2487983">*</span><span class="ident" id="2487984">z</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="2487989">return</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="2487998">}</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="2488001">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="2488005">//&nbsp;Fall&nbsp;back&nbsp;to&nbsp;UTC.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2488027">localLoc</span><span class="op" id="2488035">.</span><span class="ident" id="2488036">name</span>&nbsp;<span class="op" id="2488041">=</span>&nbsp;<span class="string" id="2488043">&#34;UTC&#34;</span><br>
+<span class="lineno"></span><span class="op" id="2488049">}</span><br>
+<span class="lineno">75</span><br>
+<span class="lineno"></span><span class="keyword" id="2488052">func</span>&nbsp;<span class="ident" id="2488057">loadLocation</span><span class="op" id="2488069">(</span><span class="ident" id="2488070">name</span>&nbsp;<span class="builtintype" id="2488075">string</span><span class="op" id="2488081">)</span>&nbsp;<span class="op" id="2488083">(</span><span class="op" id="2488084">*</span><span class="ident" id="2488085">Location</span><span class="op" id="2488093">,</span>&nbsp;<span class="builtintype" id="2488095">error</span><span class="op" id="2488100">)</span>&nbsp;<span class="op" id="2488102">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="2488105">for</span>&nbsp;<span class="ident" id="2488109">_</span><span class="op" id="2488110">,</span>&nbsp;<span class="ident" id="2488112">zoneDir</span>&nbsp;<span class="op" id="2488120">:=</span>&nbsp;<span class="keyword" id="2488123">range</span>&nbsp;<span class="ident" id="2488129">zoneDirs</span>&nbsp;<span class="op" id="2488138">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="2488142">if</span>&nbsp;<span class="ident" id="2488145">z</span><span class="op" id="2488146">,</span>&nbsp;<span class="ident" id="2488148">err</span>&nbsp;<span class="op" id="2488152">:=</span>&nbsp;<span class="ident" id="2488155">loadZoneFile</span><span class="op" id="2488167">(</span><span class="ident" id="2488168">zoneDir</span><span class="op" id="2488175">,</span>&nbsp;<span class="ident" id="2488177">name</span><span class="op" id="2488181">)</span><span class="op" id="2488182">;</span>&nbsp;<span class="ident" id="2488184">err</span>&nbsp;<span class="op" id="2488188">==</span>&nbsp;<span class="ident" id="2488191">nil</span>&nbsp;<span class="op" id="2488195">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2488200">z</span><span class="op" id="2488201">.</span><span class="ident" id="2488202">name</span>&nbsp;<span class="op" id="2488207">=</span>&nbsp;<span class="ident" id="2488209">name</span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="2488217">return</span>&nbsp;<span class="ident" id="2488224">z</span><span class="op" id="2488225">,</span>&nbsp;<span class="ident" id="2488227">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="2488233">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="2488236">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="2488239">return</span>&nbsp;<span class="ident" id="2488246">nil</span><span class="op" id="2488249">,</span>&nbsp;<span class="ident" id="2488251">errors</span><span class="op" id="2488257">.</span><span class="ident" id="2488258">New</span><span class="op" id="2488261">(</span><span class="string" id="2488262">&#34;unknown&nbsp;time&nbsp;zone&nbsp;&#34;</span>&nbsp;<span class="op" id="2488283">+</span>&nbsp;<span class="ident" id="2488285">name</span><span class="op" id="2488289">)</span><br>
+<span class="lineno"></span><span class="op" id="2488291">}</span>
+</div>
+</body>
+</html>

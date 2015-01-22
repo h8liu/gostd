@@ -1,0 +1,112 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment" id="1655641">//&nbsp;Copyright&nbsp;2009&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment" id="1655696">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment" id="1655750">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword" id="1655801">package</span>&nbsp;<span class="ident" id="1655809">math</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="1655815">//&nbsp;The&nbsp;original&nbsp;C&nbsp;code,&nbsp;the&nbsp;long&nbsp;comment,&nbsp;and&nbsp;the&nbsp;constants</span><br>
+<span class="lineno"></span><span class="comment" id="1655875">//&nbsp;below&nbsp;were&nbsp;from&nbsp;http://netlib.sandia.gov/cephes/cmath/sin.c,</span><br>
+<span class="lineno"></span><span class="comment" id="1655939">//&nbsp;available&nbsp;from&nbsp;http://www.netlib.org/cephes/cmath.tgz.</span><br>
+<span class="lineno">10</span><span class="comment" id="1655997">//&nbsp;The&nbsp;go&nbsp;code&nbsp;is&nbsp;a&nbsp;simplified&nbsp;version&nbsp;of&nbsp;the&nbsp;original&nbsp;C.</span><br>
+<span class="lineno"></span><span class="comment" id="1656055">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;tanh.c</span><br>
+<span class="lineno"></span><span class="comment" id="1656070">//</span><br>
+<span class="lineno"></span><span class="comment" id="1656073">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Hyperbolic&nbsp;tangent</span><br>
+<span class="lineno"></span><span class="comment" id="1656100">//</span><br>
+<span class="lineno">15</span><span class="comment" id="1656103">//&nbsp;SYNOPSIS:</span><br>
+<span class="lineno"></span><span class="comment" id="1656116">//</span><br>
+<span class="lineno"></span><span class="comment" id="1656119">//&nbsp;double&nbsp;x,&nbsp;y,&nbsp;tanh();</span><br>
+<span class="lineno"></span><span class="comment" id="1656143">//</span><br>
+<span class="lineno"></span><span class="comment" id="1656146">//&nbsp;y&nbsp;=&nbsp;tanh(&nbsp;x&nbsp;);</span><br>
+<span class="lineno">20</span><span class="comment" id="1656164">//</span><br>
+<span class="lineno"></span><span class="comment" id="1656167">//&nbsp;DESCRIPTION:</span><br>
+<span class="lineno"></span><span class="comment" id="1656183">//</span><br>
+<span class="lineno"></span><span class="comment" id="1656186">//&nbsp;Returns&nbsp;hyperbolic&nbsp;tangent&nbsp;of&nbsp;argument&nbsp;in&nbsp;the&nbsp;range&nbsp;MINLOG&nbsp;to&nbsp;MAXLOG.</span><br>
+<span class="lineno"></span><span class="comment" id="1656259">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;MAXLOG&nbsp;=&nbsp;8.8029691931113054295988e+01&nbsp;=&nbsp;log(2**127)</span><br>
+<span class="lineno">25</span><span class="comment" id="1656319">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;MINLOG&nbsp;=&nbsp;-8.872283911167299960540e+01&nbsp;=&nbsp;log(2**-128)</span><br>
+<span class="lineno"></span><span class="comment" id="1656380">//</span><br>
+<span class="lineno"></span><span class="comment" id="1656383">//&nbsp;A&nbsp;rational&nbsp;function&nbsp;is&nbsp;used&nbsp;for&nbsp;|x|&nbsp;&lt;&nbsp;0.625.&nbsp;&nbsp;The&nbsp;form</span><br>
+<span class="lineno"></span><span class="comment" id="1656441">//&nbsp;x&nbsp;+&nbsp;x**3&nbsp;P(x)/Q(x)&nbsp;of&nbsp;Cody&nbsp;&amp;&nbsp;Waite&nbsp;is&nbsp;employed.</span><br>
+<span class="lineno"></span><span class="comment" id="1656492">//&nbsp;Otherwise,</span><br>
+<span class="lineno">30</span><span class="comment" id="1656506">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;tanh(x)&nbsp;=&nbsp;sinh(x)/cosh(x)&nbsp;=&nbsp;1&nbsp;&nbsp;-&nbsp;&nbsp;2/(exp(2x)&nbsp;+&nbsp;1).</span><br>
+<span class="lineno"></span><span class="comment" id="1656565">//</span><br>
+<span class="lineno"></span><span class="comment" id="1656568">//&nbsp;ACCURACY:</span><br>
+<span class="lineno"></span><span class="comment" id="1656581">//</span><br>
+<span class="lineno"></span><span class="comment" id="1656584">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Relative&nbsp;error:</span><br>
+<span class="lineno">35</span><span class="comment" id="1656624">//&nbsp;arithmetic&nbsp;&nbsp;&nbsp;domain&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;trials&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;peak&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;rms</span><br>
+<span class="lineno"></span><span class="comment" id="1656682">//&nbsp;&nbsp;&nbsp;&nbsp;IEEE&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-2,2&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;30000&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2.5e-16&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;5.8e-17</span><br>
+<span class="lineno"></span><span class="comment" id="1656742">//</span><br>
+<span class="lineno"></span><span class="comment" id="1656745">//&nbsp;Cephes&nbsp;Math&nbsp;Library&nbsp;Release&nbsp;2.8:&nbsp;&nbsp;June,&nbsp;2000</span><br>
+<span class="lineno"></span><span class="comment" id="1656793">//&nbsp;Copyright&nbsp;1984,&nbsp;1987,&nbsp;1989,&nbsp;1992,&nbsp;2000&nbsp;by&nbsp;Stephen&nbsp;L.&nbsp;Moshier</span><br>
+<span class="lineno">40</span><span class="comment" id="1656857">//</span><br>
+<span class="lineno"></span><span class="comment" id="1656860">//&nbsp;The&nbsp;readme&nbsp;file&nbsp;at&nbsp;http://netlib.sandia.gov/cephes/&nbsp;says:</span><br>
+<span class="lineno"></span><span class="comment" id="1656921">//&nbsp;&nbsp;&nbsp;&nbsp;Some&nbsp;software&nbsp;in&nbsp;this&nbsp;archive&nbsp;may&nbsp;be&nbsp;from&nbsp;the&nbsp;book&nbsp;_Methods&nbsp;and</span><br>
+<span class="lineno"></span><span class="comment" id="1656991">//&nbsp;Programs&nbsp;for&nbsp;Mathematical&nbsp;Functions_&nbsp;(Prentice-Hall&nbsp;or&nbsp;Simon&nbsp;&amp;&nbsp;Schuster</span><br>
+<span class="lineno"></span><span class="comment" id="1657066">//&nbsp;International,&nbsp;1989)&nbsp;or&nbsp;from&nbsp;the&nbsp;Cephes&nbsp;Mathematical&nbsp;Library,&nbsp;a</span><br>
+<span class="lineno">45</span><span class="comment" id="1657133">//&nbsp;commercial&nbsp;product.&nbsp;In&nbsp;either&nbsp;event,&nbsp;it&nbsp;is&nbsp;copyrighted&nbsp;by&nbsp;the&nbsp;author.</span><br>
+<span class="lineno"></span><span class="comment" id="1657206">//&nbsp;What&nbsp;you&nbsp;see&nbsp;here&nbsp;may&nbsp;be&nbsp;used&nbsp;freely&nbsp;but&nbsp;it&nbsp;comes&nbsp;with&nbsp;no&nbsp;support&nbsp;or</span><br>
+<span class="lineno"></span><span class="comment" id="1657278">//&nbsp;guarantee.</span><br>
+<span class="lineno"></span><span class="comment" id="1657292">//</span><br>
+<span class="lineno"></span><span class="comment" id="1657295">//&nbsp;&nbsp;&nbsp;The&nbsp;two&nbsp;known&nbsp;misprints&nbsp;in&nbsp;the&nbsp;book&nbsp;are&nbsp;repaired&nbsp;here&nbsp;in&nbsp;the</span><br>
+<span class="lineno">50</span><span class="comment" id="1657361">//&nbsp;source&nbsp;listings&nbsp;for&nbsp;the&nbsp;gamma&nbsp;function&nbsp;and&nbsp;the&nbsp;incomplete&nbsp;beta</span><br>
+<span class="lineno"></span><span class="comment" id="1657427">//&nbsp;integral.</span><br>
+<span class="lineno"></span><span class="comment" id="1657440">//</span><br>
+<span class="lineno"></span><span class="comment" id="1657443">//&nbsp;&nbsp;&nbsp;Stephen&nbsp;L.&nbsp;Moshier</span><br>
+<span class="lineno"></span><span class="comment" id="1657467">//&nbsp;&nbsp;&nbsp;moshier@na-net.ornl.gov</span><br>
+<span class="lineno">55</span><span class="comment" id="1657496">//</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="1657500">var</span>&nbsp;<span class="ident" id="1657504">tanhP</span>&nbsp;<span class="op" id="1657510">=</span>&nbsp;<span class="op" id="1657512">[</span><span class="op" id="1657513">...</span><span class="op" id="1657516">]</span><span class="builtintype" id="1657517">float64</span><span class="op" id="1657524">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1657527">-</span><span class="num" id="1657528">9.64399179425052238628E-1</span><span class="op" id="1657553">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1657556">-</span><span class="num" id="1657557">9.92877231001918586564E1</span><span class="op" id="1657581">,</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1657584">-</span><span class="num" id="1657585">1.61468768441708447952E3</span><span class="op" id="1657609">,</span><br>
+<span class="lineno"></span><span class="op" id="1657611">}</span><br>
+<span class="lineno"></span><span class="keyword" id="1657613">var</span>&nbsp;<span class="ident" id="1657617">tanhQ</span>&nbsp;<span class="op" id="1657623">=</span>&nbsp;<span class="op" id="1657625">[</span><span class="op" id="1657626">...</span><span class="op" id="1657629">]</span><span class="builtintype" id="1657630">float64</span><span class="op" id="1657637">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="num" id="1657640">1.12811678491632931402E2</span><span class="op" id="1657664">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="num" id="1657667">2.23548839060100448583E3</span><span class="op" id="1657691">,</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="num" id="1657694">4.84406305325125486048E3</span><span class="op" id="1657718">,</span><br>
+<span class="lineno"></span><span class="op" id="1657720">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="1657723">//&nbsp;Tanh&nbsp;returns&nbsp;the&nbsp;hyperbolic&nbsp;tangent&nbsp;of&nbsp;x.</span><br>
+<span class="lineno"></span><span class="comment" id="1657768">//</span><br>
+<span class="lineno">70</span><span class="comment" id="1657771">//&nbsp;Special&nbsp;cases&nbsp;are:</span><br>
+<span class="lineno"></span><span class="comment" id="1657793">//&nbsp;&nbsp;&nbsp;&nbspTanh(±0)&nbsp;=&nbsp;±0</span><br>
+<span class="lineno"></span><span class="comment" id="1657812">//&nbsp;&nbsp;&nbsp;&nbspTanh(±Inf)&nbsp;=&nbsp;±1</span><br>
+<span class="lineno"></span><span class="comment" id="1657833">//&nbsp;&nbsp;&nbsp;&nbspTanh(NaN)&nbsp;=&nbsp;NaN</span><br>
+<span class="lineno"></span><span class="keyword" id="1657852">func</span>&nbsp;<span class="ident" id="1657857">Tanh</span><span class="op" id="1657861">(</span><span class="ident" id="1657862">x</span>&nbsp;<span class="builtintype" id="1657864">float64</span><span class="op" id="1657871">)</span>&nbsp;<span class="builtintype" id="1657873">float64</span>&nbsp;<span class="op" id="1657881">{</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1657884">const</span>&nbsp;<span class="ident" id="1657890">MAXLOG</span>&nbsp;<span class="op" id="1657897">=</span>&nbsp;<span class="num" id="1657899">8.8029691931113054295988e+01</span>&nbsp;<span class="comment" id="1657928">//&nbsp;log(2**127)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1657944">z</span>&nbsp;<span class="op" id="1657946">:=</span>&nbsp;<span class="ident" id="1657949">Abs</span><span class="op" id="1657952">(</span><span class="ident" id="1657953">x</span><span class="op" id="1657954">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1657957">switch</span>&nbsp;<span class="op" id="1657964">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1657967">case</span>&nbsp;<span class="ident" id="1657972">z</span>&nbsp;<span class="op" id="1657974">&gt;</span>&nbsp;<span class="num" id="1657976">0.5</span><span class="op" id="1657979">*</span><span class="ident" id="1657980">MAXLOG</span><span class="op" id="1657986">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1657990">if</span>&nbsp;<span class="ident" id="1657993">x</span>&nbsp;<span class="op" id="1657995">&lt;</span>&nbsp;<span class="num" id="1657997">0</span>&nbsp;<span class="op" id="1657999">{</span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1658004">return</span>&nbsp;<span class="op" id="1658011">-</span><span class="num" id="1658012">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1658016">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1658020">return</span>&nbsp;<span class="num" id="1658027">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1658030">case</span>&nbsp;<span class="ident" id="1658035">z</span>&nbsp;<span class="op" id="1658037">&gt;=</span>&nbsp;<span class="num" id="1658040">0.625</span><span class="op" id="1658045">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1658049">s</span>&nbsp;<span class="op" id="1658051">:=</span>&nbsp;<span class="ident" id="1658054">Exp</span><span class="op" id="1658057">(</span><span class="num" id="1658058">2</span>&nbsp;<span class="op" id="1658060">*</span>&nbsp;<span class="ident" id="1658062">z</span><span class="op" id="1658063">)</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1658067">z</span>&nbsp;<span class="op" id="1658069">=</span>&nbsp;<span class="num" id="1658071">1</span>&nbsp;<span class="op" id="1658073">-</span>&nbsp;<span class="num" id="1658075">2</span><span class="op" id="1658076">/</span><span class="op" id="1658077">(</span><span class="ident" id="1658078">s</span><span class="op" id="1658079">+</span><span class="num" id="1658080">1</span><span class="op" id="1658081">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1658085">if</span>&nbsp;<span class="ident" id="1658088">x</span>&nbsp;<span class="op" id="1658090">&lt;</span>&nbsp;<span class="num" id="1658092">0</span>&nbsp;<span class="op" id="1658094">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1658099">z</span>&nbsp;<span class="op" id="1658101">=</span>&nbsp;<span class="op" id="1658103">-</span><span class="ident" id="1658104">z</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1658108">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1658111">default</span><span class="op" id="1658118">:</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1658122">if</span>&nbsp;<span class="ident" id="1658125">x</span>&nbsp;<span class="op" id="1658127">==</span>&nbsp;<span class="num" id="1658130">0</span>&nbsp;<span class="op" id="1658132">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1658137">return</span>&nbsp;<span class="ident" id="1658144">x</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1658148">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1658152">s</span>&nbsp;<span class="op" id="1658154">:=</span>&nbsp;<span class="ident" id="1658157">x</span>&nbsp;<span class="op" id="1658159">*</span>&nbsp;<span class="ident" id="1658161">x</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1658165">z</span>&nbsp;<span class="op" id="1658167">=</span>&nbsp;<span class="ident" id="1658169">x</span>&nbsp;<span class="op" id="1658171">+</span>&nbsp;<span class="ident" id="1658173">x</span><span class="op" id="1658174">*</span><span class="ident" id="1658175">s</span><span class="op" id="1658176">*</span><span class="op" id="1658177">(</span><span class="op" id="1658178">(</span><span class="ident" id="1658179">tanhP</span><span class="op" id="1658184">[</span><span class="num" id="1658185">0</span><span class="op" id="1658186">]</span><span class="op" id="1658187">*</span><span class="ident" id="1658188">s</span><span class="op" id="1658189">+</span><span class="ident" id="1658190">tanhP</span><span class="op" id="1658195">[</span><span class="num" id="1658196">1</span><span class="op" id="1658197">]</span><span class="op" id="1658198">)</span><span class="op" id="1658199">*</span><span class="ident" id="1658200">s</span><span class="op" id="1658201">+</span><span class="ident" id="1658202">tanhP</span><span class="op" id="1658207">[</span><span class="num" id="1658208">2</span><span class="op" id="1658209">]</span><span class="op" id="1658210">)</span><span class="op" id="1658211">/</span><span class="op" id="1658212">(</span><span class="op" id="1658213">(</span><span class="op" id="1658214">(</span><span class="ident" id="1658215">s</span><span class="op" id="1658216">+</span><span class="ident" id="1658217">tanhQ</span><span class="op" id="1658222">[</span><span class="num" id="1658223">0</span><span class="op" id="1658224">]</span><span class="op" id="1658225">)</span><span class="op" id="1658226">*</span><span class="ident" id="1658227">s</span><span class="op" id="1658228">+</span><span class="ident" id="1658229">tanhQ</span><span class="op" id="1658234">[</span><span class="num" id="1658235">1</span><span class="op" id="1658236">]</span><span class="op" id="1658237">)</span><span class="op" id="1658238">*</span><span class="ident" id="1658239">s</span><span class="op" id="1658240">+</span><span class="ident" id="1658241">tanhQ</span><span class="op" id="1658246">[</span><span class="num" id="1658247">2</span><span class="op" id="1658248">]</span><span class="op" id="1658249">)</span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1658252">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1658255">return</span>&nbsp;<span class="ident" id="1658262">z</span><br>
+<span class="lineno"></span><span class="op" id="1658264">}</span>
+</div>
+</body>
+</html>

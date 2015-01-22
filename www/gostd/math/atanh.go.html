@@ -1,0 +1,92 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment" id="1527561">//&nbsp;Copyright&nbsp;2010&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment" id="1527616">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment" id="1527670">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword" id="1527721">package</span>&nbsp;<span class="ident" id="1527729">math</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="1527735">//&nbsp;The&nbsp;original&nbsp;C&nbsp;code,&nbsp;the&nbsp;long&nbsp;comment,&nbsp;and&nbsp;the&nbsp;constants</span><br>
+<span class="lineno"></span><span class="comment" id="1527795">//&nbsp;below&nbsp;are&nbsp;from&nbsp;FreeBSD&#39;s&nbsp;/usr/src/lib/msun/src/e_atanh.c</span><br>
+<span class="lineno"></span><span class="comment" id="1527855">//&nbsp;and&nbsp;came&nbsp;with&nbsp;this&nbsp;notice.&nbsp;&nbsp;The&nbsp;go&nbsp;code&nbsp;is&nbsp;a&nbsp;simplified</span><br>
+<span class="lineno">10</span><span class="comment" id="1527914">//&nbsp;version&nbsp;of&nbsp;the&nbsp;original&nbsp;C.</span><br>
+<span class="lineno"></span><span class="comment" id="1527944">//</span><br>
+<span class="lineno"></span><span class="comment" id="1527947">//&nbsp;====================================================</span><br>
+<span class="lineno"></span><span class="comment" id="1528003">//&nbsp;Copyright&nbsp;(C)&nbsp;1993&nbsp;by&nbsp;Sun&nbsp;Microsystems,&nbsp;Inc.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment" id="1528072">//</span><br>
+<span class="lineno">15</span><span class="comment" id="1528075">//&nbsp;Developed&nbsp;at&nbsp;SunPro,&nbsp;a&nbsp;Sun&nbsp;Microsystems,&nbsp;Inc.&nbsp;business.</span><br>
+<span class="lineno"></span><span class="comment" id="1528134">//&nbsp;Permission&nbsp;to&nbsp;use,&nbsp;copy,&nbsp;modify,&nbsp;and&nbsp;distribute&nbsp;this</span><br>
+<span class="lineno"></span><span class="comment" id="1528190">//&nbsp;software&nbsp;is&nbsp;freely&nbsp;granted,&nbsp;provided&nbsp;that&nbsp;this&nbsp;notice</span><br>
+<span class="lineno"></span><span class="comment" id="1528247">//&nbsp;is&nbsp;preserved.</span><br>
+<span class="lineno"></span><span class="comment" id="1528264">//&nbsp;====================================================</span><br>
+<span class="lineno">20</span><span class="comment" id="1528320">//</span><br>
+<span class="lineno"></span><span class="comment" id="1528323">//</span><br>
+<span class="lineno"></span><span class="comment" id="1528326">//&nbsp;__ieee754_atanh(x)</span><br>
+<span class="lineno"></span><span class="comment" id="1528348">//&nbsp;Method&nbsp;:</span><br>
+<span class="lineno"></span><span class="comment" id="1528360">//&nbsp;&nbsp;&nbsp;&nbsp1.&nbsp;Reduce&nbsp;x&nbsp;to&nbsp;positive&nbsp;by&nbsp;atanh(-x)&nbsp;=&nbsp;-atanh(x)</span><br>
+<span class="lineno">25</span><span class="comment" id="1528412">//&nbsp;&nbsp;&nbsp;&nbsp2.&nbsp;For&nbsp;x&gt;=0.5</span><br>
+<span class="lineno"></span><span class="comment" id="1528429">//&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2x&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;x</span><br>
+<span class="lineno"></span><span class="comment" id="1528489">//&nbsp;&nbsp;&nbsp;&nbspatanh(x)&nbsp;=&nbsp;---&nbsp;*&nbsp;log(1&nbsp;+&nbsp;-------)&nbsp;=&nbsp;0.5&nbsp;*&nbsp;log1p(2&nbsp;*&nbsp;--------)</span><br>
+<span class="lineno"></span><span class="comment" id="1528554">//&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;2&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1&nbsp;-&nbsp;x&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1&nbsp;-&nbsp;x</span><br>
+<span class="lineno"></span><span class="comment" id="1528616">//</span><br>
+<span class="lineno">30</span><span class="comment" id="1528619">//&nbsp;&nbsp;&nbsp;&nbspFor&nbsp;x&lt;0.5</span><br>
+<span class="lineno"></span><span class="comment" id="1528632">//&nbsp;&nbsp;&nbsp;&nbspatanh(x)&nbsp;=&nbsp;0.5*log1p(2x+2x*x/(1-x))</span><br>
+<span class="lineno"></span><span class="comment" id="1528671">//</span><br>
+<span class="lineno"></span><span class="comment" id="1528674">//&nbsp;Special&nbsp;cases:</span><br>
+<span class="lineno"></span><span class="comment" id="1528692">//&nbsp;&nbsp;&nbsp;&nbspatanh(x)&nbsp;is&nbsp;NaN&nbsp;if&nbsp;|x|&nbsp;&gt;&nbsp;1&nbsp;with&nbsp;signal;</span><br>
+<span class="lineno">35</span><span class="comment" id="1528735">//&nbsp;&nbsp;&nbsp;&nbspatanh(NaN)&nbsp;is&nbsp;that&nbsp;NaN&nbsp;with&nbsp;no&nbsp;signal;</span><br>
+<span class="lineno"></span><span class="comment" id="1528777">//&nbsp;&nbsp;&nbsp;&nbspatanh(+-1)&nbsp;is&nbsp;+-INF&nbsp;with&nbsp;signal.</span><br>
+<span class="lineno"></span><span class="comment" id="1528813">//</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="1528817">//&nbsp;Atanh&nbsp;returns&nbsp;the&nbsp;inverse&nbsp;hyperbolic&nbsp;tangent&nbsp;of&nbsp;x.</span><br>
+<span class="lineno">40</span><span class="comment" id="1528871">//</span><br>
+<span class="lineno"></span><span class="comment" id="1528874">//&nbsp;Special&nbsp;cases&nbsp;are:</span><br>
+<span class="lineno"></span><span class="comment" id="1528896">//&nbsp;&nbsp;&nbsp;&nbspAtanh(1)&nbsp;=&nbsp;+Inf</span><br>
+<span class="lineno"></span><span class="comment" id="1528915">//&nbsp;&nbsp;&nbsp;&nbspAtanh(±0)&nbsp;=&nbsp;±0</span><br>
+<span class="lineno"></span><span class="comment" id="1528935">//&nbsp;&nbsp;&nbsp;&nbspAtanh(-1)&nbsp;=&nbsp;-Inf</span><br>
+<span class="lineno">45</span><span class="comment" id="1528955">//&nbsp;&nbsp;&nbsp;&nbspAtanh(x)&nbsp;=&nbsp;NaN&nbsp;if&nbsp;x&nbsp;&lt;&nbsp;-1&nbsp;or&nbsp;x&nbsp;&gt;&nbsp;1</span><br>
+<span class="lineno"></span><span class="comment" id="1528992">//&nbsp;&nbsp;&nbsp;&nbspAtanh(NaN)&nbsp;=&nbsp;NaN</span><br>
+<span class="lineno"></span><span class="keyword" id="1529012">func</span>&nbsp;<span class="ident" id="1529017">Atanh</span><span class="op" id="1529022">(</span><span class="ident" id="1529023">x</span>&nbsp;<span class="builtintype" id="1529025">float64</span><span class="op" id="1529032">)</span>&nbsp;<span class="builtintype" id="1529034">float64</span>&nbsp;<span class="op" id="1529042">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1529045">const</span>&nbsp;<span class="ident" id="1529051">NearZero</span>&nbsp;<span class="op" id="1529060">=</span>&nbsp;<span class="num" id="1529062">1.0</span>&nbsp;<span class="op" id="1529066">/</span>&nbsp;<span class="op" id="1529068">(</span><span class="num" id="1529069">1</span>&nbsp;<span class="op" id="1529071">&lt;&lt;</span>&nbsp;<span class="num" id="1529074">28</span><span class="op" id="1529076">)</span>&nbsp;<span class="comment" id="1529078">//&nbsp;2**-28</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1529089">//&nbsp;special&nbsp;cases</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1529107">switch</span>&nbsp;<span class="op" id="1529114">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1529117">case</span>&nbsp;<span class="ident" id="1529122">x</span>&nbsp;<span class="op" id="1529124">&lt;</span>&nbsp;<span class="op" id="1529126">-</span><span class="num" id="1529127">1</span>&nbsp;<span class="op" id="1529129">||</span>&nbsp;<span class="ident" id="1529132">x</span>&nbsp;<span class="op" id="1529134">&gt;</span>&nbsp;<span class="num" id="1529136">1</span>&nbsp;<span class="op" id="1529138">||</span>&nbsp;<span class="ident" id="1529141">IsNaN</span><span class="op" id="1529146">(</span><span class="ident" id="1529147">x</span><span class="op" id="1529148">)</span><span class="op" id="1529149">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1529153">return</span>&nbsp;<span class="ident" id="1529160">NaN</span><span class="op" id="1529163">(</span><span class="op" id="1529164">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1529167">case</span>&nbsp;<span class="ident" id="1529172">x</span>&nbsp;<span class="op" id="1529174">==</span>&nbsp;<span class="num" id="1529177">1</span><span class="op" id="1529178">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1529182">return</span>&nbsp;<span class="ident" id="1529189">Inf</span><span class="op" id="1529192">(</span><span class="num" id="1529193">1</span><span class="op" id="1529194">)</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1529197">case</span>&nbsp;<span class="ident" id="1529202">x</span>&nbsp;<span class="op" id="1529204">==</span>&nbsp;<span class="op" id="1529207">-</span><span class="num" id="1529208">1</span><span class="op" id="1529209">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1529213">return</span>&nbsp;<span class="ident" id="1529220">Inf</span><span class="op" id="1529223">(</span><span class="op" id="1529224">-</span><span class="num" id="1529225">1</span><span class="op" id="1529226">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1529229">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1529232">sign</span>&nbsp;<span class="op" id="1529237">:=</span>&nbsp;<span class="builtintype" id="1529240">false</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1529247">if</span>&nbsp;<span class="ident" id="1529250">x</span>&nbsp;<span class="op" id="1529252">&lt;</span>&nbsp;<span class="num" id="1529254">0</span>&nbsp;<span class="op" id="1529256">{</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1529260">x</span>&nbsp;<span class="op" id="1529262">=</span>&nbsp;<span class="op" id="1529264">-</span><span class="ident" id="1529265">x</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1529269">sign</span>&nbsp;<span class="op" id="1529274">=</span>&nbsp;<span class="builtintype" id="1529276">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1529282">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1529285">var</span>&nbsp;<span class="ident" id="1529289">temp</span>&nbsp;<span class="builtintype" id="1529294">float64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1529303">switch</span>&nbsp;<span class="op" id="1529310">{</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1529313">case</span>&nbsp;<span class="ident" id="1529318">x</span>&nbsp;<span class="op" id="1529320">&lt;</span>&nbsp;<span class="ident" id="1529322">NearZero</span><span class="op" id="1529330">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1529334">temp</span>&nbsp;<span class="op" id="1529339">=</span>&nbsp;<span class="ident" id="1529341">x</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1529344">case</span>&nbsp;<span class="ident" id="1529349">x</span>&nbsp;<span class="op" id="1529351">&lt;</span>&nbsp;<span class="num" id="1529353">0.5</span><span class="op" id="1529356">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1529360">temp</span>&nbsp;<span class="op" id="1529365">=</span>&nbsp;<span class="ident" id="1529367">x</span>&nbsp;<span class="op" id="1529369">+</span>&nbsp;<span class="ident" id="1529371">x</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1529375">temp</span>&nbsp;<span class="op" id="1529380">=</span>&nbsp;<span class="num" id="1529382">0.5</span>&nbsp;<span class="op" id="1529386">*</span>&nbsp;<span class="ident" id="1529388">Log1p</span><span class="op" id="1529393">(</span><span class="ident" id="1529394">temp</span><span class="op" id="1529398">+</span><span class="ident" id="1529399">temp</span><span class="op" id="1529403">*</span><span class="ident" id="1529404">x</span><span class="op" id="1529405">/</span><span class="op" id="1529406">(</span><span class="num" id="1529407">1</span><span class="op" id="1529408">-</span><span class="ident" id="1529409">x</span><span class="op" id="1529410">)</span><span class="op" id="1529411">)</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1529414">default</span><span class="op" id="1529421">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1529425">temp</span>&nbsp;<span class="op" id="1529430">=</span>&nbsp;<span class="num" id="1529432">0.5</span>&nbsp;<span class="op" id="1529436">*</span>&nbsp;<span class="ident" id="1529438">Log1p</span><span class="op" id="1529443">(</span><span class="op" id="1529444">(</span><span class="ident" id="1529445">x</span><span class="op" id="1529446">+</span><span class="ident" id="1529447">x</span><span class="op" id="1529448">)</span><span class="op" id="1529449">/</span><span class="op" id="1529450">(</span><span class="num" id="1529451">1</span><span class="op" id="1529452">-</span><span class="ident" id="1529453">x</span><span class="op" id="1529454">)</span><span class="op" id="1529455">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1529458">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1529461">if</span>&nbsp;<span class="ident" id="1529464">sign</span>&nbsp;<span class="op" id="1529469">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1529473">temp</span>&nbsp;<span class="op" id="1529478">=</span>&nbsp;<span class="op" id="1529480">-</span><span class="ident" id="1529481">temp</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1529487">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1529490">return</span>&nbsp;<span class="ident" id="1529497">temp</span><br>
+<span class="lineno"></span><span class="op" id="1529502">}</span>
+</div>
+</body>
+</html>

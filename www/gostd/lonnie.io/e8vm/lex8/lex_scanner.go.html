@@ -1,0 +1,81 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="keyword" id="5122541">package</span>&nbsp;<span class="ident" id="5122549">lex8</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="5122555">import</span>&nbsp;<span class="op" id="5122562">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="5122565">&#34;bytes&#34;</span><br>
+<span class="lineno">5</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="5122574">&#34;io&#34;</span><br>
+<span class="lineno"></span><span class="op" id="5122579">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="5122582">//&nbsp;LexScanner&nbsp;parses&nbsp;a&nbsp;file&nbsp;input&nbsp;stream&nbsp;into&nbsp;tokens.</span><br>
+<span class="lineno"></span><span class="keyword" id="5122636">type</span>&nbsp;<span class="ident" id="5122641">LexScanner</span>&nbsp;<span class="keyword" id="5122652">struct</span>&nbsp;<span class="op" id="5122659">{</span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5122662">s</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op" id="5122668">*</span><span class="ident" id="5122669">RuneScanner</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5122682">errs</span>&nbsp;&nbsp;<span class="op" id="5122688">*</span><span class="ident" id="5122689">ErrorList</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5122700">valid</span>&nbsp;<span class="builtintype" id="5122706">bool</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5122713">pos</span>&nbsp;<span class="op" id="5122717">*</span><span class="ident" id="5122718">Pos</span><br>
+<span class="lineno">15</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5122723">buf</span>&nbsp;<span class="op" id="5122727">*</span><span class="ident" id="5122728">bytes</span><span class="op" id="5122733">.</span><span class="ident" id="5122734">Buffer</span><br>
+<span class="lineno"></span><span class="op" id="5122741">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="5122744">//&nbsp;NewLexScanner&nbsp;creates&nbsp;a&nbsp;new&nbsp;lexer.</span><br>
+<span class="lineno"></span><span class="keyword" id="5122782">func</span>&nbsp;<span class="ident" id="5122787">NewLexScanner</span><span class="op" id="5122800">(</span><span class="ident" id="5122801">file</span>&nbsp;<span class="builtintype" id="5122806">string</span><span class="op" id="5122812">,</span>&nbsp;<span class="ident" id="5122814">rc</span>&nbsp;<span class="ident" id="5122817">io</span><span class="op" id="5122819">.</span><span class="ident" id="5122820">ReadCloser</span><span class="op" id="5122830">)</span>&nbsp;<span class="op" id="5122832">*</span><span class="ident" id="5122833">LexScanner</span>&nbsp;<span class="op" id="5122844">{</span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5122847">ret</span>&nbsp;<span class="op" id="5122851">:=</span>&nbsp;<span class="builtinfunc" id="5122854">new</span><span class="op" id="5122857">(</span><span class="ident" id="5122858">LexScanner</span><span class="op" id="5122868">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5122871">ret</span><span class="op" id="5122874">.</span><span class="ident" id="5122875">s</span>&nbsp;<span class="op" id="5122877">=</span>&nbsp;<span class="ident" id="5122879">NewRuneScanner</span><span class="op" id="5122893">(</span><span class="ident" id="5122894">file</span><span class="op" id="5122898">,</span>&nbsp;<span class="ident" id="5122900">rc</span><span class="op" id="5122902">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5122905">ret</span><span class="op" id="5122908">.</span><span class="ident" id="5122909">errs</span>&nbsp;<span class="op" id="5122914">=</span>&nbsp;<span class="ident" id="5122916">NewErrList</span><span class="op" id="5122926">(</span><span class="op" id="5122927">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5122931">ret</span><span class="op" id="5122934">.</span><span class="ident" id="5122935">buf</span>&nbsp;<span class="op" id="5122939">=</span>&nbsp;<span class="builtinfunc" id="5122941">new</span><span class="op" id="5122944">(</span><span class="ident" id="5122945">bytes</span><span class="op" id="5122950">.</span><span class="ident" id="5122951">Buffer</span><span class="op" id="5122957">)</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5122960">ret</span><span class="op" id="5122963">.</span><span class="ident" id="5122964">pos</span>&nbsp;<span class="op" id="5122968">=</span>&nbsp;<span class="ident" id="5122970">ret</span><span class="op" id="5122973">.</span><span class="ident" id="5122974">s</span><span class="op" id="5122975">.</span><span class="ident" id="5122976">Pos</span><span class="op" id="5122979">(</span><span class="op" id="5122980">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="5122984">return</span>&nbsp;<span class="ident" id="5122991">ret</span><br>
+<span class="lineno"></span><span class="op" id="5122995">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">30</span><span class="comment" id="5122998">//&nbsp;Next&nbsp;pushes&nbsp;the&nbsp;current&nbsp;rune&nbsp;(if&nbsp;valid)&nbsp;into&nbsp;the&nbsp;buffer,</span><br>
+<span class="lineno"></span><span class="comment" id="5123058">//&nbsp;and&nbsp;returns&nbsp;the&nbsp;next&nbsp;rune&nbsp;or&nbsp;error&nbsp;from&nbsp;scanning&nbsp;the&nbsp;input</span><br>
+<span class="lineno"></span><span class="comment" id="5123120">//&nbsp;stream.</span><br>
+<span class="lineno"></span><span class="keyword" id="5123131">func</span>&nbsp;<span class="op" id="5123136">(</span><span class="ident" id="5123137">s</span>&nbsp;<span class="op" id="5123139">*</span><span class="ident" id="5123140">LexScanner</span><span class="op" id="5123150">)</span>&nbsp;<span class="ident" id="5123152">Next</span><span class="op" id="5123156">(</span><span class="op" id="5123157">)</span>&nbsp;<span class="op" id="5123159">(</span><span class="builtintype" id="5123160">rune</span><span class="op" id="5123164">,</span>&nbsp;<span class="builtintype" id="5123166">error</span><span class="op" id="5123171">)</span>&nbsp;<span class="op" id="5123173">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="5123176">if</span>&nbsp;<span class="ident" id="5123179">s</span><span class="op" id="5123180">.</span><span class="ident" id="5123181">valid</span>&nbsp;<span class="op" id="5123187">{</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5123191">s</span><span class="op" id="5123192">.</span><span class="ident" id="5123193">buf</span><span class="op" id="5123196">.</span><span class="ident" id="5123197">WriteRune</span><span class="op" id="5123206">(</span><span class="ident" id="5123207">s</span><span class="op" id="5123208">.</span><span class="ident" id="5123209">s</span><span class="op" id="5123210">.</span><span class="ident" id="5123211">Rune</span><span class="op" id="5123215">)</span>&nbsp;<span class="comment" id="5123217">//&nbsp;push&nbsp;into&nbsp;the&nbsp;buffer</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5123243">s</span><span class="op" id="5123244">.</span><span class="ident" id="5123245">valid</span>&nbsp;<span class="op" id="5123251">=</span>&nbsp;<span class="builtintype" id="5123253">false</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="5123260">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="5123264">if</span>&nbsp;<span class="op" id="5123267">!</span><span class="ident" id="5123268">s</span><span class="op" id="5123269">.</span><span class="ident" id="5123270">s</span><span class="op" id="5123271">.</span><span class="ident" id="5123272">Scan</span><span class="op" id="5123276">(</span><span class="op" id="5123277">)</span>&nbsp;<span class="op" id="5123279">{</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="5123283">if</span>&nbsp;<span class="ident" id="5123286">s</span><span class="op" id="5123287">.</span><span class="ident" id="5123288">s</span><span class="op" id="5123289">.</span><span class="ident" id="5123290">Err</span>&nbsp;<span class="op" id="5123294">!=</span>&nbsp;<span class="ident" id="5123297">nil</span>&nbsp;<span class="op" id="5123301">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="5123306">return</span>&nbsp;<span class="num" id="5123313">0</span><span class="op" id="5123314">,</span>&nbsp;<span class="ident" id="5123316">s</span><span class="op" id="5123317">.</span><span class="ident" id="5123318">s</span><span class="op" id="5123319">.</span><span class="ident" id="5123320">Err</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="5123326">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="5123331">return</span>&nbsp;<span class="num" id="5123338">0</span><span class="op" id="5123339">,</span>&nbsp;<span class="ident" id="5123341">io</span><span class="op" id="5123343">.</span><span class="ident" id="5123344">EOF</span>&nbsp;<span class="comment" id="5123348">//&nbsp;signal&nbsp;end&nbsp;of&nbsp;file</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="5123371">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5123375">s</span><span class="op" id="5123376">.</span><span class="ident" id="5123377">valid</span>&nbsp;<span class="op" id="5123383">=</span>&nbsp;<span class="builtintype" id="5123385">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="5123391">return</span>&nbsp;<span class="ident" id="5123398">s</span><span class="op" id="5123399">.</span><span class="ident" id="5123400">s</span><span class="op" id="5123401">.</span><span class="ident" id="5123402">Rune</span><span class="op" id="5123406">,</span>&nbsp;<span class="ident" id="5123408">nil</span><br>
+<span class="lineno"></span><span class="op" id="5123412">}</span><br>
+<span class="lineno">50</span><br>
+<span class="lineno"></span><span class="comment" id="5123415">//&nbsp;Accept&nbsp;returns&nbsp;the&nbsp;string&nbsp;buffered,&nbsp;and&nbsp;the&nbsp;starting&nbsp;position</span><br>
+<span class="lineno"></span><span class="comment" id="5123480">//&nbsp;of&nbsp;the&nbsp;string.</span><br>
+<span class="lineno"></span><span class="keyword" id="5123498">func</span>&nbsp;<span class="op" id="5123503">(</span><span class="ident" id="5123504">s</span>&nbsp;<span class="op" id="5123506">*</span><span class="ident" id="5123507">LexScanner</span><span class="op" id="5123517">)</span>&nbsp;<span class="ident" id="5123519">Accept</span><span class="op" id="5123525">(</span><span class="op" id="5123526">)</span>&nbsp;<span class="op" id="5123528">(</span><span class="builtintype" id="5123529">string</span><span class="op" id="5123535">,</span>&nbsp;<span class="op" id="5123537">*</span><span class="ident" id="5123538">Pos</span><span class="op" id="5123541">)</span>&nbsp;<span class="op" id="5123543">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5123546">ret</span>&nbsp;<span class="op" id="5123550">:=</span>&nbsp;<span class="ident" id="5123553">s</span><span class="op" id="5123554">.</span><span class="ident" id="5123555">buf</span><span class="op" id="5123558">.</span><span class="ident" id="5123559">String</span><span class="op" id="5123565">(</span><span class="op" id="5123566">)</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5123569">s</span><span class="op" id="5123570">.</span><span class="ident" id="5123571">buf</span><span class="op" id="5123574">.</span><span class="ident" id="5123575">Reset</span><span class="op" id="5123580">(</span><span class="op" id="5123581">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5123584">pos</span>&nbsp;<span class="op" id="5123588">:=</span>&nbsp;<span class="ident" id="5123591">s</span><span class="op" id="5123592">.</span><span class="ident" id="5123593">pos</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5123599">s</span><span class="op" id="5123600">.</span><span class="ident" id="5123601">pos</span>&nbsp;<span class="op" id="5123605">=</span>&nbsp;<span class="ident" id="5123607">s</span><span class="op" id="5123608">.</span><span class="ident" id="5123609">s</span><span class="op" id="5123610">.</span><span class="ident" id="5123611">Pos</span><span class="op" id="5123614">(</span><span class="op" id="5123615">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="5123619">return</span>&nbsp;<span class="ident" id="5123626">ret</span><span class="op" id="5123629">,</span>&nbsp;<span class="ident" id="5123631">pos</span><br>
+<span class="lineno"></span><span class="op" id="5123635">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="5123638">//&nbsp;Pos&nbsp;returns&nbsp;the&nbsp;position&nbsp;of&nbsp;the&nbsp;buffer&nbsp;start.</span><br>
+<span class="lineno"></span><span class="keyword" id="5123687">func</span>&nbsp;<span class="op" id="5123692">(</span><span class="ident" id="5123693">s</span>&nbsp;<span class="op" id="5123695">*</span><span class="ident" id="5123696">LexScanner</span><span class="op" id="5123706">)</span>&nbsp;<span class="ident" id="5123708">Pos</span><span class="op" id="5123711">(</span><span class="op" id="5123712">)</span>&nbsp;<span class="op" id="5123714">*</span><span class="ident" id="5123715">Pos</span>&nbsp;<span class="op" id="5123719">{</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="5123722">return</span>&nbsp;<span class="ident" id="5123729">s</span><span class="op" id="5123730">.</span><span class="ident" id="5123731">pos</span><br>
+<span class="lineno"></span><span class="op" id="5123735">}</span>
+</div>
+</body>
+</html>

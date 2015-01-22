@@ -1,0 +1,68 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment" id="3618364">//&nbsp;Copyright&nbsp;2010&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment" id="3618419">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment" id="3618473">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="comment" id="3618524">//&nbsp;Package&nbsp;cipher&nbsp;implements&nbsp;standard&nbsp;block&nbsp;cipher&nbsp;modes&nbsp;that&nbsp;can&nbsp;be&nbsp;wrapped</span><br>
+<span class="lineno"></span><span class="comment" id="3618601">//&nbsp;around&nbsp;low-level&nbsp;block&nbsp;cipher&nbsp;implementations.</span><br>
+<span class="lineno"></span><span class="comment" id="3618651">//&nbsp;See&nbsp;http://csrc.nist.gov/groups/ST/toolkit/BCM/current_modes.html</span><br>
+<span class="lineno"></span><span class="comment" id="3618720">//&nbsp;and&nbsp;NIST&nbsp;Special&nbsp;Publication&nbsp;800-38A.</span><br>
+<span class="lineno"></span><span class="keyword" id="3618761">package</span>&nbsp;<span class="ident" id="3618769">cipher</span><br>
+<span class="lineno">10</span><br>
+<span class="lineno"></span><span class="comment" id="3618777">//&nbsp;A&nbsp;Block&nbsp;represents&nbsp;an&nbsp;implementation&nbsp;of&nbsp;block&nbsp;cipher</span><br>
+<span class="lineno"></span><span class="comment" id="3618833">//&nbsp;using&nbsp;a&nbsp;given&nbsp;key.&nbsp;&nbsp;It&nbsp;provides&nbsp;the&nbsp;capability&nbsp;to&nbsp;encrypt</span><br>
+<span class="lineno"></span><span class="comment" id="3618894">//&nbsp;or&nbsp;decrypt&nbsp;individual&nbsp;blocks.&nbsp;&nbsp;The&nbsp;mode&nbsp;implementations</span><br>
+<span class="lineno"></span><span class="comment" id="3618953">//&nbsp;extend&nbsp;that&nbsp;capability&nbsp;to&nbsp;streams&nbsp;of&nbsp;blocks.</span><br>
+<span class="lineno">15</span><span class="keyword" id="3619001">type</span>&nbsp;<span class="ident" id="3619006">Block</span>&nbsp;<span class="keyword" id="3619012">interface</span>&nbsp;<span class="op" id="3619022">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="3619025">//&nbsp;BlockSize&nbsp;returns&nbsp;the&nbsp;cipher&#39;s&nbsp;block&nbsp;size.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="3619072">BlockSize</span><span class="op" id="3619081">(</span><span class="op" id="3619082">)</span>&nbsp;<span class="builtintype" id="3619084">int</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="3619090">//&nbsp;Encrypt&nbsp;encrypts&nbsp;the&nbsp;first&nbsp;block&nbsp;in&nbsp;src&nbsp;into&nbsp;dst.</span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="3619144">//&nbsp;Dst&nbsp;and&nbsp;src&nbsp;may&nbsp;point&nbsp;at&nbsp;the&nbsp;same&nbsp;memory.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="3619190">Encrypt</span><span class="op" id="3619197">(</span><span class="ident" id="3619198">dst</span><span class="op" id="3619201">,</span>&nbsp;<span class="ident" id="3619203">src</span>&nbsp;<span class="op" id="3619207">[</span><span class="op" id="3619208">]</span><span class="builtintype" id="3619209">byte</span><span class="op" id="3619213">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="3619217">//&nbsp;Decrypt&nbsp;decrypts&nbsp;the&nbsp;first&nbsp;block&nbsp;in&nbsp;src&nbsp;into&nbsp;dst.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="3619271">//&nbsp;Dst&nbsp;and&nbsp;src&nbsp;may&nbsp;point&nbsp;at&nbsp;the&nbsp;same&nbsp;memory.</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="3619317">Decrypt</span><span class="op" id="3619324">(</span><span class="ident" id="3619325">dst</span><span class="op" id="3619328">,</span>&nbsp;<span class="ident" id="3619330">src</span>&nbsp;<span class="op" id="3619334">[</span><span class="op" id="3619335">]</span><span class="builtintype" id="3619336">byte</span><span class="op" id="3619340">)</span><br>
+<span class="lineno"></span><span class="op" id="3619342">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="3619345">//&nbsp;A&nbsp;Stream&nbsp;represents&nbsp;a&nbsp;stream&nbsp;cipher.</span><br>
+<span class="lineno"></span><span class="keyword" id="3619385">type</span>&nbsp;<span class="ident" id="3619390">Stream</span>&nbsp;<span class="keyword" id="3619397">interface</span>&nbsp;<span class="op" id="3619407">{</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="3619410">//&nbsp;XORKeyStream&nbsp;XORs&nbsp;each&nbsp;byte&nbsp;in&nbsp;the&nbsp;given&nbsp;slice&nbsp;with&nbsp;a&nbsp;byte&nbsp;from&nbsp;the</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="3619482">//&nbsp;cipher&#39;s&nbsp;key&nbsp;stream.&nbsp;Dst&nbsp;and&nbsp;src&nbsp;may&nbsp;point&nbsp;to&nbsp;the&nbsp;same&nbsp;memory.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="3619549">XORKeyStream</span><span class="op" id="3619561">(</span><span class="ident" id="3619562">dst</span><span class="op" id="3619565">,</span>&nbsp;<span class="ident" id="3619567">src</span>&nbsp;<span class="op" id="3619571">[</span><span class="op" id="3619572">]</span><span class="builtintype" id="3619573">byte</span><span class="op" id="3619577">)</span><br>
+<span class="lineno"></span><span class="op" id="3619579">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">35</span><span class="comment" id="3619582">//&nbsp;A&nbsp;BlockMode&nbsp;represents&nbsp;a&nbsp;block&nbsp;cipher&nbsp;running&nbsp;in&nbsp;a&nbsp;block-based&nbsp;mode&nbsp;(CBC,</span><br>
+<span class="lineno"></span><span class="comment" id="3619659">//&nbsp;ECB&nbsp;etc).</span><br>
+<span class="lineno"></span><span class="keyword" id="3619672">type</span>&nbsp;<span class="ident" id="3619677">BlockMode</span>&nbsp;<span class="keyword" id="3619687">interface</span>&nbsp;<span class="op" id="3619697">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="3619700">//&nbsp;BlockSize&nbsp;returns&nbsp;the&nbsp;mode&#39;s&nbsp;block&nbsp;size.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="3619745">BlockSize</span><span class="op" id="3619754">(</span><span class="op" id="3619755">)</span>&nbsp;<span class="builtintype" id="3619757">int</span><br>
+<span class="lineno">40</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="3619763">//&nbsp;CryptBlocks&nbsp;encrypts&nbsp;or&nbsp;decrypts&nbsp;a&nbsp;number&nbsp;of&nbsp;blocks.&nbsp;The&nbsp;length&nbsp;of</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="3619834">//&nbsp;src&nbsp;must&nbsp;be&nbsp;a&nbsp;multiple&nbsp;of&nbsp;the&nbsp;block&nbsp;size.&nbsp;Dst&nbsp;and&nbsp;src&nbsp;may&nbsp;point&nbsp;to</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="3619905">//&nbsp;the&nbsp;same&nbsp;memory.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="3619926">CryptBlocks</span><span class="op" id="3619937">(</span><span class="ident" id="3619938">dst</span><span class="op" id="3619941">,</span>&nbsp;<span class="ident" id="3619943">src</span>&nbsp;<span class="op" id="3619947">[</span><span class="op" id="3619948">]</span><span class="builtintype" id="3619949">byte</span><span class="op" id="3619953">)</span><br>
+<span class="lineno">45</span><span class="op" id="3619955">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="3619958">//&nbsp;Utility&nbsp;routines</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="3619979">func</span>&nbsp;<span class="ident" id="3619984">dup</span><span class="op" id="3619987">(</span><span class="ident" id="3619988">p</span>&nbsp;<span class="op" id="3619990">[</span><span class="op" id="3619991">]</span><span class="builtintype" id="3619992">byte</span><span class="op" id="3619996">)</span>&nbsp;<span class="op" id="3619998">[</span><span class="op" id="3619999">]</span><span class="builtintype" id="3620000">byte</span>&nbsp;<span class="op" id="3620005">{</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="3620008">q</span>&nbsp;<span class="op" id="3620010">:=</span>&nbsp;<span class="builtinfunc" id="3620013">make</span><span class="op" id="3620017">(</span><span class="op" id="3620018">[</span><span class="op" id="3620019">]</span><span class="builtintype" id="3620020">byte</span><span class="op" id="3620024">,</span>&nbsp;<span class="builtinfunc" id="3620026">len</span><span class="op" id="3620029">(</span><span class="ident" id="3620030">p</span><span class="op" id="3620031">)</span><span class="op" id="3620032">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc" id="3620035">copy</span><span class="op" id="3620039">(</span><span class="ident" id="3620040">q</span><span class="op" id="3620041">,</span>&nbsp;<span class="ident" id="3620043">p</span><span class="op" id="3620044">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="3620047">return</span>&nbsp;<span class="ident" id="3620054">q</span><br>
+<span class="lineno"></span><span class="op" id="3620056">}</span>
+</div>
+</body>
+</html>

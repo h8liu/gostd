@@ -1,0 +1,145 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment" id="2429786">//&nbsp;Copyright&nbsp;2009&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment" id="2429841">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment" id="2429895">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword" id="2429946">package</span>&nbsp;<span class="ident" id="2429954">time</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="2429960">//&nbsp;Sleep&nbsp;pauses&nbsp;the&nbsp;current&nbsp;goroutine&nbsp;for&nbsp;at&nbsp;least&nbsp;the&nbsp;duration&nbsp;d.</span><br>
+<span class="lineno"></span><span class="comment" id="2430027">//&nbsp;A&nbsp;negative&nbsp;or&nbsp;zero&nbsp;duration&nbsp;causes&nbsp;Sleep&nbsp;to&nbsp;return&nbsp;immediately.</span><br>
+<span class="lineno"></span><span class="keyword" id="2430094">func</span>&nbsp;<span class="ident" id="2430099">Sleep</span><span class="op" id="2430104">(</span><span class="ident" id="2430105">d</span>&nbsp;<span class="ident" id="2430107">Duration</span><span class="op" id="2430115">)</span><br>
+<span class="lineno">10</span><br>
+<span class="lineno"></span><span class="comment" id="2430118">//&nbsp;runtimeNano&nbsp;returns&nbsp;the&nbsp;current&nbsp;value&nbsp;of&nbsp;the&nbsp;runtime&nbsp;clock&nbsp;in&nbsp;nanoseconds.</span><br>
+<span class="lineno"></span><span class="keyword" id="2430196">func</span>&nbsp;<span class="ident" id="2430201">runtimeNano</span><span class="op" id="2430212">(</span><span class="op" id="2430213">)</span>&nbsp;<span class="ident" id="2430215">int64</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="2430222">//&nbsp;Interface&nbsp;to&nbsp;timers&nbsp;implemented&nbsp;in&nbsp;package&nbsp;runtime.</span><br>
+<span class="lineno">15</span><span class="comment" id="2430277">//&nbsp;Must&nbsp;be&nbsp;in&nbsp;sync&nbsp;with&nbsp;../runtime/runtime.h:/^struct.Timer$</span><br>
+<span class="lineno"></span><span class="keyword" id="2430338">type</span>&nbsp;<span class="ident" id="2430343">runtimeTimer</span>&nbsp;<span class="keyword" id="2430356">struct</span>&nbsp;<span class="op" id="2430363">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2430366">i</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="2430373">int</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2430378">when</span>&nbsp;&nbsp;&nbsp;<span class="ident" id="2430385">int64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2430392">period</span>&nbsp;<span class="ident" id="2430399">int64</span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2430406">f</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword" id="2430413">func</span><span class="op" id="2430417">(</span><span class="keyword" id="2430418">interface</span><span class="op" id="2430427">{</span><span class="op" id="2430428">}</span><span class="op" id="2430429">,</span>&nbsp;<span class="builtintype" id="2430431">uintptr</span><span class="op" id="2430438">)</span>&nbsp;<span class="comment" id="2430440">//&nbsp;NOTE:&nbsp;must&nbsp;not&nbsp;be&nbsp;closure</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2430470">arg</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword" id="2430477">interface</span><span class="op" id="2430486">{</span><span class="op" id="2430487">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2430490">seq</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="2430497">uintptr</span><br>
+<span class="lineno"></span><span class="op" id="2430505">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">25</span><span class="comment" id="2430508">//&nbsp;when&nbsp;is&nbsp;a&nbsp;helper&nbsp;function&nbsp;for&nbsp;setting&nbsp;the&nbsp;&#39;when&#39;&nbsp;field&nbsp;of&nbsp;a&nbsp;runtimeTimer.</span><br>
+<span class="lineno"></span><span class="comment" id="2430585">//&nbsp;It&nbsp;returns&nbsp;what&nbsp;the&nbsp;time&nbsp;will&nbsp;be,&nbsp;in&nbsp;nanoseconds,&nbsp;Duration&nbsp;d&nbsp;in&nbsp;the&nbsp;future.</span><br>
+<span class="lineno"></span><span class="comment" id="2430664">//&nbsp;If&nbsp;d&nbsp;is&nbsp;negative,&nbsp;it&nbsp;is&nbsp;ignored.&nbsp;&nbsp;If&nbsp;the&nbsp;returned&nbsp;value&nbsp;would&nbsp;be&nbsp;less&nbsp;than</span><br>
+<span class="lineno"></span><span class="comment" id="2430742">//&nbsp;zero&nbsp;because&nbsp;of&nbsp;an&nbsp;overflow,&nbsp;MaxInt64&nbsp;is&nbsp;returned.</span><br>
+<span class="lineno"></span><span class="keyword" id="2430796">func</span>&nbsp;<span class="ident" id="2430801">when</span><span class="op" id="2430805">(</span><span class="ident" id="2430806">d</span>&nbsp;<span class="ident" id="2430808">Duration</span><span class="op" id="2430816">)</span>&nbsp;<span class="ident" id="2430818">int64</span>&nbsp;<span class="op" id="2430824">{</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="2430827">if</span>&nbsp;<span class="ident" id="2430830">d</span>&nbsp;<span class="op" id="2430832">&lt;=</span>&nbsp;<span class="num" id="2430835">0</span>&nbsp;<span class="op" id="2430837">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="2430841">return</span>&nbsp;<span class="ident" id="2430848">runtimeNano</span><span class="op" id="2430859">(</span><span class="op" id="2430860">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="2430863">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2430866">t</span>&nbsp;<span class="op" id="2430868">:=</span>&nbsp;<span class="ident" id="2430871">runtimeNano</span><span class="op" id="2430882">(</span><span class="op" id="2430883">)</span>&nbsp;<span class="op" id="2430885">+</span>&nbsp;<span class="ident" id="2430887">int64</span><span class="op" id="2430892">(</span><span class="ident" id="2430893">d</span><span class="op" id="2430894">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="2430897">if</span>&nbsp;<span class="ident" id="2430900">t</span>&nbsp;<span class="op" id="2430902">&lt;</span>&nbsp;<span class="num" id="2430904">0</span>&nbsp;<span class="op" id="2430906">{</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2430910">t</span>&nbsp;<span class="op" id="2430912">=</span>&nbsp;<span class="num" id="2430914">1</span><span class="op" id="2430915">&lt;&lt;</span><span class="num" id="2430917">63</span>&nbsp;<span class="op" id="2430920">-</span>&nbsp;<span class="num" id="2430922">1</span>&nbsp;<span class="comment" id="2430924">//&nbsp;math.MaxInt64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="2430942">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="2430945">return</span>&nbsp;<span class="ident" id="2430952">t</span><br>
+<span class="lineno"></span><span class="op" id="2430954">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">40</span><span class="keyword" id="2430957">func</span>&nbsp;<span class="ident" id="2430962">startTimer</span><span class="op" id="2430972">(</span><span class="op" id="2430973">*</span><span class="ident" id="2430974">runtimeTimer</span><span class="op" id="2430986">)</span><br>
+<span class="lineno"></span><span class="keyword" id="2430988">func</span>&nbsp;<span class="ident" id="2430993">stopTimer</span><span class="op" id="2431002">(</span><span class="op" id="2431003">*</span><span class="ident" id="2431004">runtimeTimer</span><span class="op" id="2431016">)</span>&nbsp;<span class="builtintype" id="2431018">bool</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="2431024">//&nbsp;The&nbsp;Timer&nbsp;type&nbsp;represents&nbsp;a&nbsp;single&nbsp;event.</span><br>
+<span class="lineno"></span><span class="comment" id="2431069">//&nbsp;When&nbsp;the&nbsp;Timer&nbsp;expires,&nbsp;the&nbsp;current&nbsp;time&nbsp;will&nbsp;be&nbsp;sent&nbsp;on&nbsp;C,</span><br>
+<span class="lineno">45</span><span class="comment" id="2431132">//&nbsp;unless&nbsp;the&nbsp;Timer&nbsp;was&nbsp;created&nbsp;by&nbsp;AfterFunc.</span><br>
+<span class="lineno"></span><span class="comment" id="2431178">//&nbsp;A&nbsp;Timer&nbsp;must&nbsp;be&nbsp;created&nbsp;with&nbsp;NewTimer&nbsp;or&nbsp;AfterFunc.</span><br>
+<span class="lineno"></span><span class="keyword" id="2431233">type</span>&nbsp;<span class="ident" id="2431238">Timer</span>&nbsp;<span class="keyword" id="2431244">struct</span>&nbsp;<span class="op" id="2431251">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2431254">C</span>&nbsp;<span class="op" id="2431256">&lt;-</span><span class="keyword" id="2431258">chan</span>&nbsp;<span class="ident" id="2431263">Time</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2431269">r</span>&nbsp;<span class="ident" id="2431271">runtimeTimer</span><br>
+<span class="lineno">50</span><span class="op" id="2431284">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="2431287">//&nbsp;Stop&nbsp;prevents&nbsp;the&nbsp;Timer&nbsp;from&nbsp;firing.</span><br>
+<span class="lineno"></span><span class="comment" id="2431327">//&nbsp;It&nbsp;returns&nbsp;true&nbsp;if&nbsp;the&nbsp;call&nbsp;stops&nbsp;the&nbsp;timer,&nbsp;false&nbsp;if&nbsp;the&nbsp;timer&nbsp;has&nbsp;already</span><br>
+<span class="lineno"></span><span class="comment" id="2431406">//&nbsp;expired&nbsp;or&nbsp;been&nbsp;stopped.</span><br>
+<span class="lineno">55</span><span class="comment" id="2431434">//&nbsp;Stop&nbsp;does&nbsp;not&nbsp;close&nbsp;the&nbsp;channel,&nbsp;to&nbsp;prevent&nbsp;a&nbsp;read&nbsp;from&nbsp;the&nbsp;channel&nbsp;succeeding</span><br>
+<span class="lineno"></span><span class="comment" id="2431516">//&nbsp;incorrectly.</span><br>
+<span class="lineno"></span><span class="keyword" id="2431532">func</span>&nbsp;<span class="op" id="2431537">(</span><span class="ident" id="2431538">t</span>&nbsp;<span class="op" id="2431540">*</span><span class="ident" id="2431541">Timer</span><span class="op" id="2431546">)</span>&nbsp;<span class="ident" id="2431548">Stop</span><span class="op" id="2431552">(</span><span class="op" id="2431553">)</span>&nbsp;<span class="builtintype" id="2431555">bool</span>&nbsp;<span class="op" id="2431560">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="2431563">if</span>&nbsp;<span class="ident" id="2431566">t</span><span class="op" id="2431567">.</span><span class="ident" id="2431568">r</span><span class="op" id="2431569">.</span><span class="ident" id="2431570">f</span>&nbsp;<span class="op" id="2431572">==</span>&nbsp;<span class="ident" id="2431575">nil</span>&nbsp;<span class="op" id="2431579">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc" id="2431583">panic</span><span class="op" id="2431588">(</span><span class="string" id="2431589">&#34;time:&nbsp;Stop&nbsp;called&nbsp;on&nbsp;uninitialized&nbsp;Timer&#34;</span><span class="op" id="2431631">)</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="2431634">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="2431637">return</span>&nbsp;<span class="ident" id="2431644">stopTimer</span><span class="op" id="2431653">(</span><span class="op" id="2431654">&amp;</span><span class="ident" id="2431655">t</span><span class="op" id="2431656">.</span><span class="ident" id="2431657">r</span><span class="op" id="2431658">)</span><br>
+<span class="lineno"></span><span class="op" id="2431660">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="2431663">//&nbsp;NewTimer&nbsp;creates&nbsp;a&nbsp;new&nbsp;Timer&nbsp;that&nbsp;will&nbsp;send</span><br>
+<span class="lineno">65</span><span class="comment" id="2431710">//&nbsp;the&nbsp;current&nbsp;time&nbsp;on&nbsp;its&nbsp;channel&nbsp;after&nbsp;at&nbsp;least&nbsp;duration&nbsp;d.</span><br>
+<span class="lineno"></span><span class="keyword" id="2431772">func</span>&nbsp;<span class="ident" id="2431777">NewTimer</span><span class="op" id="2431785">(</span><span class="ident" id="2431786">d</span>&nbsp;<span class="ident" id="2431788">Duration</span><span class="op" id="2431796">)</span>&nbsp;<span class="op" id="2431798">*</span><span class="ident" id="2431799">Timer</span>&nbsp;<span class="op" id="2431805">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2431808">c</span>&nbsp;<span class="op" id="2431810">:=</span>&nbsp;<span class="builtinfunc" id="2431813">make</span><span class="op" id="2431817">(</span><span class="keyword" id="2431818">chan</span>&nbsp;<span class="ident" id="2431823">Time</span><span class="op" id="2431827">,</span>&nbsp;<span class="num" id="2431829">1</span><span class="op" id="2431830">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2431833">t</span>&nbsp;<span class="op" id="2431835">:=</span>&nbsp;<span class="op" id="2431838">&amp;</span><span class="ident" id="2431839">Timer</span><span class="op" id="2431844">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2431848">C</span><span class="op" id="2431849">:</span>&nbsp;<span class="ident" id="2431851">c</span><span class="op" id="2431852">,</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2431856">r</span><span class="op" id="2431857">:</span>&nbsp;<span class="ident" id="2431859">runtimeTimer</span><span class="op" id="2431871">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2431876">when</span><span class="op" id="2431880">:</span>&nbsp;<span class="ident" id="2431882">when</span><span class="op" id="2431886">(</span><span class="ident" id="2431887">d</span><span class="op" id="2431888">)</span><span class="op" id="2431889">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2431894">f</span><span class="op" id="2431895">:</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="2431900">sendTime</span><span class="op" id="2431908">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2431913">arg</span><span class="op" id="2431916">:</span>&nbsp;&nbsp;<span class="ident" id="2431919">c</span><span class="op" id="2431920">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="2431924">}</span><span class="op" id="2431925">,</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="2431928">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2431931">startTimer</span><span class="op" id="2431941">(</span><span class="op" id="2431942">&amp;</span><span class="ident" id="2431943">t</span><span class="op" id="2431944">.</span><span class="ident" id="2431945">r</span><span class="op" id="2431946">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="2431949">return</span>&nbsp;<span class="ident" id="2431956">t</span><br>
+<span class="lineno"></span><span class="op" id="2431958">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">80</span><span class="comment" id="2431961">//&nbsp;Reset&nbsp;changes&nbsp;the&nbsp;timer&nbsp;to&nbsp;expire&nbsp;after&nbsp;duration&nbsp;d.</span><br>
+<span class="lineno"></span><span class="comment" id="2432016">//&nbsp;It&nbsp;returns&nbsp;true&nbsp;if&nbsp;the&nbsp;timer&nbsp;had&nbsp;been&nbsp;active,&nbsp;false&nbsp;if&nbsp;the&nbsp;timer&nbsp;had</span><br>
+<span class="lineno"></span><span class="comment" id="2432088">//&nbsp;expired&nbsp;or&nbsp;been&nbsp;stopped.</span><br>
+<span class="lineno"></span><span class="keyword" id="2432116">func</span>&nbsp;<span class="op" id="2432121">(</span><span class="ident" id="2432122">t</span>&nbsp;<span class="op" id="2432124">*</span><span class="ident" id="2432125">Timer</span><span class="op" id="2432130">)</span>&nbsp;<span class="ident" id="2432132">Reset</span><span class="op" id="2432137">(</span><span class="ident" id="2432138">d</span>&nbsp;<span class="ident" id="2432140">Duration</span><span class="op" id="2432148">)</span>&nbsp;<span class="builtintype" id="2432150">bool</span>&nbsp;<span class="op" id="2432155">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="2432158">if</span>&nbsp;<span class="ident" id="2432161">t</span><span class="op" id="2432162">.</span><span class="ident" id="2432163">r</span><span class="op" id="2432164">.</span><span class="ident" id="2432165">f</span>&nbsp;<span class="op" id="2432167">==</span>&nbsp;<span class="ident" id="2432170">nil</span>&nbsp;<span class="op" id="2432174">{</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc" id="2432178">panic</span><span class="op" id="2432183">(</span><span class="string" id="2432184">&#34;time:&nbsp;Reset&nbsp;called&nbsp;on&nbsp;uninitialized&nbsp;Timer&#34;</span><span class="op" id="2432227">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="2432230">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2432233">w</span>&nbsp;<span class="op" id="2432235">:=</span>&nbsp;<span class="ident" id="2432238">when</span><span class="op" id="2432242">(</span><span class="ident" id="2432243">d</span><span class="op" id="2432244">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2432247">active</span>&nbsp;<span class="op" id="2432254">:=</span>&nbsp;<span class="ident" id="2432257">stopTimer</span><span class="op" id="2432266">(</span><span class="op" id="2432267">&amp;</span><span class="ident" id="2432268">t</span><span class="op" id="2432269">.</span><span class="ident" id="2432270">r</span><span class="op" id="2432271">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2432274">t</span><span class="op" id="2432275">.</span><span class="ident" id="2432276">r</span><span class="op" id="2432277">.</span><span class="ident" id="2432278">when</span>&nbsp;<span class="op" id="2432283">=</span>&nbsp;<span class="ident" id="2432285">w</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2432288">startTimer</span><span class="op" id="2432298">(</span><span class="op" id="2432299">&amp;</span><span class="ident" id="2432300">t</span><span class="op" id="2432301">.</span><span class="ident" id="2432302">r</span><span class="op" id="2432303">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="2432306">return</span>&nbsp;<span class="ident" id="2432313">active</span><br>
+<span class="lineno"></span><span class="op" id="2432320">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="2432323">func</span>&nbsp;<span class="ident" id="2432328">sendTime</span><span class="op" id="2432336">(</span><span class="ident" id="2432337">c</span>&nbsp;<span class="keyword" id="2432339">interface</span><span class="op" id="2432348">{</span><span class="op" id="2432349">}</span><span class="op" id="2432350">,</span>&nbsp;<span class="ident" id="2432352">seq</span>&nbsp;<span class="builtintype" id="2432356">uintptr</span><span class="op" id="2432363">)</span>&nbsp;<span class="op" id="2432365">{</span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="2432368">//&nbsp;Non-blocking&nbsp;send&nbsp;of&nbsp;time&nbsp;on&nbsp;c.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="2432404">//&nbsp;Used&nbsp;in&nbsp;NewTimer,&nbsp;it&nbsp;cannot&nbsp;block&nbsp;anyway&nbsp;(buffer).</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="2432459">//&nbsp;Used&nbsp;in&nbsp;NewTicker,&nbsp;dropping&nbsp;sends&nbsp;on&nbsp;the&nbsp;floor&nbsp;is</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="2432513">//&nbsp;the&nbsp;desired&nbsp;behavior&nbsp;when&nbsp;the&nbsp;reader&nbsp;gets&nbsp;behind,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="2432567">//&nbsp;because&nbsp;the&nbsp;sends&nbsp;are&nbsp;periodic.</span><br>
+<span class="lineno">100</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="2432603">select</span>&nbsp;<span class="op" id="2432610">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="2432613">case</span>&nbsp;<span class="ident" id="2432618">c</span><span class="op" id="2432619">.</span><span class="op" id="2432620">(</span><span class="keyword" id="2432621">chan</span>&nbsp;<span class="ident" id="2432626">Time</span><span class="op" id="2432630">)</span>&nbsp;<span class="op" id="2432632">&lt;-</span>&nbsp;<span class="ident" id="2432635">Now</span><span class="op" id="2432638">(</span><span class="op" id="2432639">)</span><span class="op" id="2432640">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="2432643">default</span><span class="op" id="2432650">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="2432653">}</span><br>
+<span class="lineno"></span><span class="op" id="2432655">}</span><br>
+<span class="lineno">105</span><br>
+<span class="lineno"></span><span class="comment" id="2432658">//&nbsp;After&nbsp;waits&nbsp;for&nbsp;the&nbsp;duration&nbsp;to&nbsp;elapse&nbsp;and&nbsp;then&nbsp;sends&nbsp;the&nbsp;current&nbsp;time</span><br>
+<span class="lineno"></span><span class="comment" id="2432732">//&nbsp;on&nbsp;the&nbsp;returned&nbsp;channel.</span><br>
+<span class="lineno"></span><span class="comment" id="2432760">//&nbsp;It&nbsp;is&nbsp;equivalent&nbsp;to&nbsp;NewTimer(d).C.</span><br>
+<span class="lineno"></span><span class="keyword" id="2432798">func</span>&nbsp;<span class="ident" id="2432803">After</span><span class="op" id="2432808">(</span><span class="ident" id="2432809">d</span>&nbsp;<span class="ident" id="2432811">Duration</span><span class="op" id="2432819">)</span>&nbsp;<span class="op" id="2432821">&lt;-</span><span class="keyword" id="2432823">chan</span>&nbsp;<span class="ident" id="2432828">Time</span>&nbsp;<span class="op" id="2432833">{</span><br>
+<span class="lineno">110</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="2432836">return</span>&nbsp;<span class="ident" id="2432843">NewTimer</span><span class="op" id="2432851">(</span><span class="ident" id="2432852">d</span><span class="op" id="2432853">)</span><span class="op" id="2432854">.</span><span class="ident" id="2432855">C</span><br>
+<span class="lineno"></span><span class="op" id="2432857">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="2432860">//&nbsp;AfterFunc&nbsp;waits&nbsp;for&nbsp;the&nbsp;duration&nbsp;to&nbsp;elapse&nbsp;and&nbsp;then&nbsp;calls&nbsp;f</span><br>
+<span class="lineno"></span><span class="comment" id="2432923">//&nbsp;in&nbsp;its&nbsp;own&nbsp;goroutine.&nbsp;It&nbsp;returns&nbsp;a&nbsp;Timer&nbsp;that&nbsp;can</span><br>
+<span class="lineno">115</span><span class="comment" id="2432976">//&nbsp;be&nbsp;used&nbsp;to&nbsp;cancel&nbsp;the&nbsp;call&nbsp;using&nbsp;its&nbsp;Stop&nbsp;method.</span><br>
+<span class="lineno"></span><span class="keyword" id="2433029">func</span>&nbsp;<span class="ident" id="2433034">AfterFunc</span><span class="op" id="2433043">(</span><span class="ident" id="2433044">d</span>&nbsp;<span class="ident" id="2433046">Duration</span><span class="op" id="2433054">,</span>&nbsp;<span class="ident" id="2433056">f</span>&nbsp;<span class="keyword" id="2433058">func</span><span class="op" id="2433062">(</span><span class="op" id="2433063">)</span><span class="op" id="2433064">)</span>&nbsp;<span class="op" id="2433066">*</span><span class="ident" id="2433067">Timer</span>&nbsp;<span class="op" id="2433073">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2433076">t</span>&nbsp;<span class="op" id="2433078">:=</span>&nbsp;<span class="op" id="2433081">&amp;</span><span class="ident" id="2433082">Timer</span><span class="op" id="2433087">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2433091">r</span><span class="op" id="2433092">:</span>&nbsp;<span class="ident" id="2433094">runtimeTimer</span><span class="op" id="2433106">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2433111">when</span><span class="op" id="2433115">:</span>&nbsp;<span class="ident" id="2433117">when</span><span class="op" id="2433121">(</span><span class="ident" id="2433122">d</span><span class="op" id="2433123">)</span><span class="op" id="2433124">,</span><br>
+<span class="lineno">120</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2433129">f</span><span class="op" id="2433130">:</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="2433135">goFunc</span><span class="op" id="2433141">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2433146">arg</span><span class="op" id="2433149">:</span>&nbsp;&nbsp;<span class="ident" id="2433152">f</span><span class="op" id="2433153">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="2433157">}</span><span class="op" id="2433158">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="2433161">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2433164">startTimer</span><span class="op" id="2433174">(</span><span class="op" id="2433175">&amp;</span><span class="ident" id="2433176">t</span><span class="op" id="2433177">.</span><span class="ident" id="2433178">r</span><span class="op" id="2433179">)</span><br>
+<span class="lineno">125</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="2433182">return</span>&nbsp;<span class="ident" id="2433189">t</span><br>
+<span class="lineno"></span><span class="op" id="2433191">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="2433194">func</span>&nbsp;<span class="ident" id="2433199">goFunc</span><span class="op" id="2433205">(</span><span class="ident" id="2433206">arg</span>&nbsp;<span class="keyword" id="2433210">interface</span><span class="op" id="2433219">{</span><span class="op" id="2433220">}</span><span class="op" id="2433221">,</span>&nbsp;<span class="ident" id="2433223">seq</span>&nbsp;<span class="builtintype" id="2433227">uintptr</span><span class="op" id="2433234">)</span>&nbsp;<span class="op" id="2433236">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="2433239">go</span>&nbsp;<span class="ident" id="2433242">arg</span><span class="op" id="2433245">.</span><span class="op" id="2433246">(</span><span class="keyword" id="2433247">func</span><span class="op" id="2433251">(</span><span class="op" id="2433252">)</span><span class="op" id="2433253">)</span><span class="op" id="2433254">(</span><span class="op" id="2433255">)</span><br>
+<span class="lineno">130</span><span class="op" id="2433257">}</span>
+</div>
+</body>
+</html>

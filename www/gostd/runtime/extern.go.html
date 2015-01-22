@@ -1,0 +1,183 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment" id="1859201">//&nbsp;Copyright&nbsp;2009&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment" id="1859256">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment" id="1859310">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="comment" id="1859361">/*<br>
+<span class="lineno"></span>Package&nbsp;runtime&nbsp;contains&nbsp;operations&nbsp;that&nbsp;interact&nbsp;with&nbsp;Go&#39;s&nbsp;runtime&nbsp;system,<br>
+<span class="lineno"></span>such&nbsp;as&nbsp;functions&nbsp;to&nbsp;control&nbsp;goroutines.&nbsp;It&nbsp;also&nbsp;includes&nbsp;the&nbsp;low-level&nbsp;type&nbsp;information<br>
+<span class="lineno"></span>used&nbsp;by&nbsp;the&nbsp;reflect&nbsp;package;&nbsp;see&nbsp;reflect&#39;s&nbsp;documentation&nbsp;for&nbsp;the&nbsp;programmable<br>
+<span class="lineno"></span>interface&nbsp;to&nbsp;the&nbsp;run-time&nbsp;type&nbsp;system.<br>
+<span class="lineno">10</span><br>
+<span class="lineno"></span>Environment&nbsp;Variables<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>The&nbsp;following&nbsp;environment&nbsp;variables&nbsp;($name&nbsp;or&nbsp;%name%,&nbsp;depending&nbsp;on&nbsp;the&nbsp;host<br>
+<span class="lineno"></span>operating&nbsp;system)&nbsp;control&nbsp;the&nbsp;run-time&nbsp;behavior&nbsp;of&nbsp;Go&nbsp;programs.&nbsp;The&nbsp;meanings<br>
+<span class="lineno">15</span>and&nbsp;use&nbsp;may&nbsp;change&nbsp;from&nbsp;release&nbsp;to&nbsp;release.<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>The&nbsp;GOGC&nbsp;variable&nbsp;sets&nbsp;the&nbsp;initial&nbsp;garbage&nbsp;collection&nbsp;target&nbsp;percentage.<br>
+<span class="lineno"></span>A&nbsp;collection&nbsp;is&nbsp;triggered&nbsp;when&nbsp;the&nbsp;ratio&nbsp;of&nbsp;freshly&nbsp;allocated&nbsp;data&nbsp;to&nbsp;live&nbsp;data<br>
+<span class="lineno"></span>remaining&nbsp;after&nbsp;the&nbsp;previous&nbsp;collection&nbsp;reaches&nbsp;this&nbsp;percentage.&nbsp;The&nbsp;default<br>
+<span class="lineno">20</span>is&nbsp;GOGC=100.&nbsp;Setting&nbsp;GOGC=off&nbsp;disables&nbsp;the&nbsp;garbage&nbsp;collector&nbsp;entirely.<br>
+<span class="lineno"></span>The&nbsp;runtime/debug&nbsp;package&#39;s&nbsp;SetGCPercent&nbsp;function&nbsp;allows&nbsp;changing&nbsp;this<br>
+<span class="lineno"></span>percentage&nbsp;at&nbsp;run&nbsp;time.&nbsp;See&nbsp;http://golang.org/pkg/runtime/debug/#SetGCPercent.<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>The&nbsp;GODEBUG&nbsp;variable&nbsp;controls&nbsp;debug&nbsp;output&nbsp;from&nbsp;the&nbsp;runtime.&nbsp;GODEBUG&nbsp;value&nbsp;is<br>
+<span class="lineno">25</span>a&nbsp;comma-separated&nbsp;list&nbsp;of&nbsp;name=val&nbsp;pairs.&nbsp;Supported&nbsp;names&nbsp;are:<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspallocfreetrace:&nbsp;setting&nbsp;allocfreetrace=1&nbsp;causes&nbsp;every&nbsp;allocation&nbsp;to&nbsp;be<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspprofiled&nbsp;and&nbsp;a&nbsp;stack&nbsp;trace&nbsp;printed&nbsp;on&nbsp;each&nbsp;object&#39;s&nbsp;allocation&nbsp;and&nbsp;free.<br>
+<span class="lineno"></span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbspefence:&nbsp;setting&nbsp;efence=1&nbsp;causes&nbsp;the&nbsp;allocator&nbsp;to&nbsp;run&nbsp;in&nbsp;a&nbsp;mode<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspwhere&nbsp;each&nbsp;object&nbsp;is&nbsp;allocated&nbsp;on&nbsp;a&nbsp;unique&nbsp;page&nbsp;and&nbsp;addresses&nbsp;are<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspnever&nbsp;recycled.<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspgctrace:&nbsp;setting&nbsp;gctrace=1&nbsp;causes&nbsp;the&nbsp;garbage&nbsp;collector&nbsp;to&nbsp;emit&nbsp;a&nbsp;single&nbsp;line&nbsp;to&nbsp;standard<br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsperror&nbsp;at&nbsp;each&nbsp;collection,&nbsp;summarizing&nbsp;the&nbsp;amount&nbsp;of&nbsp;memory&nbsp;collected&nbsp;and&nbsp;the<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsplength&nbsp;of&nbsp;the&nbsp;pause.&nbsp;Setting&nbsp;gctrace=2&nbsp;emits&nbsp;the&nbsp;same&nbsp;summary&nbsp;but&nbsp;also<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsprepeats&nbsp;each&nbsp;collection.<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspgcdead:&nbsp;setting&nbsp;gcdead=1&nbsp;causes&nbsp;the&nbsp;garbage&nbsp;collector&nbsp;to&nbsp;clobber&nbsp;all&nbsp;stack&nbsp;slots<br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbspthat&nbsp;it&nbsp;thinks&nbsp;are&nbsp;dead.<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspinvalidptr:&nbsp;defaults&nbsp;to&nbsp;invalidptr=1,&nbsp;causing&nbsp;the&nbsp;garbage&nbsp;collector&nbsp;and&nbsp;stack<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspcopier&nbsp;to&nbsp;crash&nbsp;the&nbsp;program&nbsp;if&nbsp;an&nbsp;invalid&nbsp;pointer&nbsp;value&nbsp;(for&nbsp;example,&nbsp;1)<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspis&nbsp;found&nbsp;in&nbsp;a&nbsp;pointer-typed&nbsp;location.&nbsp;Setting&nbsp;invalidptr=0&nbsp;disables&nbsp;this&nbsp;check.<br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbspThis&nbsp;should&nbsp;only&nbsp;be&nbsp;used&nbsp;as&nbsp;a&nbsp;temporary&nbsp;workaround&nbsp;to&nbsp;diagnose&nbsp;buggy&nbsp;code.<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspThe&nbsp;real&nbsp;fix&nbsp;is&nbsp;to&nbsp;not&nbsp;store&nbsp;integers&nbsp;in&nbsp;pointer-typed&nbsp;locations.<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspscheddetail:&nbsp;setting&nbsp;schedtrace=X&nbsp;and&nbsp;scheddetail=1&nbsp;causes&nbsp;the&nbsp;scheduler&nbsp;to&nbsp;emit<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspdetailed&nbsp;multiline&nbsp;info&nbsp;every&nbsp;X&nbsp;milliseconds,&nbsp;describing&nbsp;state&nbsp;of&nbsp;the&nbsp;scheduler,<br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbspprocessors,&nbsp;threads&nbsp;and&nbsp;goroutines.<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbspschedtrace:&nbsp;setting&nbsp;schedtrace=X&nbsp;causes&nbsp;the&nbsp;scheduler&nbsp;to&nbsp;emit&nbsp;a&nbsp;single&nbsp;line&nbsp;to&nbsp;standard<br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsperror&nbsp;every&nbsp;X&nbsp;milliseconds,&nbsp;summarizing&nbsp;the&nbsp;scheduler&nbsp;state.<br>
+<span class="lineno"></span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbspscavenge:&nbsp;scavenge=1&nbsp;enables&nbsp;debugging&nbsp;mode&nbsp;of&nbsp;heap&nbsp;scavenger.<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>The&nbsp;GOMAXPROCS&nbsp;variable&nbsp;limits&nbsp;the&nbsp;number&nbsp;of&nbsp;operating&nbsp;system&nbsp;threads&nbsp;that<br>
+<span class="lineno"></span>can&nbsp;execute&nbsp;user-level&nbsp;Go&nbsp;code&nbsp;simultaneously.&nbsp;There&nbsp;is&nbsp;no&nbsp;limit&nbsp;to&nbsp;the&nbsp;number&nbsp;of&nbsp;threads<br>
+<span class="lineno"></span>that&nbsp;can&nbsp;be&nbsp;blocked&nbsp;in&nbsp;system&nbsp;calls&nbsp;on&nbsp;behalf&nbsp;of&nbsp;Go&nbsp;code;&nbsp;those&nbsp;do&nbsp;not&nbsp;count&nbsp;against<br>
+<span class="lineno">60</span>the&nbsp;GOMAXPROCS&nbsp;limit.&nbsp;This&nbsp;package&#39;s&nbsp;GOMAXPROCS&nbsp;function&nbsp;queries&nbsp;and&nbsp;changes<br>
+<span class="lineno"></span>the&nbsp;limit.<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>The&nbsp;GOTRACEBACK&nbsp;variable&nbsp;controls&nbsp;the&nbsp;amount&nbsp;of&nbsp;output&nbsp;generated&nbsp;when&nbsp;a&nbsp;Go<br>
+<span class="lineno"></span>program&nbsp;fails&nbsp;due&nbsp;to&nbsp;an&nbsp;unrecovered&nbsp;panic&nbsp;or&nbsp;an&nbsp;unexpected&nbsp;runtime&nbsp;condition.<br>
+<span class="lineno">65</span>By&nbsp;default,&nbsp;a&nbsp;failure&nbsp;prints&nbsp;a&nbsp;stack&nbsp;trace&nbsp;for&nbsp;every&nbsp;extant&nbsp;goroutine,&nbsp;eliding&nbsp;functions<br>
+<span class="lineno"></span>internal&nbsp;to&nbsp;the&nbsp;run-time&nbsp;system,&nbsp;and&nbsp;then&nbsp;exits&nbsp;with&nbsp;exit&nbsp;code&nbsp;2.<br>
+<span class="lineno"></span>If&nbsp;GOTRACEBACK=0,&nbsp;the&nbsp;per-goroutine&nbsp;stack&nbsp;traces&nbsp;are&nbsp;omitted&nbsp;entirely.<br>
+<span class="lineno"></span>If&nbsp;GOTRACEBACK=1,&nbsp;the&nbsp;default&nbsp;behavior&nbsp;is&nbsp;used.<br>
+<span class="lineno"></span>If&nbsp;GOTRACEBACK=2,&nbsp;the&nbsp;per-goroutine&nbsp;stack&nbsp;traces&nbsp;include&nbsp;run-time&nbsp;functions.<br>
+<span class="lineno">70</span>If&nbsp;GOTRACEBACK=crash,&nbsp;the&nbsp;per-goroutine&nbsp;stack&nbsp;traces&nbsp;include&nbsp;run-time&nbsp;functions,<br>
+<span class="lineno"></span>and&nbsp;if&nbsp;possible&nbsp;the&nbsp;program&nbsp;crashes&nbsp;in&nbsp;an&nbsp;operating-specific&nbsp;manner&nbsp;instead&nbsp;of<br>
+<span class="lineno"></span>exiting.&nbsp;For&nbsp;example,&nbsp;on&nbsp;Unix&nbsp;systems,&nbsp;the&nbsp;program&nbsp;raises&nbsp;SIGABRT&nbsp;to&nbsp;trigger&nbsp;a<br>
+<span class="lineno"></span>core&nbsp;dump.<br>
+<span class="lineno"></span><br>
+<span class="lineno">75</span>The&nbsp;GOARCH,&nbsp;GOOS,&nbsp;GOPATH,&nbsp;and&nbsp;GOROOT&nbsp;environment&nbsp;variables&nbsp;complete<br>
+<span class="lineno"></span>the&nbsp;set&nbsp;of&nbsp;Go&nbsp;environment&nbsp;variables.&nbsp;They&nbsp;influence&nbsp;the&nbsp;building&nbsp;of&nbsp;Go&nbsp;programs<br>
+<span class="lineno"></span>(see&nbsp;http://golang.org/cmd/go&nbsp;and&nbsp;http://golang.org/pkg/go/build).<br>
+<span class="lineno"></span>GOARCH,&nbsp;GOOS,&nbsp;and&nbsp;GOROOT&nbsp;are&nbsp;recorded&nbsp;at&nbsp;compile&nbsp;time&nbsp;and&nbsp;made&nbsp;available&nbsp;by<br>
+<span class="lineno"></span>constants&nbsp;or&nbsp;functions&nbsp;in&nbsp;this&nbsp;package,&nbsp;but&nbsp;they&nbsp;do&nbsp;not&nbsp;influence&nbsp;the&nbsp;execution<br>
+<span class="lineno">80</span>of&nbsp;the&nbsp;run-time&nbsp;system.<br>
+<span class="lineno"></span>*/</span><br>
+<span class="lineno"></span><span class="keyword" id="1863424">package</span>&nbsp;<span class="ident" id="1863432">runtime</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="1863441">//&nbsp;Caller&nbsp;reports&nbsp;file&nbsp;and&nbsp;line&nbsp;number&nbsp;information&nbsp;about&nbsp;function&nbsp;invocations&nbsp;on</span><br>
+<span class="lineno">85</span><span class="comment" id="1863522">//&nbsp;the&nbsp;calling&nbsp;goroutine&#39;s&nbsp;stack.&nbsp;&nbsp;The&nbsp;argument&nbsp;skip&nbsp;is&nbsp;the&nbsp;number&nbsp;of&nbsp;stack&nbsp;frames</span><br>
+<span class="lineno"></span><span class="comment" id="1863605">//&nbsp;to&nbsp;ascend,&nbsp;with&nbsp;0&nbsp;identifying&nbsp;the&nbsp;caller&nbsp;of&nbsp;Caller.&nbsp;&nbsp;(For&nbsp;historical&nbsp;reasons&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment" id="1863689">//&nbsp;meaning&nbsp;of&nbsp;skip&nbsp;differs&nbsp;between&nbsp;Caller&nbsp;and&nbsp;Callers.)&nbsp;The&nbsp;return&nbsp;values&nbsp;report&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment" id="1863774">//&nbsp;program&nbsp;counter,&nbsp;file&nbsp;name,&nbsp;and&nbsp;line&nbsp;number&nbsp;within&nbsp;the&nbsp;file&nbsp;of&nbsp;the&nbsp;corresponding</span><br>
+<span class="lineno"></span><span class="comment" id="1863858">//&nbsp;call.&nbsp;&nbsp;The&nbsp;boolean&nbsp;ok&nbsp;is&nbsp;false&nbsp;if&nbsp;it&nbsp;was&nbsp;not&nbsp;possible&nbsp;to&nbsp;recover&nbsp;the&nbsp;information.</span><br>
+<span class="lineno">90</span><span class="keyword" id="1863943">func</span>&nbsp;<span class="ident" id="1863948">Caller</span><span class="op" id="1863954">(</span><span class="ident" id="1863955">skip</span>&nbsp;<span class="builtintype" id="1863960">int</span><span class="op" id="1863963">)</span>&nbsp;<span class="op" id="1863965">(</span><span class="ident" id="1863966">pc</span>&nbsp;<span class="builtintype" id="1863969">uintptr</span><span class="op" id="1863976">,</span>&nbsp;<span class="ident" id="1863978">file</span>&nbsp;<span class="builtintype" id="1863983">string</span><span class="op" id="1863989">,</span>&nbsp;<span class="ident" id="1863991">line</span>&nbsp;<span class="builtintype" id="1863996">int</span><span class="op" id="1863999">,</span>&nbsp;<span class="ident" id="1864001">ok</span>&nbsp;<span class="builtintype" id="1864004">bool</span><span class="op" id="1864008">)</span>&nbsp;<span class="op" id="1864010">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1864013">//&nbsp;Ask&nbsp;for&nbsp;two&nbsp;PCs:&nbsp;the&nbsp;one&nbsp;we&nbsp;were&nbsp;asked&nbsp;for</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1864060">//&nbsp;and&nbsp;what&nbsp;it&nbsp;called,&nbsp;so&nbsp;that&nbsp;we&nbsp;can&nbsp;see&nbsp;if&nbsp;it</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1864109">//&nbsp;&#34;called&#34;&nbsp;sigpanic.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1864132">var</span>&nbsp;<span class="ident" id="1864136">rpc</span>&nbsp;<span class="op" id="1864140">[</span><span class="num" id="1864141">2</span><span class="op" id="1864142">]</span><span class="builtintype" id="1864143">uintptr</span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1864152">if</span>&nbsp;<span class="ident" id="1864155">callers</span><span class="op" id="1864162">(</span><span class="num" id="1864163">1</span><span class="op" id="1864164">+</span><span class="ident" id="1864165">skip</span><span class="op" id="1864169">-</span><span class="num" id="1864170">1</span><span class="op" id="1864171">,</span>&nbsp;<span class="op" id="1864173">&amp;</span><span class="ident" id="1864174">rpc</span><span class="op" id="1864177">[</span><span class="num" id="1864178">0</span><span class="op" id="1864179">]</span><span class="op" id="1864180">,</span>&nbsp;<span class="num" id="1864182">2</span><span class="op" id="1864183">)</span>&nbsp;<span class="op" id="1864185">&lt;</span>&nbsp;<span class="num" id="1864187">2</span>&nbsp;<span class="op" id="1864189">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1864193">return</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1864201">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1864204">f</span>&nbsp;<span class="op" id="1864206">:=</span>&nbsp;<span class="ident" id="1864209">findfunc</span><span class="op" id="1864217">(</span><span class="ident" id="1864218">rpc</span><span class="op" id="1864221">[</span><span class="num" id="1864222">1</span><span class="op" id="1864223">]</span><span class="op" id="1864224">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1864227">if</span>&nbsp;<span class="ident" id="1864230">f</span>&nbsp;<span class="op" id="1864232">==</span>&nbsp;<span class="ident" id="1864235">nil</span>&nbsp;<span class="op" id="1864239">{</span><br>
+<span class="lineno">100</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1864243">//&nbsp;TODO(rsc):&nbsp;Probably&nbsp;a&nbsp;bug?</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1864275">//&nbsp;The&nbsp;C&nbsp;version&nbsp;said&nbsp;&#34;have&nbsp;retpc&nbsp;at&nbsp;least&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1864321">//&nbsp;but&nbsp;actually&nbsp;returned&nbsp;pc=0.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1864354">ok</span>&nbsp;<span class="op" id="1864357">=</span>&nbsp;<span class="builtintype" id="1864359">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1864366">return</span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1864374">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1864377">pc</span>&nbsp;<span class="op" id="1864380">=</span>&nbsp;<span class="ident" id="1864382">rpc</span><span class="op" id="1864385">[</span><span class="num" id="1864386">1</span><span class="op" id="1864387">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1864390">xpc</span>&nbsp;<span class="op" id="1864394">:=</span>&nbsp;<span class="ident" id="1864397">pc</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1864401">g</span>&nbsp;<span class="op" id="1864403">:=</span>&nbsp;<span class="ident" id="1864406">findfunc</span><span class="op" id="1864414">(</span><span class="ident" id="1864415">rpc</span><span class="op" id="1864418">[</span><span class="num" id="1864419">0</span><span class="op" id="1864420">]</span><span class="op" id="1864421">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1864424">//&nbsp;All&nbsp;architectures&nbsp;turn&nbsp;faults&nbsp;into&nbsp;apparent&nbsp;calls&nbsp;to&nbsp;sigpanic.</span><br>
+<span class="lineno">110</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1864491">//&nbsp;If&nbsp;we&nbsp;see&nbsp;a&nbsp;call&nbsp;to&nbsp;sigpanic,&nbsp;we&nbsp;do&nbsp;not&nbsp;back&nbsp;up&nbsp;the&nbsp;PC&nbsp;to&nbsp;find</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1864558">//&nbsp;the&nbsp;line&nbsp;number&nbsp;of&nbsp;the&nbsp;call&nbsp;instruction,&nbsp;because&nbsp;there&nbsp;is&nbsp;no&nbsp;call.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1864629">if</span>&nbsp;<span class="ident" id="1864632">xpc</span>&nbsp;<span class="op" id="1864636">&gt;</span>&nbsp;<span class="ident" id="1864638">f</span><span class="op" id="1864639">.</span><span class="ident" id="1864640">entry</span>&nbsp;<span class="op" id="1864646">&amp;&amp;</span>&nbsp;<span class="op" id="1864649">(</span><span class="ident" id="1864650">g</span>&nbsp;<span class="op" id="1864652">==</span>&nbsp;<span class="ident" id="1864655">nil</span>&nbsp;<span class="op" id="1864659">||</span>&nbsp;<span class="ident" id="1864662">g</span><span class="op" id="1864663">.</span><span class="ident" id="1864664">entry</span>&nbsp;<span class="op" id="1864670">!=</span>&nbsp;<span class="ident" id="1864673">funcPC</span><span class="op" id="1864679">(</span><span class="ident" id="1864680">sigpanic</span><span class="op" id="1864688">)</span><span class="op" id="1864689">)</span>&nbsp;<span class="op" id="1864691">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1864695">xpc</span><span class="op" id="1864698">--</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1864702">}</span><br>
+<span class="lineno">115</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1864705">line</span>&nbsp;<span class="op" id="1864710">=</span>&nbsp;<span class="builtintype" id="1864712">int</span><span class="op" id="1864715">(</span><span class="ident" id="1864716">funcline</span><span class="op" id="1864724">(</span><span class="ident" id="1864725">f</span><span class="op" id="1864726">,</span>&nbsp;<span class="ident" id="1864728">xpc</span><span class="op" id="1864731">,</span>&nbsp;<span class="op" id="1864733">&amp;</span><span class="ident" id="1864734">file</span><span class="op" id="1864738">)</span><span class="op" id="1864739">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1864742">ok</span>&nbsp;<span class="op" id="1864745">=</span>&nbsp;<span class="builtintype" id="1864747">true</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1864753">return</span><br>
+<span class="lineno"></span><span class="op" id="1864760">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">120</span><span class="comment" id="1864763">//&nbsp;Callers&nbsp;fills&nbsp;the&nbsp;slice&nbsp;pc&nbsp;with&nbsp;the&nbsp;return&nbsp;program&nbsp;counters&nbsp;of&nbsp;function&nbsp;invocations</span><br>
+<span class="lineno"></span><span class="comment" id="1864850">//&nbsp;on&nbsp;the&nbsp;calling&nbsp;goroutine&#39;s&nbsp;stack.&nbsp;&nbsp;The&nbsp;argument&nbsp;skip&nbsp;is&nbsp;the&nbsp;number&nbsp;of&nbsp;stack&nbsp;frames</span><br>
+<span class="lineno"></span><span class="comment" id="1864936">//&nbsp;to&nbsp;skip&nbsp;before&nbsp;recording&nbsp;in&nbsp;pc,&nbsp;with&nbsp;0&nbsp;identifying&nbsp;the&nbsp;frame&nbsp;for&nbsp;Callers&nbsp;itself&nbsp;and</span><br>
+<span class="lineno"></span><span class="comment" id="1865023">//&nbsp;1&nbsp;identifying&nbsp;the&nbsp;caller&nbsp;of&nbsp;Callers.</span><br>
+<span class="lineno"></span><span class="comment" id="1865063">//&nbsp;It&nbsp;returns&nbsp;the&nbsp;number&nbsp;of&nbsp;entries&nbsp;written&nbsp;to&nbsp;pc.</span><br>
+<span class="lineno">125</span><span class="comment" id="1865114">//</span><br>
+<span class="lineno"></span><span class="comment" id="1865117">//&nbsp;Note&nbsp;that&nbsp;since&nbsp;each&nbsp;slice&nbsp;entry&nbsp;pc[i]&nbsp;is&nbsp;a&nbsp;return&nbsp;program&nbsp;counter,</span><br>
+<span class="lineno"></span><span class="comment" id="1865188">//&nbsp;looking&nbsp;up&nbsp;the&nbsp;file&nbsp;and&nbsp;line&nbsp;for&nbsp;pc[i]&nbsp;(for&nbsp;example,&nbsp;using&nbsp;(*Func).FileLine)</span><br>
+<span class="lineno"></span><span class="comment" id="1865268">//&nbsp;will&nbsp;return&nbsp;the&nbsp;file&nbsp;and&nbsp;line&nbsp;number&nbsp;of&nbsp;the&nbsp;instruction&nbsp;immediately</span><br>
+<span class="lineno"></span><span class="comment" id="1865339">//&nbsp;following&nbsp;the&nbsp;call.</span><br>
+<span class="lineno">130</span><span class="comment" id="1865362">//&nbsp;To&nbsp;look&nbsp;up&nbsp;the&nbsp;file&nbsp;and&nbsp;line&nbsp;number&nbsp;of&nbsp;the&nbsp;call&nbsp;itself,&nbsp;use&nbsp;pc[i]-1.</span><br>
+<span class="lineno"></span><span class="comment" id="1865434">//&nbsp;As&nbsp;an&nbsp;exception&nbsp;to&nbsp;this&nbsp;rule,&nbsp;if&nbsp;pc[i-1]&nbsp;corresponds&nbsp;to&nbsp;the&nbsp;function</span><br>
+<span class="lineno"></span><span class="comment" id="1865506">//&nbsp;runtime.sigpanic,&nbsp;then&nbsp;pc[i]&nbsp;is&nbsp;the&nbsp;program&nbsp;counter&nbsp;of&nbsp;a&nbsp;faulting</span><br>
+<span class="lineno"></span><span class="comment" id="1865575">//&nbsp;instruction&nbsp;and&nbsp;should&nbsp;be&nbsp;used&nbsp;without&nbsp;any&nbsp;subtraction.</span><br>
+<span class="lineno"></span><span class="keyword" id="1865634">func</span>&nbsp;<span class="ident" id="1865639">Callers</span><span class="op" id="1865646">(</span><span class="ident" id="1865647">skip</span>&nbsp;<span class="builtintype" id="1865652">int</span><span class="op" id="1865655">,</span>&nbsp;<span class="ident" id="1865657">pc</span>&nbsp;<span class="op" id="1865660">[</span><span class="op" id="1865661">]</span><span class="builtintype" id="1865662">uintptr</span><span class="op" id="1865669">)</span>&nbsp;<span class="builtintype" id="1865671">int</span>&nbsp;<span class="op" id="1865675">{</span><br>
+<span class="lineno">135</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1865678">//&nbsp;runtime.callers&nbsp;uses&nbsp;pc.array==nil&nbsp;as&nbsp;a&nbsp;signal</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1865729">//&nbsp;to&nbsp;print&nbsp;a&nbsp;stack&nbsp;trace.&nbsp;&nbsp;Pick&nbsp;off&nbsp;0-length&nbsp;pc&nbsp;here</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1865784">//&nbsp;so&nbsp;that&nbsp;we&nbsp;don&#39;t&nbsp;let&nbsp;a&nbsp;nil&nbsp;pc&nbsp;slice&nbsp;get&nbsp;to&nbsp;it.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1865835">if</span>&nbsp;<span class="builtinfunc" id="1865838">len</span><span class="op" id="1865841">(</span><span class="ident" id="1865842">pc</span><span class="op" id="1865844">)</span>&nbsp;<span class="op" id="1865846">==</span>&nbsp;<span class="num" id="1865849">0</span>&nbsp;<span class="op" id="1865851">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1865855">return</span>&nbsp;<span class="num" id="1865862">0</span><br>
+<span class="lineno">140</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1865865">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1865868">return</span>&nbsp;<span class="ident" id="1865875">callers</span><span class="op" id="1865882">(</span><span class="ident" id="1865883">skip</span><span class="op" id="1865887">,</span>&nbsp;<span class="op" id="1865889">&amp;</span><span class="ident" id="1865890">pc</span><span class="op" id="1865892">[</span><span class="num" id="1865893">0</span><span class="op" id="1865894">]</span><span class="op" id="1865895">,</span>&nbsp;<span class="builtinfunc" id="1865897">len</span><span class="op" id="1865900">(</span><span class="ident" id="1865901">pc</span><span class="op" id="1865903">)</span><span class="op" id="1865904">)</span><br>
+<span class="lineno"></span><span class="op" id="1865906">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="1865909">//&nbsp;GOROOT&nbsp;returns&nbsp;the&nbsp;root&nbsp;of&nbsp;the&nbsp;Go&nbsp;tree.</span><br>
+<span class="lineno">145</span><span class="comment" id="1865952">//&nbsp;It&nbsp;uses&nbsp;the&nbsp;GOROOT&nbsp;environment&nbsp;variable,&nbsp;if&nbsp;set,</span><br>
+<span class="lineno"></span><span class="comment" id="1866004">//&nbsp;or&nbsp;else&nbsp;the&nbsp;root&nbsp;used&nbsp;during&nbsp;the&nbsp;Go&nbsp;build.</span><br>
+<span class="lineno"></span><span class="keyword" id="1866050">func</span>&nbsp;<span class="ident" id="1866055">GOROOT</span><span class="op" id="1866061">(</span><span class="op" id="1866062">)</span>&nbsp;<span class="builtintype" id="1866064">string</span>&nbsp;<span class="op" id="1866071">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1866074">s</span>&nbsp;<span class="op" id="1866076">:=</span>&nbsp;<span class="ident" id="1866079">gogetenv</span><span class="op" id="1866087">(</span><span class="string" id="1866088">&#34;GOROOT&#34;</span><span class="op" id="1866096">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1866099">if</span>&nbsp;<span class="ident" id="1866102">s</span>&nbsp;<span class="op" id="1866104">!=</span>&nbsp;<span class="string" id="1866107">&#34;&#34;</span>&nbsp;<span class="op" id="1866110">{</span><br>
+<span class="lineno">150</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1866114">return</span>&nbsp;<span class="ident" id="1866121">s</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1866124">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1866127">return</span>&nbsp;<span class="ident" id="1866134">defaultGoroot</span><br>
+<span class="lineno"></span><span class="op" id="1866148">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">155</span><span class="comment" id="1866151">//&nbsp;Version&nbsp;returns&nbsp;the&nbsp;Go&nbsp;tree&#39;s&nbsp;version&nbsp;string.</span><br>
+<span class="lineno"></span><span class="comment" id="1866200">//&nbsp;It&nbsp;is&nbsp;either&nbsp;the&nbsp;commit&nbsp;hash&nbsp;and&nbsp;date&nbsp;at&nbsp;the&nbsp;time&nbsp;of&nbsp;the&nbsp;build&nbsp;or,</span><br>
+<span class="lineno"></span><span class="comment" id="1866270">//&nbsp;when&nbsp;possible,&nbsp;a&nbsp;release&nbsp;tag&nbsp;like&nbsp;&#34;go1.3&#34;.</span><br>
+<span class="lineno"></span><span class="keyword" id="1866316">func</span>&nbsp;<span class="ident" id="1866321">Version</span><span class="op" id="1866328">(</span><span class="op" id="1866329">)</span>&nbsp;<span class="builtintype" id="1866331">string</span>&nbsp;<span class="op" id="1866338">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1866341">return</span>&nbsp;<span class="ident" id="1866348">theVersion</span><br>
+<span class="lineno">160</span><span class="op" id="1866359">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="1866362">//&nbsp;GOOS&nbsp;is&nbsp;the&nbsp;running&nbsp;program&#39;s&nbsp;operating&nbsp;system&nbsp;target:</span><br>
+<span class="lineno"></span><span class="comment" id="1866420">//&nbsp;one&nbsp;of&nbsp;darwin,&nbsp;freebsd,&nbsp;linux,&nbsp;and&nbsp;so&nbsp;on.</span><br>
+<span class="lineno"></span><span class="keyword" id="1866465">const</span>&nbsp;<span class="ident" id="1866471">GOOS</span>&nbsp;<span class="builtintype" id="1866476">string</span>&nbsp;<span class="op" id="1866483">=</span>&nbsp;<span class="ident" id="1866485">theGoos</span><br>
+<span class="lineno">165</span><br>
+<span class="lineno"></span><span class="comment" id="1866494">//&nbsp;GOARCH&nbsp;is&nbsp;the&nbsp;running&nbsp;program&#39;s&nbsp;architecture&nbsp;target:</span><br>
+<span class="lineno"></span><span class="comment" id="1866550">//&nbsp;386,&nbsp;amd64,&nbsp;or&nbsp;arm.</span><br>
+<span class="lineno"></span><span class="keyword" id="1866573">const</span>&nbsp;<span class="ident" id="1866579">GOARCH</span>&nbsp;<span class="builtintype" id="1866586">string</span>&nbsp;<span class="op" id="1866593">=</span>&nbsp;<span class="ident" id="1866595">theGoarch</span>
+</div>
+</body>
+</html>

@@ -1,0 +1,238 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment" id="7734068">//&nbsp;Copyright&nbsp;2012&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment" id="7734123">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment" id="7734177">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword" id="7734228">package</span>&nbsp;<span class="ident" id="7734236">x509</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="7734242">import</span>&nbsp;<span class="op" id="7734249">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="7734252">&#34;bytes&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="7734261">&#34;crypto/rand&#34;</span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="7734276">&#34;encoding/base64&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="7734295">&#34;encoding/pem&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="7734311">&#34;testing&#34;</span><br>
+<span class="lineno"></span><span class="op" id="7734321">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">15</span><span class="keyword" id="7734324">func</span>&nbsp;<span class="ident" id="7734329">TestDecrypt</span><span class="op" id="7734340">(</span><span class="ident" id="7734341">t</span>&nbsp;<span class="op" id="7734343">*</span><span class="ident" id="7734344">testing</span><span class="op" id="7734351">.</span><span class="ident" id="7734352">T</span><span class="op" id="7734353">)</span>&nbsp;<span class="op" id="7734355">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="7734358">for</span>&nbsp;<span class="ident" id="7734362">i</span><span class="op" id="7734363">,</span>&nbsp;<span class="ident" id="7734365">data</span>&nbsp;<span class="op" id="7734370">:=</span>&nbsp;<span class="keyword" id="7734373">range</span>&nbsp;<span class="ident" id="7734379">testData</span>&nbsp;<span class="op" id="7734388">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7734392">t</span><span class="op" id="7734393">.</span><span class="ident" id="7734394">Logf</span><span class="op" id="7734398">(</span><span class="string" id="7734399">&#34;test&nbsp;%v.&nbsp;%v&#34;</span><span class="op" id="7734412">,</span>&nbsp;<span class="ident" id="7734414">i</span><span class="op" id="7734415">,</span>&nbsp;<span class="ident" id="7734417">data</span><span class="op" id="7734421">.</span><span class="ident" id="7734422">kind</span><span class="op" id="7734426">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7734430">block</span><span class="op" id="7734435">,</span>&nbsp;<span class="ident" id="7734437">rest</span>&nbsp;<span class="op" id="7734442">:=</span>&nbsp;<span class="ident" id="7734445">pem</span><span class="op" id="7734448">.</span><span class="ident" id="7734449">Decode</span><span class="op" id="7734455">(</span><span class="ident" id="7734456">data</span><span class="op" id="7734460">.</span><span class="ident" id="7734461">pemData</span><span class="op" id="7734468">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="7734472">if</span>&nbsp;<span class="builtinfunc" id="7734475">len</span><span class="op" id="7734478">(</span><span class="ident" id="7734479">rest</span><span class="op" id="7734483">)</span>&nbsp;<span class="op" id="7734485">&gt;</span>&nbsp;<span class="num" id="7734487">0</span>&nbsp;<span class="op" id="7734489">{</span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7734494">t</span><span class="op" id="7734495">.</span><span class="ident" id="7734496">Error</span><span class="op" id="7734501">(</span><span class="string" id="7734502">&#34;extra&nbsp;data&#34;</span><span class="op" id="7734514">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="7734518">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7734522">der</span><span class="op" id="7734525">,</span>&nbsp;<span class="ident" id="7734527">err</span>&nbsp;<span class="op" id="7734531">:=</span>&nbsp;<span class="ident" id="7734534">DecryptPEMBlock</span><span class="op" id="7734549">(</span><span class="ident" id="7734550">block</span><span class="op" id="7734555">,</span>&nbsp;<span class="ident" id="7734557">data</span><span class="op" id="7734561">.</span><span class="ident" id="7734562">password</span><span class="op" id="7734570">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="7734574">if</span>&nbsp;<span class="ident" id="7734577">err</span>&nbsp;<span class="op" id="7734581">!=</span>&nbsp;<span class="ident" id="7734584">nil</span>&nbsp;<span class="op" id="7734588">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7734593">t</span><span class="op" id="7734594">.</span><span class="ident" id="7734595">Error</span><span class="op" id="7734600">(</span><span class="string" id="7734601">&#34;decrypt&nbsp;failed:&nbsp;&#34;</span><span class="op" id="7734619">,</span>&nbsp;<span class="ident" id="7734621">err</span><span class="op" id="7734624">)</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="7734629">continue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="7734640">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="7734644">if</span>&nbsp;<span class="ident" id="7734647">_</span><span class="op" id="7734648">,</span>&nbsp;<span class="ident" id="7734650">err</span>&nbsp;<span class="op" id="7734654">:=</span>&nbsp;<span class="ident" id="7734657">ParsePKCS1PrivateKey</span><span class="op" id="7734677">(</span><span class="ident" id="7734678">der</span><span class="op" id="7734681">)</span><span class="op" id="7734682">;</span>&nbsp;<span class="ident" id="7734684">err</span>&nbsp;<span class="op" id="7734688">!=</span>&nbsp;<span class="ident" id="7734691">nil</span>&nbsp;<span class="op" id="7734695">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7734700">t</span><span class="op" id="7734701">.</span><span class="ident" id="7734702">Error</span><span class="op" id="7734707">(</span><span class="string" id="7734708">&#34;invalid&nbsp;private&nbsp;key:&nbsp;&#34;</span><span class="op" id="7734731">,</span>&nbsp;<span class="ident" id="7734733">err</span><span class="op" id="7734736">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="7734740">}</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7734744">plainDER</span><span class="op" id="7734752">,</span>&nbsp;<span class="ident" id="7734754">err</span>&nbsp;<span class="op" id="7734758">:=</span>&nbsp;<span class="ident" id="7734761">base64</span><span class="op" id="7734767">.</span><span class="ident" id="7734768">StdEncoding</span><span class="op" id="7734779">.</span><span class="ident" id="7734780">DecodeString</span><span class="op" id="7734792">(</span><span class="ident" id="7734793">data</span><span class="op" id="7734797">.</span><span class="ident" id="7734798">plainDER</span><span class="op" id="7734806">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="7734810">if</span>&nbsp;<span class="ident" id="7734813">err</span>&nbsp;<span class="op" id="7734817">!=</span>&nbsp;<span class="ident" id="7734820">nil</span>&nbsp;<span class="op" id="7734824">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7734829">t</span><span class="op" id="7734830">.</span><span class="ident" id="7734831">Fatal</span><span class="op" id="7734836">(</span><span class="string" id="7734837">&#34;cannot&nbsp;decode&nbsp;test&nbsp;DER&nbsp;data:&nbsp;&#34;</span><span class="op" id="7734868">,</span>&nbsp;<span class="ident" id="7734870">err</span><span class="op" id="7734873">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="7734877">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="7734881">if</span>&nbsp;<span class="op" id="7734884">!</span><span class="ident" id="7734885">bytes</span><span class="op" id="7734890">.</span><span class="ident" id="7734891">Equal</span><span class="op" id="7734896">(</span><span class="ident" id="7734897">der</span><span class="op" id="7734900">,</span>&nbsp;<span class="ident" id="7734902">plainDER</span><span class="op" id="7734910">)</span>&nbsp;<span class="op" id="7734912">{</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7734917">t</span><span class="op" id="7734918">.</span><span class="ident" id="7734919">Error</span><span class="op" id="7734924">(</span><span class="string" id="7734925">&#34;data&nbsp;mismatch&#34;</span><span class="op" id="7734940">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="7734944">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="7734947">}</span><br>
+<span class="lineno"></span><span class="op" id="7734949">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">40</span><span class="keyword" id="7734952">func</span>&nbsp;<span class="ident" id="7734957">TestEncrypt</span><span class="op" id="7734968">(</span><span class="ident" id="7734969">t</span>&nbsp;<span class="op" id="7734971">*</span><span class="ident" id="7734972">testing</span><span class="op" id="7734979">.</span><span class="ident" id="7734980">T</span><span class="op" id="7734981">)</span>&nbsp;<span class="op" id="7734983">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="7734986">for</span>&nbsp;<span class="ident" id="7734990">i</span><span class="op" id="7734991">,</span>&nbsp;<span class="ident" id="7734993">data</span>&nbsp;<span class="op" id="7734998">:=</span>&nbsp;<span class="keyword" id="7735001">range</span>&nbsp;<span class="ident" id="7735007">testData</span>&nbsp;<span class="op" id="7735016">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7735020">t</span><span class="op" id="7735021">.</span><span class="ident" id="7735022">Logf</span><span class="op" id="7735026">(</span><span class="string" id="7735027">&#34;test&nbsp;%v.&nbsp;%v&#34;</span><span class="op" id="7735040">,</span>&nbsp;<span class="ident" id="7735042">i</span><span class="op" id="7735043">,</span>&nbsp;<span class="ident" id="7735045">data</span><span class="op" id="7735049">.</span><span class="ident" id="7735050">kind</span><span class="op" id="7735054">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7735058">plainDER</span><span class="op" id="7735066">,</span>&nbsp;<span class="ident" id="7735068">err</span>&nbsp;<span class="op" id="7735072">:=</span>&nbsp;<span class="ident" id="7735075">base64</span><span class="op" id="7735081">.</span><span class="ident" id="7735082">StdEncoding</span><span class="op" id="7735093">.</span><span class="ident" id="7735094">DecodeString</span><span class="op" id="7735106">(</span><span class="ident" id="7735107">data</span><span class="op" id="7735111">.</span><span class="ident" id="7735112">plainDER</span><span class="op" id="7735120">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="7735124">if</span>&nbsp;<span class="ident" id="7735127">err</span>&nbsp;<span class="op" id="7735131">!=</span>&nbsp;<span class="ident" id="7735134">nil</span>&nbsp;<span class="op" id="7735138">{</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7735143">t</span><span class="op" id="7735144">.</span><span class="ident" id="7735145">Fatal</span><span class="op" id="7735150">(</span><span class="string" id="7735151">&#34;cannot&nbsp;decode&nbsp;test&nbsp;DER&nbsp;data:&nbsp;&#34;</span><span class="op" id="7735182">,</span>&nbsp;<span class="ident" id="7735184">err</span><span class="op" id="7735187">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="7735191">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7735195">password</span>&nbsp;<span class="op" id="7735204">:=</span>&nbsp;<span class="op" id="7735207">[</span><span class="op" id="7735208">]</span><span class="builtintype" id="7735209">byte</span><span class="op" id="7735213">(</span><span class="string" id="7735214">&#34;kremvax1&#34;</span><span class="op" id="7735224">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7735228">block</span><span class="op" id="7735233">,</span>&nbsp;<span class="ident" id="7735235">err</span>&nbsp;<span class="op" id="7735239">:=</span>&nbsp;<span class="ident" id="7735242">EncryptPEMBlock</span><span class="op" id="7735257">(</span><span class="ident" id="7735258">rand</span><span class="op" id="7735262">.</span><span class="ident" id="7735263">Reader</span><span class="op" id="7735269">,</span>&nbsp;<span class="string" id="7735271">&#34;RSA&nbsp;PRIVATE&nbsp;KEY&#34;</span><span class="op" id="7735288">,</span>&nbsp;<span class="ident" id="7735290">plainDER</span><span class="op" id="7735298">,</span>&nbsp;<span class="ident" id="7735300">password</span><span class="op" id="7735308">,</span>&nbsp;<span class="ident" id="7735310">data</span><span class="op" id="7735314">.</span><span class="ident" id="7735315">kind</span><span class="op" id="7735319">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="7735323">if</span>&nbsp;<span class="ident" id="7735326">err</span>&nbsp;<span class="op" id="7735330">!=</span>&nbsp;<span class="ident" id="7735333">nil</span>&nbsp;<span class="op" id="7735337">{</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7735342">t</span><span class="op" id="7735343">.</span><span class="ident" id="7735344">Error</span><span class="op" id="7735349">(</span><span class="string" id="7735350">&#34;encrypt:&nbsp;&#34;</span><span class="op" id="7735361">,</span>&nbsp;<span class="ident" id="7735363">err</span><span class="op" id="7735366">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="7735371">continue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="7735382">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="7735386">if</span>&nbsp;<span class="op" id="7735389">!</span><span class="ident" id="7735390">IsEncryptedPEMBlock</span><span class="op" id="7735409">(</span><span class="ident" id="7735410">block</span><span class="op" id="7735415">)</span>&nbsp;<span class="op" id="7735417">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7735422">t</span><span class="op" id="7735423">.</span><span class="ident" id="7735424">Error</span><span class="op" id="7735429">(</span><span class="string" id="7735430">&#34;PEM&nbsp;block&nbsp;does&nbsp;not&nbsp;appear&nbsp;to&nbsp;be&nbsp;encrypted&#34;</span><span class="op" id="7735473">)</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="7735477">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="7735481">if</span>&nbsp;<span class="ident" id="7735484">block</span><span class="op" id="7735489">.</span><span class="ident" id="7735490">Type</span>&nbsp;<span class="op" id="7735495">!=</span>&nbsp;<span class="string" id="7735498">&#34;RSA&nbsp;PRIVATE&nbsp;KEY&#34;</span>&nbsp;<span class="op" id="7735516">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7735521">t</span><span class="op" id="7735522">.</span><span class="ident" id="7735523">Errorf</span><span class="op" id="7735529">(</span><span class="string" id="7735530">&#34;unexpected&nbsp;block&nbsp;type;&nbsp;got&nbsp;%q&nbsp;want&nbsp;%q&#34;</span><span class="op" id="7735569">,</span>&nbsp;<span class="ident" id="7735571">block</span><span class="op" id="7735576">.</span><span class="ident" id="7735577">Type</span><span class="op" id="7735581">,</span>&nbsp;<span class="string" id="7735583">&#34;RSA&nbsp;PRIVATE&nbsp;KEY&#34;</span><span class="op" id="7735600">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="7735604">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="7735608">if</span>&nbsp;<span class="ident" id="7735611">block</span><span class="op" id="7735616">.</span><span class="ident" id="7735617">Headers</span><span class="op" id="7735624">[</span><span class="string" id="7735625">&#34;Proc-Type&#34;</span><span class="op" id="7735636">]</span>&nbsp;<span class="op" id="7735638">!=</span>&nbsp;<span class="string" id="7735641">&#34;4,ENCRYPTED&#34;</span>&nbsp;<span class="op" id="7735655">{</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7735660">t</span><span class="op" id="7735661">.</span><span class="ident" id="7735662">Errorf</span><span class="op" id="7735668">(</span><span class="string" id="7735669">&#34;block&nbsp;does&nbsp;not&nbsp;have&nbsp;correct&nbsp;Proc-Type&nbsp;header&#34;</span><span class="op" id="7735715">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="7735719">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7735723">der</span><span class="op" id="7735726">,</span>&nbsp;<span class="ident" id="7735728">err</span>&nbsp;<span class="op" id="7735732">:=</span>&nbsp;<span class="ident" id="7735735">DecryptPEMBlock</span><span class="op" id="7735750">(</span><span class="ident" id="7735751">block</span><span class="op" id="7735756">,</span>&nbsp;<span class="ident" id="7735758">password</span><span class="op" id="7735766">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="7735770">if</span>&nbsp;<span class="ident" id="7735773">err</span>&nbsp;<span class="op" id="7735777">!=</span>&nbsp;<span class="ident" id="7735780">nil</span>&nbsp;<span class="op" id="7735784">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7735789">t</span><span class="op" id="7735790">.</span><span class="ident" id="7735791">Error</span><span class="op" id="7735796">(</span><span class="string" id="7735797">&#34;decrypt:&nbsp;&#34;</span><span class="op" id="7735808">,</span>&nbsp;<span class="ident" id="7735810">err</span><span class="op" id="7735813">)</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="7735818">continue</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="7735829">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="7735833">if</span>&nbsp;<span class="op" id="7735836">!</span><span class="ident" id="7735837">bytes</span><span class="op" id="7735842">.</span><span class="ident" id="7735843">Equal</span><span class="op" id="7735848">(</span><span class="ident" id="7735849">der</span><span class="op" id="7735852">,</span>&nbsp;<span class="ident" id="7735854">plainDER</span><span class="op" id="7735862">)</span>&nbsp;<span class="op" id="7735864">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7735869">t</span><span class="op" id="7735870">.</span><span class="ident" id="7735871">Errorf</span><span class="op" id="7735877">(</span><span class="string" id="7735878">&#34;data&nbsp;mismatch&#34;</span><span class="op" id="7735893">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="7735897">}</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="7735900">}</span><br>
+<span class="lineno"></span><span class="op" id="7735902">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="7735905">var</span>&nbsp;<span class="ident" id="7735909">testData</span>&nbsp;<span class="op" id="7735918">=</span>&nbsp;<span class="op" id="7735920">[</span><span class="op" id="7735921">]</span><span class="keyword" id="7735922">struct</span>&nbsp;<span class="op" id="7735929">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7735932">kind</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="7735941">PEMCipher</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7735952">password</span>&nbsp;<span class="op" id="7735961">[</span><span class="op" id="7735962">]</span><span class="builtintype" id="7735963">byte</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7735969">pemData</span>&nbsp;&nbsp;<span class="op" id="7735978">[</span><span class="op" id="7735979">]</span><span class="builtintype" id="7735980">byte</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7735986">plainDER</span>&nbsp;<span class="builtintype" id="7735995">string</span><br>
+<span class="lineno"></span><span class="op" id="7736002">}</span><span class="op" id="7736003">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="7736006">{</span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7736010">kind</span><span class="op" id="7736014">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="7736020">PEMCipherDES</span><span class="op" id="7736032">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7736036">password</span><span class="op" id="7736044">:</span>&nbsp;<span class="op" id="7736046">[</span><span class="op" id="7736047">]</span><span class="builtintype" id="7736048">byte</span><span class="op" id="7736052">(</span><span class="string" id="7736053">&#34;asdf&#34;</span><span class="op" id="7736059">)</span><span class="op" id="7736060">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7736064">pemData</span><span class="op" id="7736071">:</span>&nbsp;<span class="op" id="7736073">[</span><span class="op" id="7736074">]</span><span class="builtintype" id="7736075">byte</span><span class="op" id="7736079">(</span><span class="string" id="7736080">`<br>
+<span class="lineno"></span>-----BEGIN&nbsp;RSA&nbsp;PRIVATE&nbsp;KEY-----<br>
+<span class="lineno"></span>Proc-Type:&nbsp;4,ENCRYPTED<br>
+<span class="lineno">85</span>DEK-Info:&nbsp;DES-CBC,34F09A4FC8DE22B5<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>WXxy8kbZdiZvANtKvhmPBLV7eVFj2A5z6oAxvI9KGyhG0ZK0skfnt00C24vfU7m5<br>
+<span class="lineno"></span>ICXeoqP67lzJ18xCzQfHjDaBNs53DSDT+Iz4e8QUep1xQ30+8QKX2NA2coee3nwc<br>
+<span class="lineno"></span>6oM1cuvhNUDemBH2i3dKgMVkfaga0zQiiOq6HJyGSncCMSruQ7F9iWEfRbFcxFCx<br>
+<span class="lineno">90</span>qtHb1kirfGKEtgWTF+ynyco6+2gMXNu70L7nJcnxnV/RLFkHt7AUU1yrclxz7eZz<br>
+<span class="lineno"></span>XOH9VfTjb52q/I8Suozq9coVQwg4tXfIoYUdT//O+mB7zJb9HI9Ps77b9TxDE6Gm<br>
+<span class="lineno"></span>4C9brwZ3zg2vqXcwwV6QRZMtyll9rOpxkbw6NPlpfBqkc3xS51bbxivbO/Nve4KD<br>
+<span class="lineno"></span>r12ymjFNF4stXCfJnNqKoZ50BHmEEUDu5Wb0fpVn82XrGw7CYc4iug==<br>
+<span class="lineno"></span>-----END&nbsp;RSA&nbsp;PRIVATE&nbsp;KEY-----`</span><span class="op" id="7736650">)</span><span class="op" id="7736651">,</span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7736655">plainDER</span><span class="op" id="7736663">:</span>&nbsp;<span class="string" id="7736665">`<br>
+<span class="lineno"></span>MIIBPAIBAAJBAPASZe+tCPU6p80AjHhDkVsLYa51D35e/YGa8QcZyooeZM8EHozo<br>
+<span class="lineno"></span>KD0fNiKI+53bHdy07N+81VQ8/ejPcRoXPlsCAwEAAQJBAMTxIuSq27VpR+zZ7WJf<br>
+<span class="lineno"></span>c6fvv1OBvpMZ0/d1pxL/KnOAgq2rD5hDtk9b0LGhTPgQAmrrMTKuSeGoIuYE+gKQ<br>
+<span class="lineno"></span>QvkCIQD+GC1m+/do+QRurr0uo46Kx1LzLeSCrjBk34wiOp2+dwIhAPHfTLRXS2fv<br>
+<span class="lineno">100</span>7rljm0bYa4+eDZpz+E8RcXEgzhhvcQQ9AiAI5eHZJGOyml3MXnQjiPi55WcDOw0w<br>
+<span class="lineno"></span>glcRgT6QCEtz2wIhANSyqaFtosIkHKqrDUGfz/bb5tqMYTAnBruVPaf/WEOBAiEA<br>
+<span class="lineno"></span>9xORWeRG1tRpso4+dYy4KdDkuLPIO01KY6neYGm3BCM=`</span><span class="op" id="7737102">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="7737105">}</span><span class="op" id="7737106">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="7737109">{</span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7737113">kind</span><span class="op" id="7737117">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="7737123">PEMCipher3DES</span><span class="op" id="7737136">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7737140">password</span><span class="op" id="7737148">:</span>&nbsp;<span class="op" id="7737150">[</span><span class="op" id="7737151">]</span><span class="builtintype" id="7737152">byte</span><span class="op" id="7737156">(</span><span class="string" id="7737157">&#34;asdf&#34;</span><span class="op" id="7737163">)</span><span class="op" id="7737164">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7737168">pemData</span><span class="op" id="7737175">:</span>&nbsp;<span class="op" id="7737177">[</span><span class="op" id="7737178">]</span><span class="builtintype" id="7737179">byte</span><span class="op" id="7737183">(</span><span class="string" id="7737184">`<br>
+<span class="lineno"></span>-----BEGIN&nbsp;RSA&nbsp;PRIVATE&nbsp;KEY-----<br>
+<span class="lineno"></span>Proc-Type:&nbsp;4,ENCRYPTED<br>
+<span class="lineno">110</span>DEK-Info:&nbsp;DES-EDE3-CBC,C1F4A6A03682C2C7<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>0JqVdBEH6iqM7drTkj+e2W/bE3LqakaiWhb9WUVonFkhyu8ca/QzebY3b5gCvAZQ<br>
+<span class="lineno"></span>YwBvDcT/GHospKqPx+cxDHJNsUASDZws6bz8ZXWJGwZGExKzr0+Qx5fgXn44Ms3x<br>
+<span class="lineno"></span>8g1ENFuTXtxo+KoNK0zuAMAqp66Llcds3Fjl4XR18QaD0CrVNAfOdgATWZm5GJxk<br>
+<span class="lineno">115</span>Fgx5f84nT+/ovvreG+xeOzWgvtKo0UUZVrhGOgfKLpa57adumcJ6SkUuBtEFpZFB<br>
+<span class="lineno"></span>ldw5w7WC7d13x2LsRkwo8ZrDKgIV+Y9GNvhuCCkTzNP0V3gNeJpd201HZHR+9n3w<br>
+<span class="lineno"></span>3z0VjR/MGqsfcy1ziEWMNOO53At3zlG6zP05aHMnMcZoVXadEK6L1gz++inSSDCq<br>
+<span class="lineno"></span>gI0UJP4e3JVB7AkgYymYAwiYALAkoEIuanxoc50njJk=<br>
+<span class="lineno"></span>-----END&nbsp;RSA&nbsp;PRIVATE&nbsp;KEY-----`</span><span class="op" id="7737747">)</span><span class="op" id="7737748">,</span><br>
+<span class="lineno">120</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7737752">plainDER</span><span class="op" id="7737760">:</span>&nbsp;<span class="string" id="7737762">`<br>
+<span class="lineno"></span>MIIBOwIBAAJBANOCXKdoNS/iP/MAbl9cf1/SF3P+Ns7ZeNL27CfmDh0O6Zduaax5<br>
+<span class="lineno"></span>NBiumd2PmjkaCu7lQ5JOibHfWn+xJsc3kw0CAwEAAQJANX/W8d1Q/sCqzkuAn4xl<br>
+<span class="lineno"></span>B5a7qfJWaLHndu1QRLNTRJPn0Ee7OKJ4H0QKOhQM6vpjRrz+P2u9thn6wUxoPsef<br>
+<span class="lineno"></span>QQIhAP/jCkfejFcy4v15beqKzwz08/tslVjF+Yq41eJGejmxAiEA05pMoqfkyjcx<br>
+<span class="lineno">125</span>fyvGhpoOyoCp71vSGUfR2I9CR65oKh0CIC1Msjs66LlfJtQctRq6bCEtFCxEcsP+<br>
+<span class="lineno"></span>eEjYo/Sk6WphAiEAxpgWPMJeU/shFT28gS+tmhjPZLpEoT1qkVlC14u0b3ECIQDX<br>
+<span class="lineno"></span>tZZZxCtPAm7shftEib0VU77Lk8MsXJcx2C4voRsjEw==`</span><span class="op" id="7738199">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="7738202">}</span><span class="op" id="7738203">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="7738206">{</span><br>
+<span class="lineno">130</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7738210">kind</span><span class="op" id="7738214">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="7738220">PEMCipherAES128</span><span class="op" id="7738235">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7738239">password</span><span class="op" id="7738247">:</span>&nbsp;<span class="op" id="7738249">[</span><span class="op" id="7738250">]</span><span class="builtintype" id="7738251">byte</span><span class="op" id="7738255">(</span><span class="string" id="7738256">&#34;asdf&#34;</span><span class="op" id="7738262">)</span><span class="op" id="7738263">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7738267">pemData</span><span class="op" id="7738274">:</span>&nbsp;<span class="op" id="7738276">[</span><span class="op" id="7738277">]</span><span class="builtintype" id="7738278">byte</span><span class="op" id="7738282">(</span><span class="string" id="7738283">`<br>
+<span class="lineno"></span>-----BEGIN&nbsp;RSA&nbsp;PRIVATE&nbsp;KEY-----<br>
+<span class="lineno"></span>Proc-Type:&nbsp;4,ENCRYPTED<br>
+<span class="lineno">135</span>DEK-Info:&nbsp;AES-128-CBC,D4492E793FC835CC038A728ED174F78A<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>EyfQSzXSjv6BaNH+NHdXRlkHdimpF9izWlugVJAPApgXrq5YldPe2aGIOFXyJ+QE<br>
+<span class="lineno"></span>ZIG20DYqaPzJRjTEbPNZ6Es0S2JJ5yCpKxwJuDkgJZKtF39Q2i36JeGbSZQIuWJE<br>
+<span class="lineno"></span>GZbBpf1jDH/pr0iGonuAdl2PCCZUiy+8eLsD2tyviHUkFLOB+ykYoJ5t8ngZ/B6D<br>
+<span class="lineno">140</span>33U43LLb7+9zD4y3Q9OVHqBFGyHcxCY9+9Qh4ZnFp7DTf6RY5TNEvE3s4g6aDpBs<br>
+<span class="lineno"></span>3NbvRVvYTgs8K9EPk4K+5R+P2kD8J8KvEIGxVa1vz8QoCJ/jr7Ka2rvNgPCex5/E<br>
+<span class="lineno"></span>080LzLHPCrXKdlr/f50yhNWq08ZxMWQFkui+FDHPDUaEELKAXV8/5PDxw80Rtybo<br>
+<span class="lineno"></span>AVYoCVIbZXZCuCO81op8UcOgEpTtyU5Lgh3Mw5scQL0=<br>
+<span class="lineno"></span>-----END&nbsp;RSA&nbsp;PRIVATE&nbsp;KEY-----`</span><span class="op" id="7738861">)</span><span class="op" id="7738862">,</span><br>
+<span class="lineno">145</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7738866">plainDER</span><span class="op" id="7738874">:</span>&nbsp;<span class="string" id="7738876">`<br>
+<span class="lineno"></span>MIIBOgIBAAJBAMBlj5FxYtqbcy8wY89d/S7n0+r5MzD9F63BA/Lpl78vQKtdJ5dT<br>
+<span class="lineno"></span>cDGh/rBt1ufRrNp0WihcmZi7Mpl/3jHjiWECAwEAAQJABNOHYnKhtDIqFYj1OAJ3<br>
+<span class="lineno"></span>k3GlU0OlERmIOoeY/cL2V4lgwllPBEs7r134AY4wMmZSBUj8UR/O4SNO668ElKPE<br>
+<span class="lineno"></span>cQIhAOuqY7/115x5KCdGDMWi+jNaMxIvI4ETGwV40ykGzqlzAiEA0P9oEC3m9tHB<br>
+<span class="lineno">150</span>kbpjSTxaNkrXxDgdEOZz8X0uOUUwHNsCIAwzcSCiGLyYJTULUmP1ESERfW1mlV78<br>
+<span class="lineno"></span>XzzESaJpIM/zAiBQkSTcl9VhcJreQqvjn5BnPZLP4ZHS4gPwJAGdsj5J4QIhAOVR<br>
+<span class="lineno"></span>B3WlRNTXR2WsJ5JdByezg9xzdXzULqmga0OE339a`</span><span class="op" id="7739309">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="7739312">}</span><span class="op" id="7739313">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="7739316">{</span><br>
+<span class="lineno">155</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7739320">kind</span><span class="op" id="7739324">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="7739330">PEMCipherAES192</span><span class="op" id="7739345">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7739349">password</span><span class="op" id="7739357">:</span>&nbsp;<span class="op" id="7739359">[</span><span class="op" id="7739360">]</span><span class="builtintype" id="7739361">byte</span><span class="op" id="7739365">(</span><span class="string" id="7739366">&#34;asdf&#34;</span><span class="op" id="7739372">)</span><span class="op" id="7739373">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7739377">pemData</span><span class="op" id="7739384">:</span>&nbsp;<span class="op" id="7739386">[</span><span class="op" id="7739387">]</span><span class="builtintype" id="7739388">byte</span><span class="op" id="7739392">(</span><span class="string" id="7739393">`<br>
+<span class="lineno"></span>-----BEGIN&nbsp;RSA&nbsp;PRIVATE&nbsp;KEY-----<br>
+<span class="lineno"></span>Proc-Type:&nbsp;4,ENCRYPTED<br>
+<span class="lineno">160</span>DEK-Info:&nbsp;AES-192-CBC,E2C9FB02BCA23ADE1829F8D8BC5F5369<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>cqVslvHqDDM6qwU6YjezCRifXmKsrgEev7ng6Qs7UmDJOpHDgJQZI9fwMFUhIyn5<br>
+<span class="lineno"></span>FbCu1SHkLMW52Ld3CuEqMnzWMlhPrW8tFvUOrMWPYSisv7nNq88HobZEJcUNL2MM<br>
+<span class="lineno"></span>Y15XmHW6IJwPqhKyLHpWXyOCVEh4ODND2nV15PCoi18oTa475baxSk7+1qH7GuIs<br>
+<span class="lineno">165</span>Rb7tshNTMqHbCpyo9Rn3UxeFIf9efdl8YLiMoIqc7J8E5e9VlbeQSdLMQOgDAQJG<br>
+<span class="lineno"></span>ReUtTw8exmKsY4gsSjhkg5uiw7/ZB1Ihto0qnfQJgjGc680qGkT1d6JfvOfeYAk6<br>
+<span class="lineno"></span>xn5RqS/h8rYAYm64KnepfC9vIujo4NqpaREDmaLdX5MJPQ+SlytITQvgUsUq3q/t<br>
+<span class="lineno"></span>Ss85xjQEZH3hzwjQqdJvmA4hYP6SUjxYpBM+02xZ1Xw=<br>
+<span class="lineno"></span>-----END&nbsp;RSA&nbsp;PRIVATE&nbsp;KEY-----`</span><span class="op" id="7739971">)</span><span class="op" id="7739972">,</span><br>
+<span class="lineno">170</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7739976">plainDER</span><span class="op" id="7739984">:</span>&nbsp;<span class="string" id="7739986">`<br>
+<span class="lineno"></span>MIIBOwIBAAJBAMGcRrZiNNmtF20zyS6MQ7pdGx17aFDl+lTl+qnLuJRUCMUG05xs<br>
+<span class="lineno"></span>OmxmL/O1Qlf+bnqR8Bgg65SfKg21SYuLhiMCAwEAAQJBAL94uuHyO4wux2VC+qpj<br>
+<span class="lineno"></span>IzPykjdU7XRcDHbbvksf4xokSeUFjjD3PB0Qa83M94y89ZfdILIqS9x5EgSB4/lX<br>
+<span class="lineno"></span>qNkCIQD6cCIqLfzq/lYbZbQgAAjpBXeQVYsbvVtJrPrXJAlVVQIhAMXpDKMeFPMn<br>
+<span class="lineno">175</span>J0g2rbx1gngx0qOa5r5iMU5w/noN4W2XAiBjf+WzCG5yFvazD+dOx3TC0A8+4x3P<br>
+<span class="lineno"></span>uZ3pWbaXf5PNuQIgAcdXarvhelH2w2piY1g3BPeFqhzBSCK/yLGxR82KIh8CIQDD<br>
+<span class="lineno"></span>+qGKsd09NhQ/G27y/DARzOYtml1NvdmCQAgsDIIOLA==`</span><span class="op" id="7740423">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="7740426">}</span><span class="op" id="7740427">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="7740430">{</span><br>
+<span class="lineno">180</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7740434">kind</span><span class="op" id="7740438">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="7740444">PEMCipherAES256</span><span class="op" id="7740459">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7740463">password</span><span class="op" id="7740471">:</span>&nbsp;<span class="op" id="7740473">[</span><span class="op" id="7740474">]</span><span class="builtintype" id="7740475">byte</span><span class="op" id="7740479">(</span><span class="string" id="7740480">&#34;asdf&#34;</span><span class="op" id="7740486">)</span><span class="op" id="7740487">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7740491">pemData</span><span class="op" id="7740498">:</span>&nbsp;<span class="op" id="7740500">[</span><span class="op" id="7740501">]</span><span class="builtintype" id="7740502">byte</span><span class="op" id="7740506">(</span><span class="string" id="7740507">`<br>
+<span class="lineno"></span>-----BEGIN&nbsp;RSA&nbsp;PRIVATE&nbsp;KEY-----<br>
+<span class="lineno"></span>Proc-Type:&nbsp;4,ENCRYPTED<br>
+<span class="lineno">185</span>DEK-Info:&nbsp;AES-256-CBC,8E7ED5CD731902CE938957A886A5FFBD<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>4Mxr+KIzRVwoOP0wwq6caSkvW0iS+GE2h2Ov/u+n9ZTMwL83PRnmjfjzBgfRZLVf<br>
+<span class="lineno"></span>JFPXxUK26kMNpIdssNnqGOds+DhB+oSrsNKoxgxSl5OBoYv9eJTVYm7qOyAFIsjr<br>
+<span class="lineno"></span>DRKAcjYCmzfesr7PVTowwy0RtHmYwyXMGDlAzzZrEvaiySFFmMyKKvtoavwaFoc7<br>
+<span class="lineno">190</span>Pz3RZScwIuubzTGJ1x8EzdffYOsdCa9Mtgpp3L136+23dOd6L/qK2EG2fzrJSHs/<br>
+<span class="lineno"></span>2XugkleBFSMKzEp9mxXKRfa++uidQvMZTFLDK9w5YjrRvMBo/l2BoZIsq0jAIE1N<br>
+<span class="lineno"></span>sv5Z/KwlX+3MDEpPQpUwGPlGGdLnjI3UZ+cjgqBcoMiNc6HfgbBgYJSU6aDSHuCk<br>
+<span class="lineno"></span>clCwByxWkBNgJ2GrkwNrF26v+bGJJJNR4SKouY1jQf0=<br>
+<span class="lineno"></span>-----END&nbsp;RSA&nbsp;PRIVATE&nbsp;KEY-----`</span><span class="op" id="7741085">)</span><span class="op" id="7741086">,</span><br>
+<span class="lineno">195</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7741090">plainDER</span><span class="op" id="7741098">:</span>&nbsp;<span class="string" id="7741100">`<br>
+<span class="lineno"></span>MIIBOgIBAAJBAKy3GFkstoCHIEeUU/qO8207m8WSrjksR+p9B4tf1w5k+2O1V/GY<br>
+<span class="lineno"></span>AQ5WFCApItcOkQe/I0yZZJk/PmCqMzSxrc8CAwEAAQJAOCAz0F7AW9oNelVQSP8F<br>
+<span class="lineno"></span>Sfzx7O1yom+qWyAQQJF/gFR11gpf9xpVnnyu1WxIRnDUh1LZwUsjwlDYb7MB74id<br>
+<span class="lineno"></span>oQIhANPcOiLwOPT4sIUpRM5HG6BF1BI7L77VpyGVk8xNP7X/AiEA0LMHZtk4I+lJ<br>
+<span class="lineno">200</span>nClgYp4Yh2JZ1Znbu7IoQMCEJCjwKDECIGd8Dzm5tViTkUW6Hs3Tlf73nNs65duF<br>
+<span class="lineno"></span>aRnSglss8I3pAiEAonEnKruawgD8RavDFR+fUgmQiPz4FnGGeVgfwpGG1JECIBYq<br>
+<span class="lineno"></span>PXHYtPqxQIbD2pScR5qum7iGUh11lEUPkmt+2uqS`</span><span class="op" id="7741533">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="7741536">}</span><span class="op" id="7741537">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="7741540">{</span><br>
+<span class="lineno">205</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="7741544">//&nbsp;generated&nbsp;with:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="7741565">//&nbsp;openssl&nbsp;genrsa&nbsp;-aes128&nbsp;-passout&nbsp;pass:asdf&nbsp;-out&nbsp;server.orig.key&nbsp;128</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7741637">kind</span><span class="op" id="7741641">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="7741647">PEMCipherAES128</span><span class="op" id="7741662">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7741666">password</span><span class="op" id="7741674">:</span>&nbsp;<span class="op" id="7741676">[</span><span class="op" id="7741677">]</span><span class="builtintype" id="7741678">byte</span><span class="op" id="7741682">(</span><span class="string" id="7741683">&#34;asdf&#34;</span><span class="op" id="7741689">)</span><span class="op" id="7741690">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7741694">pemData</span><span class="op" id="7741701">:</span>&nbsp;<span class="op" id="7741703">[</span><span class="op" id="7741704">]</span><span class="builtintype" id="7741705">byte</span><span class="op" id="7741709">(</span><span class="string" id="7741710">`<br>
+<span class="lineno">210</span>-----BEGIN&nbsp;RSA&nbsp;PRIVATE&nbsp;KEY-----<br>
+<span class="lineno"></span>Proc-Type:&nbsp;4,ENCRYPTED<br>
+<span class="lineno"></span>DEK-Info:&nbsp;AES-128-CBC,74611ABC2571AF11B1BF9B69E62C89E7<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>6ei/MlytjE0FFgZOGQ+jrwomKfpl8kdefeE0NSt/DMRrw8OacHAzBNi3pPEa0eX3<br>
+<span class="lineno">215</span>eND9l7C9meCirWovjj9QWVHrXyugFuDIqgdhQ8iHTgCfF3lrmcttVrbIfMDw+smD<br>
+<span class="lineno"></span>hTP8O1mS/MHl92NE0nhv0w==<br>
+<span class="lineno"></span>-----END&nbsp;RSA&nbsp;PRIVATE&nbsp;KEY-----`</span><span class="op" id="7742008">)</span><span class="op" id="7742009">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7742013">plainDER</span><span class="op" id="7742021">:</span>&nbsp;<span class="string" id="7742023">`<br>
+<span class="lineno"></span>MGMCAQACEQC6ssxmYuauuHGOCDAI54RdAgMBAAECEQCWIn6Yv2O+kBcDF7STctKB<br>
+<span class="lineno">220</span>AgkA8SEfu/2i3g0CCQDGNlXbBHX7kQIIK3Ww5o0cYbECCQDCimPb0dYGsQIIeQ7A<br>
+<span class="lineno"></span>jryIst8=`</span><span class="op" id="7742164">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="7742167">}</span><span class="op" id="7742168">,</span><br>
+<span class="lineno"></span><span class="op" id="7742170">}</span>
+</div>
+</body>
+</html>

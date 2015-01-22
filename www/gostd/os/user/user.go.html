@@ -1,0 +1,58 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment" id="6342153">//&nbsp;Copyright&nbsp;2011&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment" id="6342208">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment" id="6342262">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="comment" id="6342313">//&nbsp;Package&nbsp;user&nbsp;allows&nbsp;user&nbsp;account&nbsp;lookups&nbsp;by&nbsp;name&nbsp;or&nbsp;id.</span><br>
+<span class="lineno"></span><span class="keyword" id="6342372">package</span>&nbsp;<span class="ident" id="6342380">user</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="6342386">import</span>&nbsp;<span class="op" id="6342393">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6342396">&#34;strconv&#34;</span><br>
+<span class="lineno">10</span><span class="op" id="6342406">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="6342409">var</span>&nbsp;<span class="ident" id="6342413">implemented</span>&nbsp;<span class="op" id="6342425">=</span>&nbsp;<span class="builtintype" id="6342427">true</span>&nbsp;<span class="comment" id="6342432">//&nbsp;set&nbsp;to&nbsp;false&nbsp;by&nbsp;lookup_stubs.go&#39;s&nbsp;init</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="6342475">//&nbsp;User&nbsp;represents&nbsp;a&nbsp;user&nbsp;account.</span><br>
+<span class="lineno">15</span><span class="comment" id="6342510">//</span><br>
+<span class="lineno"></span><span class="comment" id="6342513">//&nbsp;On&nbsp;posix&nbsp;systems&nbsp;Uid&nbsp;and&nbsp;Gid&nbsp;contain&nbsp;a&nbsp;decimal&nbsp;number</span><br>
+<span class="lineno"></span><span class="comment" id="6342570">//&nbsp;representing&nbsp;uid&nbsp;and&nbsp;gid.&nbsp;On&nbsp;windows&nbsp;Uid&nbsp;and&nbsp;Gid</span><br>
+<span class="lineno"></span><span class="comment" id="6342622">//&nbsp;contain&nbsp;security&nbsp;identifier&nbsp;(SID)&nbsp;in&nbsp;a&nbsp;string&nbsp;format.</span><br>
+<span class="lineno"></span><span class="comment" id="6342679">//&nbsp;On&nbsp;Plan&nbsp;9,&nbsp;Uid,&nbsp;Gid,&nbsp;Username,&nbsp;and&nbsp;Name&nbsp;will&nbsp;be&nbsp;the</span><br>
+<span class="lineno">20</span><span class="comment" id="6342734">//&nbsp;contents&nbsp;of&nbsp;/dev/user.</span><br>
+<span class="lineno"></span><span class="keyword" id="6342760">type</span>&nbsp;<span class="ident" id="6342765">User</span>&nbsp;<span class="keyword" id="6342770">struct</span>&nbsp;<span class="op" id="6342777">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6342780">Uid</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6342789">string</span>&nbsp;<span class="comment" id="6342796">//&nbsp;user&nbsp;id</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6342808">Gid</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6342817">string</span>&nbsp;<span class="comment" id="6342824">//&nbsp;primary&nbsp;group&nbsp;id</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6342845">Username</span>&nbsp;<span class="builtintype" id="6342854">string</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6342862">Name</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6342871">string</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6342879">HomeDir</span>&nbsp;&nbsp;<span class="builtintype" id="6342888">string</span><br>
+<span class="lineno"></span><span class="op" id="6342895">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="6342898">//&nbsp;UnknownUserIdError&nbsp;is&nbsp;returned&nbsp;by&nbsp;LookupId&nbsp;when</span><br>
+<span class="lineno">30</span><span class="comment" id="6342949">//&nbsp;a&nbsp;user&nbsp;cannot&nbsp;be&nbsp;found.</span><br>
+<span class="lineno"></span><span class="keyword" id="6342976">type</span>&nbsp;<span class="ident" id="6342981">UnknownUserIdError</span>&nbsp;<span class="builtintype" id="6343000">int</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="6343005">func</span>&nbsp;<span class="op" id="6343010">(</span><span class="ident" id="6343011">e</span>&nbsp;<span class="ident" id="6343013">UnknownUserIdError</span><span class="op" id="6343031">)</span>&nbsp;<span class="ident" id="6343033">Error</span><span class="op" id="6343038">(</span><span class="op" id="6343039">)</span>&nbsp;<span class="builtintype" id="6343041">string</span>&nbsp;<span class="op" id="6343048">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="6343051">return</span>&nbsp;<span class="string" id="6343058">&#34;user:&nbsp;unknown&nbsp;userid&nbsp;&#34;</span>&nbsp;<span class="op" id="6343082">+</span>&nbsp;<span class="ident" id="6343084">strconv</span><span class="op" id="6343091">.</span><span class="ident" id="6343092">Itoa</span><span class="op" id="6343096">(</span><span class="builtintype" id="6343097">int</span><span class="op" id="6343100">(</span><span class="ident" id="6343101">e</span><span class="op" id="6343102">)</span><span class="op" id="6343103">)</span><br>
+<span class="lineno">35</span><span class="op" id="6343105">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="6343108">//&nbsp;UnknownUserError&nbsp;is&nbsp;returned&nbsp;by&nbsp;Lookup&nbsp;when</span><br>
+<span class="lineno"></span><span class="comment" id="6343155">//&nbsp;a&nbsp;user&nbsp;cannot&nbsp;be&nbsp;found.</span><br>
+<span class="lineno"></span><span class="keyword" id="6343182">type</span>&nbsp;<span class="ident" id="6343187">UnknownUserError</span>&nbsp;<span class="builtintype" id="6343204">string</span><br>
+<span class="lineno">40</span><br>
+<span class="lineno"></span><span class="keyword" id="6343212">func</span>&nbsp;<span class="op" id="6343217">(</span><span class="ident" id="6343218">e</span>&nbsp;<span class="ident" id="6343220">UnknownUserError</span><span class="op" id="6343236">)</span>&nbsp;<span class="ident" id="6343238">Error</span><span class="op" id="6343243">(</span><span class="op" id="6343244">)</span>&nbsp;<span class="builtintype" id="6343246">string</span>&nbsp;<span class="op" id="6343253">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="6343256">return</span>&nbsp;<span class="string" id="6343263">&#34;user:&nbsp;unknown&nbsp;user&nbsp;&#34;</span>&nbsp;<span class="op" id="6343285">+</span>&nbsp;<span class="builtintype" id="6343287">string</span><span class="op" id="6343293">(</span><span class="ident" id="6343294">e</span><span class="op" id="6343295">)</span><br>
+<span class="lineno"></span><span class="op" id="6343297">}</span>
+</div>
+</body>
+</html>

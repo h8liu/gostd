@@ -1,0 +1,123 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment" id="1945882">//&nbsp;Copyright&nbsp;2009&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment" id="1945937">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment" id="1945991">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword" id="1946042">package</span>&nbsp;<span class="ident" id="1946050">runtime</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="1946059">import</span>&nbsp;<span class="string" id="1946066">&#34;unsafe&#34;</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="1946076">//&nbsp;Note:&nbsp;the&nbsp;MemStats&nbsp;struct&nbsp;should&nbsp;be&nbsp;kept&nbsp;in&nbsp;sync&nbsp;with</span><br>
+<span class="lineno">10</span><span class="comment" id="1946133">//&nbsp;struct&nbsp;MStats&nbsp;in&nbsp;malloc.h</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="1946163">//&nbsp;A&nbsp;MemStats&nbsp;records&nbsp;statistics&nbsp;about&nbsp;the&nbsp;memory&nbsp;allocator.</span><br>
+<span class="lineno"></span><span class="keyword" id="1946224">type</span>&nbsp;<span class="ident" id="1946229">MemStats</span>&nbsp;<span class="keyword" id="1946238">struct</span>&nbsp;<span class="op" id="1946245">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1946248">//&nbsp;General&nbsp;statistics.</span><br>
+<span class="lineno">15</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1946272">Alloc</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="1946283">uint64</span>&nbsp;<span class="comment" id="1946290">//&nbsp;bytes&nbsp;allocated&nbsp;and&nbsp;still&nbsp;in&nbsp;use</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1946327">TotalAlloc</span>&nbsp;<span class="ident" id="1946338">uint64</span>&nbsp;<span class="comment" id="1946345">//&nbsp;bytes&nbsp;allocated&nbsp;(even&nbsp;if&nbsp;freed)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1946381">Sys</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="1946392">uint64</span>&nbsp;<span class="comment" id="1946399">//&nbsp;bytes&nbsp;obtained&nbsp;from&nbsp;system&nbsp;(sum&nbsp;of&nbsp;XxxSys&nbsp;below)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1946452">Lookups</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="1946463">uint64</span>&nbsp;<span class="comment" id="1946470">//&nbsp;number&nbsp;of&nbsp;pointer&nbsp;lookups</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1946500">Mallocs</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="1946511">uint64</span>&nbsp;<span class="comment" id="1946518">//&nbsp;number&nbsp;of&nbsp;mallocs</span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1946540">Frees</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="1946551">uint64</span>&nbsp;<span class="comment" id="1946558">//&nbsp;number&nbsp;of&nbsp;frees</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1946579">//&nbsp;Main&nbsp;allocation&nbsp;heap&nbsp;statistics.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1946616">HeapAlloc</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="1946629">uint64</span>&nbsp;<span class="comment" id="1946636">//&nbsp;bytes&nbsp;allocated&nbsp;and&nbsp;still&nbsp;in&nbsp;use</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1946673">HeapSys</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="1946686">uint64</span>&nbsp;<span class="comment" id="1946693">//&nbsp;bytes&nbsp;obtained&nbsp;from&nbsp;system</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1946724">HeapIdle</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="1946737">uint64</span>&nbsp;<span class="comment" id="1946744">//&nbsp;bytes&nbsp;in&nbsp;idle&nbsp;spans</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1946768">HeapInuse</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="1946781">uint64</span>&nbsp;<span class="comment" id="1946788">//&nbsp;bytes&nbsp;in&nbsp;non-idle&nbsp;span</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1946815">HeapReleased</span>&nbsp;<span class="ident" id="1946828">uint64</span>&nbsp;<span class="comment" id="1946835">//&nbsp;bytes&nbsp;released&nbsp;to&nbsp;the&nbsp;OS</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1946864">HeapObjects</span>&nbsp;&nbsp;<span class="ident" id="1946877">uint64</span>&nbsp;<span class="comment" id="1946884">//&nbsp;total&nbsp;number&nbsp;of&nbsp;allocated&nbsp;objects</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1946923">//&nbsp;Low-level&nbsp;fixed-size&nbsp;structure&nbsp;allocator&nbsp;statistics.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1946980">//&nbsp;&nbsp;&nbsp;&nbspInuse&nbsp;is&nbsp;bytes&nbsp;used&nbsp;now.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1947009">//&nbsp;&nbsp;&nbsp;&nbspSys&nbsp;is&nbsp;bytes&nbsp;obtained&nbsp;from&nbsp;system.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1947048">StackInuse</span>&nbsp;&nbsp;<span class="ident" id="1947060">uint64</span>&nbsp;<span class="comment" id="1947067">//&nbsp;bytes&nbsp;used&nbsp;by&nbsp;stack&nbsp;allocator</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1947101">StackSys</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="1947113">uint64</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1947121">MSpanInuse</span>&nbsp;&nbsp;<span class="ident" id="1947133">uint64</span>&nbsp;<span class="comment" id="1947140">//&nbsp;mspan&nbsp;structures</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1947161">MSpanSys</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="1947173">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1947181">MCacheInuse</span>&nbsp;<span class="ident" id="1947193">uint64</span>&nbsp;<span class="comment" id="1947200">//&nbsp;mcache&nbsp;structures</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1947222">MCacheSys</span>&nbsp;&nbsp;&nbsp;<span class="ident" id="1947234">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1947242">BuckHashSys</span>&nbsp;<span class="ident" id="1947254">uint64</span>&nbsp;<span class="comment" id="1947261">//&nbsp;profiling&nbsp;bucket&nbsp;hash&nbsp;table</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1947293">GCSys</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="1947305">uint64</span>&nbsp;<span class="comment" id="1947312">//&nbsp;GC&nbsp;metadata</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1947328">OtherSys</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="1947340">uint64</span>&nbsp;<span class="comment" id="1947347">//&nbsp;other&nbsp;system&nbsp;allocations</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1947377">//&nbsp;Garbage&nbsp;collector&nbsp;statistics.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1947411">NextGC</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="1947424">uint64</span>&nbsp;<span class="comment" id="1947431">//&nbsp;next&nbsp;collection&nbsp;will&nbsp;happen&nbsp;when&nbsp;HeapAlloc&nbsp;≥&nbsp;this&nbsp;amount</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1947494">LastGC</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="1947507">uint64</span>&nbsp;<span class="comment" id="1947514">//&nbsp;end&nbsp;time&nbsp;of&nbsp;last&nbsp;collection&nbsp;(nanoseconds&nbsp;since&nbsp;1970)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1947571">PauseTotalNs</span>&nbsp;<span class="ident" id="1947584">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1947592">PauseNs</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op" id="1947605">[</span><span class="num" id="1947606">256</span><span class="op" id="1947609">]</span><span class="ident" id="1947610">uint64</span>&nbsp;<span class="comment" id="1947617">//&nbsp;circular&nbsp;buffer&nbsp;of&nbsp;recent&nbsp;GC&nbsp;pause&nbsp;durations,&nbsp;most&nbsp;recent&nbsp;at&nbsp;[(NumGC+255)%256]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1947700">PauseEnd</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op" id="1947713">[</span><span class="num" id="1947714">256</span><span class="op" id="1947717">]</span><span class="ident" id="1947718">uint64</span>&nbsp;<span class="comment" id="1947725">//&nbsp;circular&nbsp;buffer&nbsp;of&nbsp;recent&nbsp;GC&nbsp;pause&nbsp;end&nbsp;times</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1947774">NumGC</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="1947787">uint32</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1947795">EnableGC</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="1947808">bool</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1947814">DebugGC</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="1947827">bool</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1947834">//&nbsp;Per-size&nbsp;allocation&nbsp;statistics.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1947870">//&nbsp;61&nbsp;is&nbsp;NumSizeClasses&nbsp;in&nbsp;the&nbsp;C&nbsp;code.</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1947910">BySize</span>&nbsp;<span class="op" id="1947917">[</span><span class="num" id="1947918">61</span><span class="op" id="1947920">]</span><span class="keyword" id="1947921">struct</span>&nbsp;<span class="op" id="1947928">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1947932">Size</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="1947940">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1947949">Mallocs</span>&nbsp;<span class="ident" id="1947957">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1947966">Frees</span>&nbsp;&nbsp;&nbsp;<span class="ident" id="1947974">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1947982">}</span><br>
+<span class="lineno">60</span><span class="op" id="1947984">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="1947987">var</span>&nbsp;<span class="ident" id="1947991">sizeof_C_MStats</span>&nbsp;<span class="builtintype" id="1948007">uintptr</span>&nbsp;<span class="comment" id="1948015">//&nbsp;filled&nbsp;in&nbsp;by&nbsp;malloc.goc</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="1948043">func</span>&nbsp;<span class="ident" id="1948048">init</span><span class="op" id="1948052">(</span><span class="op" id="1948053">)</span>&nbsp;<span class="op" id="1948055">{</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1948058">var</span>&nbsp;<span class="ident" id="1948062">memStats</span>&nbsp;<span class="ident" id="1948071">MemStats</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1948081">if</span>&nbsp;<span class="ident" id="1948084">sizeof_C_MStats</span>&nbsp;<span class="op" id="1948100">!=</span>&nbsp;<span class="ident" id="1948103">unsafe</span><span class="op" id="1948109">.</span><span class="ident" id="1948110">Sizeof</span><span class="op" id="1948116">(</span><span class="ident" id="1948117">memStats</span><span class="op" id="1948125">)</span>&nbsp;<span class="op" id="1948127">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc" id="1948131">println</span><span class="op" id="1948138">(</span><span class="ident" id="1948139">sizeof_C_MStats</span><span class="op" id="1948154">,</span>&nbsp;<span class="ident" id="1948156">unsafe</span><span class="op" id="1948162">.</span><span class="ident" id="1948163">Sizeof</span><span class="op" id="1948169">(</span><span class="ident" id="1948170">memStats</span><span class="op" id="1948178">)</span><span class="op" id="1948179">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1948183">gothrow</span><span class="op" id="1948190">(</span><span class="string" id="1948191">&#34;MStats&nbsp;vs&nbsp;MemStatsType&nbsp;size&nbsp;mismatch&#34;</span><span class="op" id="1948229">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1948232">}</span><br>
+<span class="lineno">70</span><span class="op" id="1948234">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="1948237">//&nbsp;ReadMemStats&nbsp;populates&nbsp;m&nbsp;with&nbsp;memory&nbsp;allocator&nbsp;statistics.</span><br>
+<span class="lineno"></span><span class="keyword" id="1948299">func</span>&nbsp;<span class="ident" id="1948304">ReadMemStats</span><span class="op" id="1948316">(</span><span class="ident" id="1948317">m</span>&nbsp;<span class="op" id="1948319">*</span><span class="ident" id="1948320">MemStats</span><span class="op" id="1948328">)</span>&nbsp;<span class="op" id="1948330">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1948333">//&nbsp;Have&nbsp;to&nbsp;acquire&nbsp;worldsema&nbsp;to&nbsp;stop&nbsp;the&nbsp;world,</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1948382">//&nbsp;because&nbsp;stoptheworld&nbsp;can&nbsp;only&nbsp;be&nbsp;used&nbsp;by</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1948427">//&nbsp;one&nbsp;goroutine&nbsp;at&nbsp;a&nbsp;time,&nbsp;and&nbsp;there&nbsp;might&nbsp;be</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1948475">//&nbsp;a&nbsp;pending&nbsp;garbage&nbsp;collection&nbsp;already&nbsp;calling&nbsp;it.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1948528">semacquire</span><span class="op" id="1948538">(</span><span class="op" id="1948539">&amp;</span><span class="ident" id="1948540">worldsema</span><span class="op" id="1948549">,</span>&nbsp;<span class="builtintype" id="1948551">false</span><span class="op" id="1948556">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1948559">gp</span>&nbsp;<span class="op" id="1948562">:=</span>&nbsp;<span class="ident" id="1948565">getg</span><span class="op" id="1948569">(</span><span class="op" id="1948570">)</span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1948573">gp</span><span class="op" id="1948575">.</span><span class="ident" id="1948576">m</span><span class="op" id="1948577">.</span><span class="ident" id="1948578">gcing</span>&nbsp;<span class="op" id="1948584">=</span>&nbsp;<span class="num" id="1948586">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1948589">onM</span><span class="op" id="1948592">(</span><span class="ident" id="1948593">stoptheworld</span><span class="op" id="1948605">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1948609">gp</span><span class="op" id="1948611">.</span><span class="ident" id="1948612">m</span><span class="op" id="1948613">.</span><span class="ident" id="1948614">ptrarg</span><span class="op" id="1948620">[</span><span class="num" id="1948621">0</span><span class="op" id="1948622">]</span>&nbsp;<span class="op" id="1948624">=</span>&nbsp;<span class="ident" id="1948626">noescape</span><span class="op" id="1948634">(</span><span class="ident" id="1948635">unsafe</span><span class="op" id="1948641">.</span><span class="ident" id="1948642">Pointer</span><span class="op" id="1948649">(</span><span class="ident" id="1948650">m</span><span class="op" id="1948651">)</span><span class="op" id="1948652">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1948655">onM</span><span class="op" id="1948658">(</span><span class="ident" id="1948659">readmemstats_m</span><span class="op" id="1948673">)</span><br>
+<span class="lineno">85</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1948677">gp</span><span class="op" id="1948679">.</span><span class="ident" id="1948680">m</span><span class="op" id="1948681">.</span><span class="ident" id="1948682">gcing</span>&nbsp;<span class="op" id="1948688">=</span>&nbsp;<span class="num" id="1948690">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1948693">gp</span><span class="op" id="1948695">.</span><span class="ident" id="1948696">m</span><span class="op" id="1948697">.</span><span class="ident" id="1948698">locks</span><span class="op" id="1948703">++</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1948707">semrelease</span><span class="op" id="1948717">(</span><span class="op" id="1948718">&amp;</span><span class="ident" id="1948719">worldsema</span><span class="op" id="1948728">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1948731">onM</span><span class="op" id="1948734">(</span><span class="ident" id="1948735">starttheworld</span><span class="op" id="1948748">)</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1948751">gp</span><span class="op" id="1948753">.</span><span class="ident" id="1948754">m</span><span class="op" id="1948755">.</span><span class="ident" id="1948756">locks</span><span class="op" id="1948761">--</span><br>
+<span class="lineno"></span><span class="op" id="1948764">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="1948767">//&nbsp;Implementation&nbsp;of&nbsp;runtime/debug.WriteHeapDump</span><br>
+<span class="lineno"></span><span class="keyword" id="1948816">func</span>&nbsp;<span class="ident" id="1948821">writeHeapDump</span><span class="op" id="1948834">(</span><span class="ident" id="1948835">fd</span>&nbsp;<span class="builtintype" id="1948838">uintptr</span><span class="op" id="1948845">)</span>&nbsp;<span class="op" id="1948847">{</span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1948850">semacquire</span><span class="op" id="1948860">(</span><span class="op" id="1948861">&amp;</span><span class="ident" id="1948862">worldsema</span><span class="op" id="1948871">,</span>&nbsp;<span class="builtintype" id="1948873">false</span><span class="op" id="1948878">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1948881">gp</span>&nbsp;<span class="op" id="1948884">:=</span>&nbsp;<span class="ident" id="1948887">getg</span><span class="op" id="1948891">(</span><span class="op" id="1948892">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1948895">gp</span><span class="op" id="1948897">.</span><span class="ident" id="1948898">m</span><span class="op" id="1948899">.</span><span class="ident" id="1948900">gcing</span>&nbsp;<span class="op" id="1948906">=</span>&nbsp;<span class="num" id="1948908">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1948911">onM</span><span class="op" id="1948914">(</span><span class="ident" id="1948915">stoptheworld</span><span class="op" id="1948927">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">100</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1948931">gp</span><span class="op" id="1948933">.</span><span class="ident" id="1948934">m</span><span class="op" id="1948935">.</span><span class="ident" id="1948936">scalararg</span><span class="op" id="1948945">[</span><span class="num" id="1948946">0</span><span class="op" id="1948947">]</span>&nbsp;<span class="op" id="1948949">=</span>&nbsp;<span class="ident" id="1948951">fd</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1948955">onM</span><span class="op" id="1948958">(</span><span class="ident" id="1948959">writeheapdump_m</span><span class="op" id="1948974">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1948978">gp</span><span class="op" id="1948980">.</span><span class="ident" id="1948981">m</span><span class="op" id="1948982">.</span><span class="ident" id="1948983">gcing</span>&nbsp;<span class="op" id="1948989">=</span>&nbsp;<span class="num" id="1948991">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1948994">gp</span><span class="op" id="1948996">.</span><span class="ident" id="1948997">m</span><span class="op" id="1948998">.</span><span class="ident" id="1948999">locks</span><span class="op" id="1949004">++</span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1949008">semrelease</span><span class="op" id="1949018">(</span><span class="op" id="1949019">&amp;</span><span class="ident" id="1949020">worldsema</span><span class="op" id="1949029">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1949032">onM</span><span class="op" id="1949035">(</span><span class="ident" id="1949036">starttheworld</span><span class="op" id="1949049">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1949052">gp</span><span class="op" id="1949054">.</span><span class="ident" id="1949055">m</span><span class="op" id="1949056">.</span><span class="ident" id="1949057">locks</span><span class="op" id="1949062">--</span><br>
+<span class="lineno"></span><span class="op" id="1949065">}</span>
+</div>
+</body>
+</html>

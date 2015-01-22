@@ -1,0 +1,54 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment" id="3564211">//&nbsp;Copyright&nbsp;2014&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment" id="3564267">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment" id="3564321">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword" id="3564372">package</span>&nbsp;<span class="ident" id="3564380">rand</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="3564386">import</span>&nbsp;<span class="op" id="3564393">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="3564396">&#34;internal/syscall&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="3564416">&#34;sync&#34;</span><br>
+<span class="lineno">10</span><span class="op" id="3564423">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="3564426">func</span>&nbsp;<span class="ident" id="3564431">init</span><span class="op" id="3564435">(</span><span class="op" id="3564436">)</span>&nbsp;<span class="op" id="3564438">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="3564441">altGetRandom</span>&nbsp;<span class="op" id="3564454">=</span>&nbsp;<span class="ident" id="3564456">getRandomLinux</span><br>
+<span class="lineno"></span><span class="op" id="3564471">}</span><br>
+<span class="lineno">15</span><br>
+<span class="lineno"></span><span class="keyword" id="3564474">var</span>&nbsp;<span class="op" id="3564478">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="3564481">once</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="3564492">sync</span><span class="op" id="3564496">.</span><span class="ident" id="3564497">Once</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="3564503">useSyscall</span>&nbsp;<span class="builtintype" id="3564514">bool</span><br>
+<span class="lineno"></span><span class="op" id="3564519">)</span><br>
+<span class="lineno">20</span><br>
+<span class="lineno"></span><span class="keyword" id="3564522">func</span>&nbsp;<span class="ident" id="3564527">pickStrategy</span><span class="op" id="3564539">(</span><span class="op" id="3564540">)</span>&nbsp;<span class="op" id="3564542">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="3564545">//&nbsp;Test&nbsp;whether&nbsp;we&nbsp;should&nbsp;use&nbsp;the&nbsp;system&nbsp;call&nbsp;or&nbsp;/dev/urandom.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="3564609">//&nbsp;We&#39;ll&nbsp;fall&nbsp;back&nbsp;to&nbsp;urandom&nbsp;if:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="3564644">//&nbsp;-&nbsp;the&nbsp;kernel&nbsp;is&nbsp;too&nbsp;old&nbsp;(before&nbsp;3.17)</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="3564686">//&nbsp;-&nbsp;the&nbsp;machine&nbsp;has&nbsp;no&nbsp;entropy&nbsp;available&nbsp;(early&nbsp;boot&nbsp;+&nbsp;no&nbsp;hardware</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="3564755">//&nbsp;&nbsp;&nbsp;entropy&nbsp;source?)&nbsp;and&nbsp;we&nbsp;want&nbsp;to&nbsp;avoid&nbsp;blocking&nbsp;later.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="3564815">var</span>&nbsp;<span class="ident" id="3564819">buf</span>&nbsp;<span class="op" id="3564823">[</span><span class="num" id="3564824">1</span><span class="op" id="3564825">]</span><span class="builtintype" id="3564826">byte</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="3564832">n</span><span class="op" id="3564833">,</span>&nbsp;<span class="ident" id="3564835">err</span>&nbsp;<span class="op" id="3564839">:=</span>&nbsp;<span class="ident" id="3564842">syscall</span><span class="op" id="3564849">.</span><span class="ident" id="3564850">GetRandom</span><span class="op" id="3564859">(</span><span class="ident" id="3564860">buf</span><span class="op" id="3564863">[</span><span class="op" id="3564864">:</span><span class="op" id="3564865">]</span><span class="op" id="3564866">,</span>&nbsp;<span class="ident" id="3564868">syscall</span><span class="op" id="3564875">.</span><span class="ident" id="3564876">GRND_NONBLOCK</span><span class="op" id="3564889">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="3564892">useSyscall</span>&nbsp;<span class="op" id="3564903">=</span>&nbsp;<span class="ident" id="3564905">n</span>&nbsp;<span class="op" id="3564907">==</span>&nbsp;<span class="num" id="3564910">1</span>&nbsp;<span class="op" id="3564912">&amp;&amp;</span>&nbsp;<span class="ident" id="3564915">err</span>&nbsp;<span class="op" id="3564919">==</span>&nbsp;<span class="ident" id="3564922">nil</span><br>
+<span class="lineno">30</span><span class="op" id="3564926">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="3564929">func</span>&nbsp;<span class="ident" id="3564934">getRandomLinux</span><span class="op" id="3564948">(</span><span class="ident" id="3564949">p</span>&nbsp;<span class="op" id="3564951">[</span><span class="op" id="3564952">]</span><span class="builtintype" id="3564953">byte</span><span class="op" id="3564957">)</span>&nbsp;<span class="op" id="3564959">(</span><span class="ident" id="3564960">ok</span>&nbsp;<span class="builtintype" id="3564963">bool</span><span class="op" id="3564967">)</span>&nbsp;<span class="op" id="3564969">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="3564972">once</span><span class="op" id="3564976">.</span><span class="ident" id="3564977">Do</span><span class="op" id="3564979">(</span><span class="ident" id="3564980">pickStrategy</span><span class="op" id="3564992">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="3564995">if</span>&nbsp;<span class="op" id="3564998">!</span><span class="ident" id="3564999">useSyscall</span>&nbsp;<span class="op" id="3565010">{</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="3565014">return</span>&nbsp;<span class="builtintype" id="3565021">false</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="3565028">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="3565031">n</span><span class="op" id="3565032">,</span>&nbsp;<span class="ident" id="3565034">err</span>&nbsp;<span class="op" id="3565038">:=</span>&nbsp;<span class="ident" id="3565041">syscall</span><span class="op" id="3565048">.</span><span class="ident" id="3565049">GetRandom</span><span class="op" id="3565058">(</span><span class="ident" id="3565059">p</span><span class="op" id="3565060">,</span>&nbsp;<span class="num" id="3565062">0</span><span class="op" id="3565063">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="3565066">return</span>&nbsp;<span class="ident" id="3565073">n</span>&nbsp;<span class="op" id="3565075">==</span>&nbsp;<span class="builtinfunc" id="3565078">len</span><span class="op" id="3565081">(</span><span class="ident" id="3565082">p</span><span class="op" id="3565083">)</span>&nbsp;<span class="op" id="3565085">&amp;&amp;</span>&nbsp;<span class="ident" id="3565088">err</span>&nbsp;<span class="op" id="3565092">==</span>&nbsp;<span class="ident" id="3565095">nil</span><br>
+<span class="lineno"></span><span class="op" id="3565099">}</span>
+</div>
+</body>
+</html>

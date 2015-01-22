@@ -1,0 +1,126 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment" id="5150452">//&nbsp;Copyright&nbsp;2009&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment" id="5150507">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment" id="5150561">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="comment" id="5150612">//&nbsp;Package&nbsp;doc&nbsp;extracts&nbsp;source&nbsp;code&nbsp;documentation&nbsp;from&nbsp;a&nbsp;Go&nbsp;AST.</span><br>
+<span class="lineno"></span><span class="keyword" id="5150677">package</span>&nbsp;<span class="ident" id="5150685">doc</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="5150690">import</span>&nbsp;<span class="op" id="5150697">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="5150700">&#34;go/ast&#34;</span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="5150710">&#34;go/token&#34;</span><br>
+<span class="lineno"></span><span class="op" id="5150721">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="5150724">//&nbsp;Package&nbsp;is&nbsp;the&nbsp;documentation&nbsp;for&nbsp;an&nbsp;entire&nbsp;package.</span><br>
+<span class="lineno"></span><span class="keyword" id="5150779">type</span>&nbsp;<span class="ident" id="5150784">Package</span>&nbsp;<span class="keyword" id="5150792">struct</span>&nbsp;<span class="op" id="5150799">{</span><br>
+<span class="lineno">15</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5150802">Doc</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="5150813">string</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5150821">Name</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="5150832">string</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5150840">ImportPath</span>&nbsp;<span class="builtintype" id="5150851">string</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5150859">Imports</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="op" id="5150870">[</span><span class="op" id="5150871">]</span><span class="builtintype" id="5150872">string</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5150880">Filenames</span>&nbsp;&nbsp;<span class="op" id="5150891">[</span><span class="op" id="5150892">]</span><span class="builtintype" id="5150893">string</span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5150901">Notes</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword" id="5150912">map</span><span class="op" id="5150915">[</span><span class="builtintype" id="5150916">string</span><span class="op" id="5150922">]</span><span class="op" id="5150923">[</span><span class="op" id="5150924">]</span><span class="op" id="5150925">*</span><span class="ident" id="5150926">Note</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="5150932">//&nbsp;DEPRECATED.&nbsp;For&nbsp;backward&nbsp;compatibility&nbsp;Bugs&nbsp;is&nbsp;still&nbsp;populated,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="5151000">//&nbsp;but&nbsp;all&nbsp;new&nbsp;code&nbsp;should&nbsp;use&nbsp;Notes&nbsp;instead.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5151047">Bugs</span>&nbsp;<span class="op" id="5151052">[</span><span class="op" id="5151053">]</span><span class="builtintype" id="5151054">string</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="5151063">//&nbsp;declarations</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5151080">Consts</span>&nbsp;<span class="op" id="5151087">[</span><span class="op" id="5151088">]</span><span class="op" id="5151089">*</span><span class="ident" id="5151090">Value</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5151097">Types</span>&nbsp;&nbsp;<span class="op" id="5151104">[</span><span class="op" id="5151105">]</span><span class="op" id="5151106">*</span><span class="ident" id="5151107">Type</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5151113">Vars</span>&nbsp;&nbsp;&nbsp;<span class="op" id="5151120">[</span><span class="op" id="5151121">]</span><span class="op" id="5151122">*</span><span class="ident" id="5151123">Value</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5151130">Funcs</span>&nbsp;&nbsp;<span class="op" id="5151137">[</span><span class="op" id="5151138">]</span><span class="op" id="5151139">*</span><span class="ident" id="5151140">Func</span><br>
+<span class="lineno">30</span><span class="op" id="5151145">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="5151148">//&nbsp;Value&nbsp;is&nbsp;the&nbsp;documentation&nbsp;for&nbsp;a&nbsp;(possibly&nbsp;grouped)&nbsp;var&nbsp;or&nbsp;const&nbsp;declaration.</span><br>
+<span class="lineno"></span><span class="keyword" id="5151229">type</span>&nbsp;<span class="ident" id="5151234">Value</span>&nbsp;<span class="keyword" id="5151240">struct</span>&nbsp;<span class="op" id="5151247">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5151250">Doc</span>&nbsp;&nbsp;&nbsp;<span class="builtintype" id="5151256">string</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5151264">Names</span>&nbsp;<span class="op" id="5151270">[</span><span class="op" id="5151271">]</span><span class="builtintype" id="5151272">string</span>&nbsp;<span class="comment" id="5151279">//&nbsp;var&nbsp;or&nbsp;const&nbsp;names&nbsp;in&nbsp;declaration&nbsp;order</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5151323">Decl</span>&nbsp;&nbsp;<span class="op" id="5151329">*</span><span class="ident" id="5151330">ast</span><span class="op" id="5151333">.</span><span class="ident" id="5151334">GenDecl</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5151344">order</span>&nbsp;<span class="builtintype" id="5151350">int</span><br>
+<span class="lineno"></span><span class="op" id="5151354">}</span><br>
+<span class="lineno">40</span><br>
+<span class="lineno"></span><span class="comment" id="5151357">//&nbsp;Type&nbsp;is&nbsp;the&nbsp;documentation&nbsp;for&nbsp;a&nbsp;type&nbsp;declaration.</span><br>
+<span class="lineno"></span><span class="keyword" id="5151410">type</span>&nbsp;<span class="ident" id="5151415">Type</span>&nbsp;<span class="keyword" id="5151420">struct</span>&nbsp;<span class="op" id="5151427">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5151430">Doc</span>&nbsp;&nbsp;<span class="builtintype" id="5151435">string</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5151443">Name</span>&nbsp;<span class="builtintype" id="5151448">string</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5151456">Decl</span>&nbsp;<span class="op" id="5151461">*</span><span class="ident" id="5151462">ast</span><span class="op" id="5151465">.</span><span class="ident" id="5151466">GenDecl</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="5151476">//&nbsp;associated&nbsp;declarations</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5151504">Consts</span>&nbsp;&nbsp;<span class="op" id="5151512">[</span><span class="op" id="5151513">]</span><span class="op" id="5151514">*</span><span class="ident" id="5151515">Value</span>&nbsp;<span class="comment" id="5151521">//&nbsp;sorted&nbsp;list&nbsp;of&nbsp;constants&nbsp;of&nbsp;(mostly)&nbsp;this&nbsp;type</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5151572">Vars</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="op" id="5151580">[</span><span class="op" id="5151581">]</span><span class="op" id="5151582">*</span><span class="ident" id="5151583">Value</span>&nbsp;<span class="comment" id="5151589">//&nbsp;sorted&nbsp;list&nbsp;of&nbsp;variables&nbsp;of&nbsp;(mostly)&nbsp;this&nbsp;type</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5151640">Funcs</span>&nbsp;&nbsp;&nbsp;<span class="op" id="5151648">[</span><span class="op" id="5151649">]</span><span class="op" id="5151650">*</span><span class="ident" id="5151651">Func</span>&nbsp;&nbsp;<span class="comment" id="5151657">//&nbsp;sorted&nbsp;list&nbsp;of&nbsp;functions&nbsp;returning&nbsp;this&nbsp;type</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5151706">Methods</span>&nbsp;<span class="op" id="5151714">[</span><span class="op" id="5151715">]</span><span class="op" id="5151716">*</span><span class="ident" id="5151717">Func</span>&nbsp;&nbsp;<span class="comment" id="5151723">//&nbsp;sorted&nbsp;list&nbsp;of&nbsp;methods&nbsp;(including&nbsp;embedded&nbsp;ones)&nbsp;of&nbsp;this&nbsp;type</span><br>
+<span class="lineno"></span><span class="op" id="5151788">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="5151791">//&nbsp;Func&nbsp;is&nbsp;the&nbsp;documentation&nbsp;for&nbsp;a&nbsp;func&nbsp;declaration.</span><br>
+<span class="lineno">55</span><span class="keyword" id="5151844">type</span>&nbsp;<span class="ident" id="5151849">Func</span>&nbsp;<span class="keyword" id="5151854">struct</span>&nbsp;<span class="op" id="5151861">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5151864">Doc</span>&nbsp;&nbsp;<span class="builtintype" id="5151869">string</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5151877">Name</span>&nbsp;<span class="builtintype" id="5151882">string</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5151890">Decl</span>&nbsp;<span class="op" id="5151895">*</span><span class="ident" id="5151896">ast</span><span class="op" id="5151899">.</span><span class="ident" id="5151900">FuncDecl</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="5151911">//&nbsp;methods</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="5151923">//&nbsp;(for&nbsp;functions,&nbsp;these&nbsp;fields&nbsp;have&nbsp;the&nbsp;respective&nbsp;zero&nbsp;value)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5151988">Recv</span>&nbsp;&nbsp;<span class="builtintype" id="5151994">string</span>&nbsp;<span class="comment" id="5152001">//&nbsp;actual&nbsp;&nbsp;&nbsp;receiver&nbsp;&#34;T&#34;&nbsp;or&nbsp;&#34;*T&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5152035">Orig</span>&nbsp;&nbsp;<span class="builtintype" id="5152041">string</span>&nbsp;<span class="comment" id="5152048">//&nbsp;original&nbsp;receiver&nbsp;&#34;T&#34;&nbsp;or&nbsp;&#34;*T&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5152082">Level</span>&nbsp;<span class="builtintype" id="5152088">int</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment" id="5152095">//&nbsp;embedding&nbsp;level;&nbsp;0&nbsp;means&nbsp;not&nbsp;embedded</span><br>
+<span class="lineno">65</span><span class="op" id="5152136">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="5152139">//&nbsp;A&nbsp;Note&nbsp;represents&nbsp;a&nbsp;marked&nbsp;comment&nbsp;starting&nbsp;with&nbsp;&#34;MARKER(uid):&nbsp;note&nbsp;body&#34;.</span><br>
+<span class="lineno"></span><span class="comment" id="5152217">//&nbsp;Any&nbsp;note&nbsp;with&nbsp;a&nbsp;marker&nbsp;of&nbsp;2&nbsp;or&nbsp;more&nbsp;upper&nbsp;case&nbsp;[A-Z]&nbsp;letters&nbsp;and&nbsp;a&nbsp;uid&nbsp;of</span><br>
+<span class="lineno"></span><span class="comment" id="5152294">//&nbsp;at&nbsp;least&nbsp;one&nbsp;character&nbsp;is&nbsp;recognized.&nbsp;The&nbsp;&#34;:&#34;&nbsp;following&nbsp;the&nbsp;uid&nbsp;is&nbsp;optional.</span><br>
+<span class="lineno">70</span><span class="comment" id="5152374">//&nbsp;Notes&nbsp;are&nbsp;collected&nbsp;in&nbsp;the&nbsp;Package.Notes&nbsp;map&nbsp;indexed&nbsp;by&nbsp;the&nbsp;notes&nbsp;marker.</span><br>
+<span class="lineno"></span><span class="keyword" id="5152451">type</span>&nbsp;<span class="ident" id="5152456">Note</span>&nbsp;<span class="keyword" id="5152461">struct</span>&nbsp;<span class="op" id="5152468">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5152471">Pos</span><span class="op" id="5152474">,</span>&nbsp;<span class="ident" id="5152476">End</span>&nbsp;<span class="ident" id="5152480">token</span><span class="op" id="5152485">.</span><span class="ident" id="5152486">Pos</span>&nbsp;<span class="comment" id="5152490">//&nbsp;position&nbsp;range&nbsp;of&nbsp;the&nbsp;comment&nbsp;containing&nbsp;the&nbsp;marker</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5152546">UID</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="5152555">string</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment" id="5152565">//&nbsp;uid&nbsp;found&nbsp;with&nbsp;the&nbsp;marker</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5152595">Body</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="5152604">string</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment" id="5152614">//&nbsp;note&nbsp;body&nbsp;text</span><br>
+<span class="lineno">75</span><span class="op" id="5152632">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="5152635">//&nbsp;Mode&nbsp;values&nbsp;control&nbsp;the&nbsp;operation&nbsp;of&nbsp;New.</span><br>
+<span class="lineno"></span><span class="keyword" id="5152680">type</span>&nbsp;<span class="ident" id="5152685">Mode</span>&nbsp;<span class="builtintype" id="5152690">int</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">80</span><span class="keyword" id="5152695">const</span>&nbsp;<span class="op" id="5152701">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="5152704">//&nbsp;extract&nbsp;documentation&nbsp;for&nbsp;all&nbsp;package-level&nbsp;declarations,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="5152766">//&nbsp;not&nbsp;just&nbsp;exported&nbsp;ones</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5152793">AllDecls</span>&nbsp;<span class="ident" id="5152802">Mode</span>&nbsp;<span class="op" id="5152807">=</span>&nbsp;<span class="num" id="5152809">1</span>&nbsp;<span class="op" id="5152811">&lt;&lt;</span>&nbsp;<span class="ident" id="5152814">iota</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="5152821">//&nbsp;show&nbsp;all&nbsp;embedded&nbsp;methods,&nbsp;not&nbsp;just&nbsp;the&nbsp;ones&nbsp;of</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="5152873">//&nbsp;invisible&nbsp;(unexported)&nbsp;anonymous&nbsp;fields</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5152917">AllMethods</span><br>
+<span class="lineno"></span><span class="op" id="5152928">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">90</span><span class="comment" id="5152931">//&nbsp;New&nbsp;computes&nbsp;the&nbsp;package&nbsp;documentation&nbsp;for&nbsp;the&nbsp;given&nbsp;package&nbsp;AST.</span><br>
+<span class="lineno"></span><span class="comment" id="5153000">//&nbsp;New&nbsp;takes&nbsp;ownership&nbsp;of&nbsp;the&nbsp;AST&nbsp;pkg&nbsp;and&nbsp;may&nbsp;edit&nbsp;or&nbsp;overwrite&nbsp;it.</span><br>
+<span class="lineno"></span><span class="comment" id="5153068">//</span><br>
+<span class="lineno"></span><span class="keyword" id="5153071">func</span>&nbsp;<span class="ident" id="5153076">New</span><span class="op" id="5153079">(</span><span class="ident" id="5153080">pkg</span>&nbsp;<span class="op" id="5153084">*</span><span class="ident" id="5153085">ast</span><span class="op" id="5153088">.</span><span class="ident" id="5153089">Package</span><span class="op" id="5153096">,</span>&nbsp;<span class="ident" id="5153098">importPath</span>&nbsp;<span class="builtintype" id="5153109">string</span><span class="op" id="5153115">,</span>&nbsp;<span class="ident" id="5153117">mode</span>&nbsp;<span class="ident" id="5153122">Mode</span><span class="op" id="5153126">)</span>&nbsp;<span class="op" id="5153128">*</span><span class="ident" id="5153129">Package</span>&nbsp;<span class="op" id="5153137">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="5153140">var</span>&nbsp;<span class="ident" id="5153144">r</span>&nbsp;<span class="ident" id="5153146">reader</span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5153154">r</span><span class="op" id="5153155">.</span><span class="ident" id="5153156">readPackage</span><span class="op" id="5153167">(</span><span class="ident" id="5153168">pkg</span><span class="op" id="5153171">,</span>&nbsp;<span class="ident" id="5153173">mode</span><span class="op" id="5153177">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5153180">r</span><span class="op" id="5153181">.</span><span class="ident" id="5153182">computeMethodSets</span><span class="op" id="5153199">(</span><span class="op" id="5153200">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5153203">r</span><span class="op" id="5153204">.</span><span class="ident" id="5153205">cleanupTypes</span><span class="op" id="5153217">(</span><span class="op" id="5153218">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="5153221">return</span>&nbsp;<span class="op" id="5153228">&amp;</span><span class="ident" id="5153229">Package</span><span class="op" id="5153236">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5153240">Doc</span><span class="op" id="5153243">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="5153252">r</span><span class="op" id="5153253">.</span><span class="ident" id="5153254">doc</span><span class="op" id="5153257">,</span><br>
+<span class="lineno">100</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5153261">Name</span><span class="op" id="5153265">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="5153273">pkg</span><span class="op" id="5153276">.</span><span class="ident" id="5153277">Name</span><span class="op" id="5153281">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5153285">ImportPath</span><span class="op" id="5153295">:</span>&nbsp;<span class="ident" id="5153297">importPath</span><span class="op" id="5153307">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5153311">Imports</span><span class="op" id="5153318">:</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="5153323">sortedKeys</span><span class="op" id="5153333">(</span><span class="ident" id="5153334">r</span><span class="op" id="5153335">.</span><span class="ident" id="5153336">imports</span><span class="op" id="5153343">)</span><span class="op" id="5153344">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5153348">Filenames</span><span class="op" id="5153357">:</span>&nbsp;&nbsp;<span class="ident" id="5153360">r</span><span class="op" id="5153361">.</span><span class="ident" id="5153362">filenames</span><span class="op" id="5153371">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5153375">Notes</span><span class="op" id="5153380">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="5153387">r</span><span class="op" id="5153388">.</span><span class="ident" id="5153389">notes</span><span class="op" id="5153394">,</span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5153398">Bugs</span><span class="op" id="5153402">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="5153410">noteBodies</span><span class="op" id="5153420">(</span><span class="ident" id="5153421">r</span><span class="op" id="5153422">.</span><span class="ident" id="5153423">notes</span><span class="op" id="5153428">[</span><span class="string" id="5153429">&#34;BUG&#34;</span><span class="op" id="5153434">]</span><span class="op" id="5153435">)</span><span class="op" id="5153436">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5153440">Consts</span><span class="op" id="5153446">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="5153452">sortedValues</span><span class="op" id="5153464">(</span><span class="ident" id="5153465">r</span><span class="op" id="5153466">.</span><span class="ident" id="5153467">values</span><span class="op" id="5153473">,</span>&nbsp;<span class="ident" id="5153475">token</span><span class="op" id="5153480">.</span><span class="ident" id="5153481">CONST</span><span class="op" id="5153486">)</span><span class="op" id="5153487">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5153491">Types</span><span class="op" id="5153496">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="5153503">sortedTypes</span><span class="op" id="5153514">(</span><span class="ident" id="5153515">r</span><span class="op" id="5153516">.</span><span class="ident" id="5153517">types</span><span class="op" id="5153522">,</span>&nbsp;<span class="ident" id="5153524">mode</span><span class="op" id="5153528">&amp;</span><span class="ident" id="5153529">AllMethods</span>&nbsp;<span class="op" id="5153540">!=</span>&nbsp;<span class="num" id="5153543">0</span><span class="op" id="5153544">)</span><span class="op" id="5153545">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5153549">Vars</span><span class="op" id="5153553">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="5153561">sortedValues</span><span class="op" id="5153573">(</span><span class="ident" id="5153574">r</span><span class="op" id="5153575">.</span><span class="ident" id="5153576">values</span><span class="op" id="5153582">,</span>&nbsp;<span class="ident" id="5153584">token</span><span class="op" id="5153589">.</span><span class="ident" id="5153590">VAR</span><span class="op" id="5153593">)</span><span class="op" id="5153594">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5153598">Funcs</span><span class="op" id="5153603">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="5153610">sortedFuncs</span><span class="op" id="5153621">(</span><span class="ident" id="5153622">r</span><span class="op" id="5153623">.</span><span class="ident" id="5153624">funcs</span><span class="op" id="5153629">,</span>&nbsp;<span class="builtintype" id="5153631">true</span><span class="op" id="5153635">)</span><span class="op" id="5153636">,</span><br>
+<span class="lineno">110</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="5153639">}</span><br>
+<span class="lineno"></span><span class="op" id="5153641">}</span>
+</div>
+</body>
+</html>

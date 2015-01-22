@@ -1,0 +1,323 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment" id="1426847">//&nbsp;Copyright&nbsp;2009&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment" id="1426902">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment" id="1426956">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="comment" id="1427007">//&nbsp;Package&nbsp;token&nbsp;defines&nbsp;constants&nbsp;representing&nbsp;the&nbsp;lexical&nbsp;tokens&nbsp;of&nbsp;the&nbsp;Go</span><br>
+<span class="lineno"></span><span class="comment" id="1427084">//&nbsp;programming&nbsp;language&nbsp;and&nbsp;basic&nbsp;operations&nbsp;on&nbsp;tokens&nbsp;(printing,&nbsp;predicates).</span><br>
+<span class="lineno"></span><span class="comment" id="1427163">//</span><br>
+<span class="lineno"></span><span class="keyword" id="1427166">package</span>&nbsp;<span class="ident" id="1427174">token</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">10</span><span class="keyword" id="1427181">import</span>&nbsp;<span class="string" id="1427188">&#34;strconv&#34;</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="1427199">//&nbsp;Token&nbsp;is&nbsp;the&nbsp;set&nbsp;of&nbsp;lexical&nbsp;tokens&nbsp;of&nbsp;the&nbsp;Go&nbsp;programming&nbsp;language.</span><br>
+<span class="lineno"></span><span class="keyword" id="1427269">type</span>&nbsp;<span class="ident" id="1427274">Token</span>&nbsp;<span class="builtintype" id="1427280">int</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">15</span><span class="comment" id="1427285">//&nbsp;The&nbsp;list&nbsp;of&nbsp;tokens.</span><br>
+<span class="lineno"></span><span class="keyword" id="1427308">const</span>&nbsp;<span class="op" id="1427314">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1427317">//&nbsp;Special&nbsp;tokens</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1427336">ILLEGAL</span>&nbsp;<span class="ident" id="1427344">Token</span>&nbsp;<span class="op" id="1427350">=</span>&nbsp;<span class="ident" id="1427352">iota</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1427358">EOF</span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1427363">COMMENT</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1427373">literal_beg</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1427386">//&nbsp;Identifiers&nbsp;and&nbsp;basic&nbsp;type&nbsp;literals</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1427426">//&nbsp;(these&nbsp;tokens&nbsp;stand&nbsp;for&nbsp;classes&nbsp;of&nbsp;literals)</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1427475">IDENT</span>&nbsp;&nbsp;<span class="comment" id="1427482">//&nbsp;main</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1427491">INT</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment" id="1427498">//&nbsp;12345</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1427508">FLOAT</span>&nbsp;&nbsp;<span class="comment" id="1427515">//&nbsp;123.45</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1427526">IMAG</span>&nbsp;&nbsp;&nbsp;<span class="comment" id="1427533">//&nbsp;123.45i</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1427545">CHAR</span>&nbsp;&nbsp;&nbsp;<span class="comment" id="1427552">//&nbsp;&#39;a&#39;</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1427560">STRING</span>&nbsp;<span class="comment" id="1427567">//&nbsp;&#34;abc&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1427577">literal_end</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1427591">operator_beg</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1427605">//&nbsp;Operators&nbsp;and&nbsp;delimiters</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1427634">ADD</span>&nbsp;<span class="comment" id="1427638">//&nbsp;+</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1427644">SUB</span>&nbsp;<span class="comment" id="1427648">//&nbsp;-</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1427654">MUL</span>&nbsp;<span class="comment" id="1427658">//&nbsp;*</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1427664">QUO</span>&nbsp;<span class="comment" id="1427668">//&nbsp;/</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1427674">REM</span>&nbsp;<span class="comment" id="1427678">//&nbsp;%</span><br>
+<span class="lineno">40</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1427685">AND</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment" id="1427693">//&nbsp;&amp;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1427699">OR</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment" id="1427707">//&nbsp;|</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1427713">XOR</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment" id="1427721">//&nbsp;^</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1427727">SHL</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment" id="1427735">//&nbsp;&lt;&lt;</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1427742">SHR</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment" id="1427750">//&nbsp;&gt;&gt;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1427757">AND_NOT</span>&nbsp;<span class="comment" id="1427765">//&nbsp;&amp;^</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1427773">ADD_ASSIGN</span>&nbsp;<span class="comment" id="1427784">//&nbsp;+=</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1427791">SUB_ASSIGN</span>&nbsp;<span class="comment" id="1427802">//&nbsp;-=</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1427809">MUL_ASSIGN</span>&nbsp;<span class="comment" id="1427820">//&nbsp;*=</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1427827">QUO_ASSIGN</span>&nbsp;<span class="comment" id="1427838">//&nbsp;/=</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1427845">REM_ASSIGN</span>&nbsp;<span class="comment" id="1427856">//&nbsp;%=</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1427864">AND_ASSIGN</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment" id="1427879">//&nbsp;&amp;=</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1427886">OR_ASSIGN</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment" id="1427901">//&nbsp;|=</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1427908">XOR_ASSIGN</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment" id="1427923">//&nbsp;^=</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1427930">SHL_ASSIGN</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment" id="1427945">//&nbsp;&lt;&lt;=</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1427953">SHR_ASSIGN</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment" id="1427968">//&nbsp;&gt;&gt;=</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1427976">AND_NOT_ASSIGN</span>&nbsp;<span class="comment" id="1427991">//&nbsp;&amp;^=</span><br>
+<span class="lineno">60</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428000">LAND</span>&nbsp;&nbsp;<span class="comment" id="1428006">//&nbsp;&amp;&amp;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428013">LOR</span>&nbsp;&nbsp;&nbsp;<span class="comment" id="1428019">//&nbsp;||</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428026">ARROW</span>&nbsp;<span class="comment" id="1428032">//&nbsp;&lt;-</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428039">INC</span>&nbsp;&nbsp;&nbsp;<span class="comment" id="1428045">//&nbsp;++</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428052">DEC</span>&nbsp;&nbsp;&nbsp;<span class="comment" id="1428058">//&nbsp;--</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428066">EQL</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment" id="1428073">//&nbsp;==</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428080">LSS</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment" id="1428087">//&nbsp;&lt;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428093">GTR</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment" id="1428100">//&nbsp;&gt;</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428106">ASSIGN</span>&nbsp;<span class="comment" id="1428113">//&nbsp;=</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428119">NOT</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment" id="1428126">//&nbsp;!</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428133">NEQ</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment" id="1428142">//&nbsp;!=</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428149">LEQ</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment" id="1428158">//&nbsp;&lt;=</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428165">GEQ</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment" id="1428174">//&nbsp;&gt;=</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428181">DEFINE</span>&nbsp;&nbsp;&nbsp;<span class="comment" id="1428190">//&nbsp;:=</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428197">ELLIPSIS</span>&nbsp;<span class="comment" id="1428206">//&nbsp;...</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428215">LPAREN</span>&nbsp;<span class="comment" id="1428222">//&nbsp;(</span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428228">LBRACK</span>&nbsp;<span class="comment" id="1428235">//&nbsp;[</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428241">LBRACE</span>&nbsp;<span class="comment" id="1428248">//&nbsp;{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428254">COMMA</span>&nbsp;&nbsp;<span class="comment" id="1428261">//&nbsp;,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428267">PERIOD</span>&nbsp;<span class="comment" id="1428274">//&nbsp;.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428281">RPAREN</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment" id="1428291">//&nbsp;)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428297">RBRACK</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment" id="1428307">//&nbsp;]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428313">RBRACE</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment" id="1428323">//&nbsp;}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428329">SEMICOLON</span>&nbsp;<span class="comment" id="1428339">//&nbsp;;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428345">COLON</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment" id="1428355">//&nbsp;:</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428361">operator_end</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428376">keyword_beg</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1428389">//&nbsp;Keywords</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428402">BREAK</span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428409">CASE</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428415">CHAN</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428421">CONST</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428428">CONTINUE</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">100</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428439">DEFAULT</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428448">DEFER</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428455">ELSE</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428461">FALLTHROUGH</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428474">FOR</span><br>
+<span class="lineno">105</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428480">FUNC</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428486">GO</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428490">GOTO</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428496">IF</span><br>
+<span class="lineno">110</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428500">IMPORT</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428509">INTERFACE</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428520">MAP</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428525">PACKAGE</span><br>
+<span class="lineno">115</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428534">RANGE</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428541">RETURN</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428550">SELECT</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428558">STRUCT</span><br>
+<span class="lineno">120</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428566">SWITCH</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428574">TYPE</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428580">VAR</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428585">keyword_end</span><br>
+<span class="lineno"></span><span class="op" id="1428597">)</span><br>
+<span class="lineno">125</span><br>
+<span class="lineno"></span><span class="keyword" id="1428600">var</span>&nbsp;<span class="ident" id="1428604">tokens</span>&nbsp;<span class="op" id="1428611">=</span>&nbsp;<span class="op" id="1428613">[</span><span class="op" id="1428614">...</span><span class="op" id="1428617">]</span><span class="builtintype" id="1428618">string</span><span class="op" id="1428624">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428627">ILLEGAL</span><span class="op" id="1428634">:</span>&nbsp;<span class="string" id="1428636">&#34;ILLEGAL&#34;</span><span class="op" id="1428645">,</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428649">EOF</span><span class="op" id="1428652">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string" id="1428658">&#34;EOF&#34;</span><span class="op" id="1428663">,</span><br>
+<span class="lineno">130</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428666">COMMENT</span><span class="op" id="1428673">:</span>&nbsp;<span class="string" id="1428675">&#34;COMMENT&#34;</span><span class="op" id="1428684">,</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428688">IDENT</span><span class="op" id="1428693">:</span>&nbsp;&nbsp;<span class="string" id="1428696">&#34;IDENT&#34;</span><span class="op" id="1428703">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428706">INT</span><span class="op" id="1428709">:</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="string" id="1428714">&#34;INT&#34;</span><span class="op" id="1428719">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428722">FLOAT</span><span class="op" id="1428727">:</span>&nbsp;&nbsp;<span class="string" id="1428730">&#34;FLOAT&#34;</span><span class="op" id="1428737">,</span><br>
+<span class="lineno">135</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428740">IMAG</span><span class="op" id="1428744">:</span>&nbsp;&nbsp;&nbsp;<span class="string" id="1428748">&#34;IMAG&#34;</span><span class="op" id="1428754">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428757">CHAR</span><span class="op" id="1428761">:</span>&nbsp;&nbsp;&nbsp;<span class="string" id="1428765">&#34;CHAR&#34;</span><span class="op" id="1428771">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428774">STRING</span><span class="op" id="1428780">:</span>&nbsp;<span class="string" id="1428782">&#34;STRING&#34;</span><span class="op" id="1428790">,</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428794">ADD</span><span class="op" id="1428797">:</span>&nbsp;<span class="string" id="1428799">&#34;+&#34;</span><span class="op" id="1428802">,</span><br>
+<span class="lineno">140</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428805">SUB</span><span class="op" id="1428808">:</span>&nbsp;<span class="string" id="1428810">&#34;-&#34;</span><span class="op" id="1428813">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428816">MUL</span><span class="op" id="1428819">:</span>&nbsp;<span class="string" id="1428821">&#34;*&#34;</span><span class="op" id="1428824">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428827">QUO</span><span class="op" id="1428830">:</span>&nbsp;<span class="string" id="1428832">&#34;/&#34;</span><span class="op" id="1428835">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428838">REM</span><span class="op" id="1428841">:</span>&nbsp;<span class="string" id="1428843">&#34;%&#34;</span><span class="op" id="1428846">,</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">145</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428850">AND</span><span class="op" id="1428853">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string" id="1428859">&#34;&amp;&#34;</span><span class="op" id="1428862">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428865">OR</span><span class="op" id="1428867">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string" id="1428874">&#34;|&#34;</span><span class="op" id="1428877">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428880">XOR</span><span class="op" id="1428883">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string" id="1428889">&#34;^&#34;</span><span class="op" id="1428892">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428895">SHL</span><span class="op" id="1428898">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string" id="1428904">&#34;&lt;&lt;&#34;</span><span class="op" id="1428908">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428911">SHR</span><span class="op" id="1428914">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string" id="1428920">&#34;&gt;&gt;&#34;</span><span class="op" id="1428924">,</span><br>
+<span class="lineno">150</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428927">AND_NOT</span><span class="op" id="1428934">:</span>&nbsp;<span class="string" id="1428936">&#34;&amp;^&#34;</span><span class="op" id="1428940">,</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428944">ADD_ASSIGN</span><span class="op" id="1428954">:</span>&nbsp;<span class="string" id="1428956">&#34;+=&#34;</span><span class="op" id="1428960">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428963">SUB_ASSIGN</span><span class="op" id="1428973">:</span>&nbsp;<span class="string" id="1428975">&#34;-=&#34;</span><span class="op" id="1428979">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1428982">MUL_ASSIGN</span><span class="op" id="1428992">:</span>&nbsp;<span class="string" id="1428994">&#34;*=&#34;</span><span class="op" id="1428998">,</span><br>
+<span class="lineno">155</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429001">QUO_ASSIGN</span><span class="op" id="1429011">:</span>&nbsp;<span class="string" id="1429013">&#34;/=&#34;</span><span class="op" id="1429017">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429020">REM_ASSIGN</span><span class="op" id="1429030">:</span>&nbsp;<span class="string" id="1429032">&#34;%=&#34;</span><span class="op" id="1429036">,</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429040">AND_ASSIGN</span><span class="op" id="1429050">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string" id="1429056">&#34;&amp;=&#34;</span><span class="op" id="1429060">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429063">OR_ASSIGN</span><span class="op" id="1429072">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string" id="1429079">&#34;|=&#34;</span><span class="op" id="1429083">,</span><br>
+<span class="lineno">160</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429086">XOR_ASSIGN</span><span class="op" id="1429096">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string" id="1429102">&#34;^=&#34;</span><span class="op" id="1429106">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429109">SHL_ASSIGN</span><span class="op" id="1429119">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string" id="1429125">&#34;&lt;&lt;=&#34;</span><span class="op" id="1429130">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429133">SHR_ASSIGN</span><span class="op" id="1429143">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string" id="1429149">&#34;&gt;&gt;=&#34;</span><span class="op" id="1429154">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429157">AND_NOT_ASSIGN</span><span class="op" id="1429171">:</span>&nbsp;<span class="string" id="1429173">&#34;&amp;^=&#34;</span><span class="op" id="1429178">,</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">165</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429182">LAND</span><span class="op" id="1429186">:</span>&nbsp;&nbsp;<span class="string" id="1429189">&#34;&amp;&amp;&#34;</span><span class="op" id="1429193">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429196">LOR</span><span class="op" id="1429199">:</span>&nbsp;&nbsp;&nbsp;<span class="string" id="1429203">&#34;||&#34;</span><span class="op" id="1429207">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429210">ARROW</span><span class="op" id="1429215">:</span>&nbsp;<span class="string" id="1429217">&#34;&lt;-&#34;</span><span class="op" id="1429221">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429224">INC</span><span class="op" id="1429227">:</span>&nbsp;&nbsp;&nbsp;<span class="string" id="1429231">&#34;++&#34;</span><span class="op" id="1429235">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429238">DEC</span><span class="op" id="1429241">:</span>&nbsp;&nbsp;&nbsp;<span class="string" id="1429245">&#34;--&#34;</span><span class="op" id="1429249">,</span><br>
+<span class="lineno">170</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429253">EQL</span><span class="op" id="1429256">:</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="string" id="1429261">&#34;==&#34;</span><span class="op" id="1429265">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429268">LSS</span><span class="op" id="1429271">:</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="string" id="1429276">&#34;&lt;&#34;</span><span class="op" id="1429279">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429282">GTR</span><span class="op" id="1429285">:</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="string" id="1429290">&#34;&gt;&#34;</span><span class="op" id="1429293">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429296">ASSIGN</span><span class="op" id="1429302">:</span>&nbsp;<span class="string" id="1429304">&#34;=&#34;</span><span class="op" id="1429307">,</span><br>
+<span class="lineno">175</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429310">NOT</span><span class="op" id="1429313">:</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="string" id="1429318">&#34;!&#34;</span><span class="op" id="1429321">,</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429325">NEQ</span><span class="op" id="1429328">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string" id="1429335">&#34;!=&#34;</span><span class="op" id="1429339">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429342">LEQ</span><span class="op" id="1429345">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string" id="1429352">&#34;&lt;=&#34;</span><span class="op" id="1429356">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429359">GEQ</span><span class="op" id="1429362">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string" id="1429369">&#34;&gt;=&#34;</span><span class="op" id="1429373">,</span><br>
+<span class="lineno">180</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429376">DEFINE</span><span class="op" id="1429382">:</span>&nbsp;&nbsp;&nbsp;<span class="string" id="1429386">&#34;:=&#34;</span><span class="op" id="1429390">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429393">ELLIPSIS</span><span class="op" id="1429401">:</span>&nbsp;<span class="string" id="1429403">&#34;...&#34;</span><span class="op" id="1429408">,</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429412">LPAREN</span><span class="op" id="1429418">:</span>&nbsp;<span class="string" id="1429420">&#34;(&#34;</span><span class="op" id="1429423">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429426">LBRACK</span><span class="op" id="1429432">:</span>&nbsp;<span class="string" id="1429434">&#34;[&#34;</span><span class="op" id="1429437">,</span><br>
+<span class="lineno">185</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429440">LBRACE</span><span class="op" id="1429446">:</span>&nbsp;<span class="string" id="1429448">&#34;{&#34;</span><span class="op" id="1429451">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429454">COMMA</span><span class="op" id="1429459">:</span>&nbsp;&nbsp;<span class="string" id="1429462">&#34;,&#34;</span><span class="op" id="1429465">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429468">PERIOD</span><span class="op" id="1429474">:</span>&nbsp;<span class="string" id="1429476">&#34;.&#34;</span><span class="op" id="1429479">,</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429483">RPAREN</span><span class="op" id="1429489">:</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="string" id="1429494">&#34;)&#34;</span><span class="op" id="1429497">,</span><br>
+<span class="lineno">190</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429500">RBRACK</span><span class="op" id="1429506">:</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="string" id="1429511">&#34;]&#34;</span><span class="op" id="1429514">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429517">RBRACE</span><span class="op" id="1429523">:</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="string" id="1429528">&#34;}&#34;</span><span class="op" id="1429531">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429534">SEMICOLON</span><span class="op" id="1429543">:</span>&nbsp;<span class="string" id="1429545">&#34;;&#34;</span><span class="op" id="1429548">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429551">COLON</span><span class="op" id="1429556">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string" id="1429562">&#34;:&#34;</span><span class="op" id="1429565">,</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">195</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429569">BREAK</span><span class="op" id="1429574">:</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="string" id="1429579">&#34;break&#34;</span><span class="op" id="1429586">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429589">CASE</span><span class="op" id="1429593">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string" id="1429599">&#34;case&#34;</span><span class="op" id="1429605">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429608">CHAN</span><span class="op" id="1429612">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string" id="1429618">&#34;chan&#34;</span><span class="op" id="1429624">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429627">CONST</span><span class="op" id="1429632">:</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="string" id="1429637">&#34;const&#34;</span><span class="op" id="1429644">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429647">CONTINUE</span><span class="op" id="1429655">:</span>&nbsp;<span class="string" id="1429657">&#34;continue&#34;</span><span class="op" id="1429667">,</span><br>
+<span class="lineno">200</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429671">DEFAULT</span><span class="op" id="1429678">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string" id="1429684">&#34;default&#34;</span><span class="op" id="1429693">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429696">DEFER</span><span class="op" id="1429701">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string" id="1429709">&#34;defer&#34;</span><span class="op" id="1429716">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429719">ELSE</span><span class="op" id="1429723">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string" id="1429732">&#34;else&#34;</span><span class="op" id="1429738">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429741">FALLTHROUGH</span><span class="op" id="1429752">:</span>&nbsp;<span class="string" id="1429754">&#34;fallthrough&#34;</span><span class="op" id="1429767">,</span><br>
+<span class="lineno">205</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429770">FOR</span><span class="op" id="1429773">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string" id="1429783">&#34;for&#34;</span><span class="op" id="1429788">,</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429792">FUNC</span><span class="op" id="1429796">:</span>&nbsp;&nbsp;&nbsp;<span class="string" id="1429800">&#34;func&#34;</span><span class="op" id="1429806">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429809">GO</span><span class="op" id="1429811">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string" id="1429817">&#34;go&#34;</span><span class="op" id="1429821">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429824">GOTO</span><span class="op" id="1429828">:</span>&nbsp;&nbsp;&nbsp;<span class="string" id="1429832">&#34;goto&#34;</span><span class="op" id="1429838">,</span><br>
+<span class="lineno">210</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429841">IF</span><span class="op" id="1429843">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string" id="1429849">&#34;if&#34;</span><span class="op" id="1429853">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429856">IMPORT</span><span class="op" id="1429862">:</span>&nbsp;<span class="string" id="1429864">&#34;import&#34;</span><span class="op" id="1429872">,</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429876">INTERFACE</span><span class="op" id="1429885">:</span>&nbsp;<span class="string" id="1429887">&#34;interface&#34;</span><span class="op" id="1429898">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429901">MAP</span><span class="op" id="1429904">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string" id="1429912">&#34;map&#34;</span><span class="op" id="1429917">,</span><br>
+<span class="lineno">215</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429920">PACKAGE</span><span class="op" id="1429927">:</span>&nbsp;&nbsp;&nbsp;<span class="string" id="1429931">&#34;package&#34;</span><span class="op" id="1429940">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429943">RANGE</span><span class="op" id="1429948">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="string" id="1429954">&#34;range&#34;</span><span class="op" id="1429961">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429964">RETURN</span><span class="op" id="1429970">:</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="string" id="1429975">&#34;return&#34;</span><span class="op" id="1429983">,</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1429987">SELECT</span><span class="op" id="1429993">:</span>&nbsp;<span class="string" id="1429995">&#34;select&#34;</span><span class="op" id="1430003">,</span><br>
+<span class="lineno">220</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1430006">STRUCT</span><span class="op" id="1430012">:</span>&nbsp;<span class="string" id="1430014">&#34;struct&#34;</span><span class="op" id="1430022">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1430025">SWITCH</span><span class="op" id="1430031">:</span>&nbsp;<span class="string" id="1430033">&#34;switch&#34;</span><span class="op" id="1430041">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1430044">TYPE</span><span class="op" id="1430048">:</span>&nbsp;&nbsp;&nbsp;<span class="string" id="1430052">&#34;type&#34;</span><span class="op" id="1430058">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1430061">VAR</span><span class="op" id="1430064">:</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="string" id="1430069">&#34;var&#34;</span><span class="op" id="1430074">,</span><br>
+<span class="lineno"></span><span class="op" id="1430076">}</span><br>
+<span class="lineno">225</span><br>
+<span class="lineno"></span><span class="comment" id="1430079">//&nbsp;String&nbsp;returns&nbsp;the&nbsp;string&nbsp;corresponding&nbsp;to&nbsp;the&nbsp;token&nbsp;tok.</span><br>
+<span class="lineno"></span><span class="comment" id="1430140">//&nbsp;For&nbsp;operators,&nbsp;delimiters,&nbsp;and&nbsp;keywords&nbsp;the&nbsp;string&nbsp;is&nbsp;the&nbsp;actual</span><br>
+<span class="lineno"></span><span class="comment" id="1430208">//&nbsp;token&nbsp;character&nbsp;sequence&nbsp;(e.g.,&nbsp;for&nbsp;the&nbsp;token&nbsp;ADD,&nbsp;the&nbsp;string&nbsp;is</span><br>
+<span class="lineno"></span><span class="comment" id="1430276">//&nbsp;&#34;+&#34;).&nbsp;For&nbsp;all&nbsp;other&nbsp;tokens&nbsp;the&nbsp;string&nbsp;corresponds&nbsp;to&nbsp;the&nbsp;token</span><br>
+<span class="lineno">230</span><span class="comment" id="1430342">//&nbsp;constant&nbsp;name&nbsp;(e.g.&nbsp;for&nbsp;the&nbsp;token&nbsp;IDENT,&nbsp;the&nbsp;string&nbsp;is&nbsp;&#34;IDENT&#34;).</span><br>
+<span class="lineno"></span><span class="comment" id="1430410">//</span><br>
+<span class="lineno"></span><span class="keyword" id="1430413">func</span>&nbsp;<span class="op" id="1430418">(</span><span class="ident" id="1430419">tok</span>&nbsp;<span class="ident" id="1430423">Token</span><span class="op" id="1430428">)</span>&nbsp;<span class="ident" id="1430430">String</span><span class="op" id="1430436">(</span><span class="op" id="1430437">)</span>&nbsp;<span class="builtintype" id="1430439">string</span>&nbsp;<span class="op" id="1430446">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1430449">s</span>&nbsp;<span class="op" id="1430451">:=</span>&nbsp;<span class="string" id="1430454">&#34;&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1430458">if</span>&nbsp;<span class="num" id="1430461">0</span>&nbsp;<span class="op" id="1430463">&lt;=</span>&nbsp;<span class="ident" id="1430466">tok</span>&nbsp;<span class="op" id="1430470">&amp;&amp;</span>&nbsp;<span class="ident" id="1430473">tok</span>&nbsp;<span class="op" id="1430477">&lt;</span>&nbsp;<span class="ident" id="1430479">Token</span><span class="op" id="1430484">(</span><span class="builtinfunc" id="1430485">len</span><span class="op" id="1430488">(</span><span class="ident" id="1430489">tokens</span><span class="op" id="1430495">)</span><span class="op" id="1430496">)</span>&nbsp;<span class="op" id="1430498">{</span><br>
+<span class="lineno">235</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1430502">s</span>&nbsp;<span class="op" id="1430504">=</span>&nbsp;<span class="ident" id="1430506">tokens</span><span class="op" id="1430512">[</span><span class="ident" id="1430513">tok</span><span class="op" id="1430516">]</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1430519">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1430522">if</span>&nbsp;<span class="ident" id="1430525">s</span>&nbsp;<span class="op" id="1430527">==</span>&nbsp;<span class="string" id="1430530">&#34;&#34;</span>&nbsp;<span class="op" id="1430533">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1430537">s</span>&nbsp;<span class="op" id="1430539">=</span>&nbsp;<span class="string" id="1430541">&#34;token(&#34;</span>&nbsp;<span class="op" id="1430550">+</span>&nbsp;<span class="ident" id="1430552">strconv</span><span class="op" id="1430559">.</span><span class="ident" id="1430560">Itoa</span><span class="op" id="1430564">(</span><span class="builtintype" id="1430565">int</span><span class="op" id="1430568">(</span><span class="ident" id="1430569">tok</span><span class="op" id="1430572">)</span><span class="op" id="1430573">)</span>&nbsp;<span class="op" id="1430575">+</span>&nbsp;<span class="string" id="1430577">&#34;)&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1430582">}</span><br>
+<span class="lineno">240</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1430585">return</span>&nbsp;<span class="ident" id="1430592">s</span><br>
+<span class="lineno"></span><span class="op" id="1430594">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="1430597">//&nbsp;A&nbsp;set&nbsp;of&nbsp;constants&nbsp;for&nbsp;precedence-based&nbsp;expression&nbsp;parsing.</span><br>
+<span class="lineno"></span><span class="comment" id="1430660">//&nbsp;Non-operators&nbsp;have&nbsp;lowest&nbsp;precedence,&nbsp;followed&nbsp;by&nbsp;operators</span><br>
+<span class="lineno">245</span><span class="comment" id="1430723">//&nbsp;starting&nbsp;with&nbsp;precedence&nbsp;1&nbsp;up&nbsp;to&nbsp;unary&nbsp;operators.&nbsp;The&nbsp;highest</span><br>
+<span class="lineno"></span><span class="comment" id="1430788">//&nbsp;precedence&nbsp;serves&nbsp;as&nbsp;&#34;catch-all&#34;&nbsp;precedence&nbsp;for&nbsp;selector,</span><br>
+<span class="lineno"></span><span class="comment" id="1430849">//&nbsp;indexing,&nbsp;and&nbsp;other&nbsp;operator&nbsp;and&nbsp;delimiter&nbsp;tokens.</span><br>
+<span class="lineno"></span><span class="comment" id="1430903">//</span><br>
+<span class="lineno"></span><span class="keyword" id="1430906">const</span>&nbsp;<span class="op" id="1430912">(</span><br>
+<span class="lineno">250</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1430915">LowestPrec</span>&nbsp;&nbsp;<span class="op" id="1430927">=</span>&nbsp;<span class="num" id="1430929">0</span>&nbsp;<span class="comment" id="1430931">//&nbsp;non-operators</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1430949">UnaryPrec</span>&nbsp;&nbsp;&nbsp;<span class="op" id="1430961">=</span>&nbsp;<span class="num" id="1430963">6</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1430966">HighestPrec</span>&nbsp;<span class="op" id="1430978">=</span>&nbsp;<span class="num" id="1430980">7</span><br>
+<span class="lineno"></span><span class="op" id="1430982">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">255</span><span class="comment" id="1430985">//&nbsp;Precedence&nbsp;returns&nbsp;the&nbsp;operator&nbsp;precedence&nbsp;of&nbsp;the&nbsp;binary</span><br>
+<span class="lineno"></span><span class="comment" id="1431045">//&nbsp;operator&nbsp;op.&nbsp;If&nbsp;op&nbsp;is&nbsp;not&nbsp;a&nbsp;binary&nbsp;operator,&nbsp;the&nbsp;result</span><br>
+<span class="lineno"></span><span class="comment" id="1431104">//&nbsp;is&nbsp;LowestPrecedence.</span><br>
+<span class="lineno"></span><span class="comment" id="1431128">//</span><br>
+<span class="lineno"></span><span class="keyword" id="1431131">func</span>&nbsp;<span class="op" id="1431136">(</span><span class="ident" id="1431137">op</span>&nbsp;<span class="ident" id="1431140">Token</span><span class="op" id="1431145">)</span>&nbsp;<span class="ident" id="1431147">Precedence</span><span class="op" id="1431157">(</span><span class="op" id="1431158">)</span>&nbsp;<span class="builtintype" id="1431160">int</span>&nbsp;<span class="op" id="1431164">{</span><br>
+<span class="lineno">260</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1431167">switch</span>&nbsp;<span class="ident" id="1431174">op</span>&nbsp;<span class="op" id="1431177">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1431180">case</span>&nbsp;<span class="ident" id="1431185">LOR</span><span class="op" id="1431188">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1431192">return</span>&nbsp;<span class="num" id="1431199">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1431202">case</span>&nbsp;<span class="ident" id="1431207">LAND</span><span class="op" id="1431211">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1431215">return</span>&nbsp;<span class="num" id="1431222">2</span><br>
+<span class="lineno">265</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1431225">case</span>&nbsp;<span class="ident" id="1431230">EQL</span><span class="op" id="1431233">,</span>&nbsp;<span class="ident" id="1431235">NEQ</span><span class="op" id="1431238">,</span>&nbsp;<span class="ident" id="1431240">LSS</span><span class="op" id="1431243">,</span>&nbsp;<span class="ident" id="1431245">LEQ</span><span class="op" id="1431248">,</span>&nbsp;<span class="ident" id="1431250">GTR</span><span class="op" id="1431253">,</span>&nbsp;<span class="ident" id="1431255">GEQ</span><span class="op" id="1431258">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1431262">return</span>&nbsp;<span class="num" id="1431269">3</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1431272">case</span>&nbsp;<span class="ident" id="1431277">ADD</span><span class="op" id="1431280">,</span>&nbsp;<span class="ident" id="1431282">SUB</span><span class="op" id="1431285">,</span>&nbsp;<span class="ident" id="1431287">OR</span><span class="op" id="1431289">,</span>&nbsp;<span class="ident" id="1431291">XOR</span><span class="op" id="1431294">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1431298">return</span>&nbsp;<span class="num" id="1431305">4</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1431308">case</span>&nbsp;<span class="ident" id="1431313">MUL</span><span class="op" id="1431316">,</span>&nbsp;<span class="ident" id="1431318">QUO</span><span class="op" id="1431321">,</span>&nbsp;<span class="ident" id="1431323">REM</span><span class="op" id="1431326">,</span>&nbsp;<span class="ident" id="1431328">SHL</span><span class="op" id="1431331">,</span>&nbsp;<span class="ident" id="1431333">SHR</span><span class="op" id="1431336">,</span>&nbsp;<span class="ident" id="1431338">AND</span><span class="op" id="1431341">,</span>&nbsp;<span class="ident" id="1431343">AND_NOT</span><span class="op" id="1431350">:</span><br>
+<span class="lineno">270</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1431354">return</span>&nbsp;<span class="num" id="1431361">5</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1431364">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1431367">return</span>&nbsp;<span class="ident" id="1431374">LowestPrec</span><br>
+<span class="lineno"></span><span class="op" id="1431385">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">275</span><span class="keyword" id="1431388">var</span>&nbsp;<span class="ident" id="1431392">keywords</span>&nbsp;<span class="keyword" id="1431401">map</span><span class="op" id="1431404">[</span><span class="builtintype" id="1431405">string</span><span class="op" id="1431411">]</span><span class="ident" id="1431412">Token</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="1431419">func</span>&nbsp;<span class="ident" id="1431424">init</span><span class="op" id="1431428">(</span><span class="op" id="1431429">)</span>&nbsp;<span class="op" id="1431431">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1431434">keywords</span>&nbsp;<span class="op" id="1431443">=</span>&nbsp;<span class="builtinfunc" id="1431445">make</span><span class="op" id="1431449">(</span><span class="keyword" id="1431450">map</span><span class="op" id="1431453">[</span><span class="builtintype" id="1431454">string</span><span class="op" id="1431460">]</span><span class="ident" id="1431461">Token</span><span class="op" id="1431466">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1431469">for</span>&nbsp;<span class="ident" id="1431473">i</span>&nbsp;<span class="op" id="1431475">:=</span>&nbsp;<span class="ident" id="1431478">keyword_beg</span>&nbsp;<span class="op" id="1431490">+</span>&nbsp;<span class="num" id="1431492">1</span><span class="op" id="1431493">;</span>&nbsp;<span class="ident" id="1431495">i</span>&nbsp;<span class="op" id="1431497">&lt;</span>&nbsp;<span class="ident" id="1431499">keyword_end</span><span class="op" id="1431510">;</span>&nbsp;<span class="ident" id="1431512">i</span><span class="op" id="1431513">++</span>&nbsp;<span class="op" id="1431516">{</span><br>
+<span class="lineno">280</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1431520">keywords</span><span class="op" id="1431528">[</span><span class="ident" id="1431529">tokens</span><span class="op" id="1431535">[</span><span class="ident" id="1431536">i</span><span class="op" id="1431537">]</span><span class="op" id="1431538">]</span>&nbsp;<span class="op" id="1431540">=</span>&nbsp;<span class="ident" id="1431542">i</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1431545">}</span><br>
+<span class="lineno"></span><span class="op" id="1431547">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="1431550">//&nbsp;Lookup&nbsp;maps&nbsp;an&nbsp;identifier&nbsp;to&nbsp;its&nbsp;keyword&nbsp;token&nbsp;or&nbsp;IDENT&nbsp;(if&nbsp;not&nbsp;a&nbsp;keyword).</span><br>
+<span class="lineno">285</span><span class="comment" id="1431629">//</span><br>
+<span class="lineno"></span><span class="keyword" id="1431632">func</span>&nbsp;<span class="ident" id="1431637">Lookup</span><span class="op" id="1431643">(</span><span class="ident" id="1431644">ident</span>&nbsp;<span class="builtintype" id="1431650">string</span><span class="op" id="1431656">)</span>&nbsp;<span class="ident" id="1431658">Token</span>&nbsp;<span class="op" id="1431664">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1431667">if</span>&nbsp;<span class="ident" id="1431670">tok</span><span class="op" id="1431673">,</span>&nbsp;<span class="ident" id="1431675">is_keyword</span>&nbsp;<span class="op" id="1431686">:=</span>&nbsp;<span class="ident" id="1431689">keywords</span><span class="op" id="1431697">[</span><span class="ident" id="1431698">ident</span><span class="op" id="1431703">]</span><span class="op" id="1431704">;</span>&nbsp;<span class="ident" id="1431706">is_keyword</span>&nbsp;<span class="op" id="1431717">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1431721">return</span>&nbsp;<span class="ident" id="1431728">tok</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1431733">}</span><br>
+<span class="lineno">290</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1431736">return</span>&nbsp;<span class="ident" id="1431743">IDENT</span><br>
+<span class="lineno"></span><span class="op" id="1431749">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="1431752">//&nbsp;Predicates</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">295</span><span class="comment" id="1431767">//&nbsp;IsLiteral&nbsp;returns&nbsp;true&nbsp;for&nbsp;tokens&nbsp;corresponding&nbsp;to&nbsp;identifiers</span><br>
+<span class="lineno"></span><span class="comment" id="1431833">//&nbsp;and&nbsp;basic&nbsp;type&nbsp;literals;&nbsp;it&nbsp;returns&nbsp;false&nbsp;otherwise.</span><br>
+<span class="lineno"></span><span class="comment" id="1431889">//</span><br>
+<span class="lineno"></span><span class="keyword" id="1431892">func</span>&nbsp;<span class="op" id="1431897">(</span><span class="ident" id="1431898">tok</span>&nbsp;<span class="ident" id="1431902">Token</span><span class="op" id="1431907">)</span>&nbsp;<span class="ident" id="1431909">IsLiteral</span><span class="op" id="1431918">(</span><span class="op" id="1431919">)</span>&nbsp;<span class="builtintype" id="1431921">bool</span>&nbsp;<span class="op" id="1431926">{</span>&nbsp;<span class="keyword" id="1431928">return</span>&nbsp;<span class="ident" id="1431935">literal_beg</span>&nbsp;<span class="op" id="1431947">&lt;</span>&nbsp;<span class="ident" id="1431949">tok</span>&nbsp;<span class="op" id="1431953">&amp;&amp;</span>&nbsp;<span class="ident" id="1431956">tok</span>&nbsp;<span class="op" id="1431960">&lt;</span>&nbsp;<span class="ident" id="1431962">literal_end</span>&nbsp;<span class="op" id="1431974">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">300</span><span class="comment" id="1431977">//&nbsp;IsOperator&nbsp;returns&nbsp;true&nbsp;for&nbsp;tokens&nbsp;corresponding&nbsp;to&nbsp;operators&nbsp;and</span><br>
+<span class="lineno"></span><span class="comment" id="1432046">//&nbsp;delimiters;&nbsp;it&nbsp;returns&nbsp;false&nbsp;otherwise.</span><br>
+<span class="lineno"></span><span class="comment" id="1432089">//</span><br>
+<span class="lineno"></span><span class="keyword" id="1432092">func</span>&nbsp;<span class="op" id="1432097">(</span><span class="ident" id="1432098">tok</span>&nbsp;<span class="ident" id="1432102">Token</span><span class="op" id="1432107">)</span>&nbsp;<span class="ident" id="1432109">IsOperator</span><span class="op" id="1432119">(</span><span class="op" id="1432120">)</span>&nbsp;<span class="builtintype" id="1432122">bool</span>&nbsp;<span class="op" id="1432127">{</span>&nbsp;<span class="keyword" id="1432129">return</span>&nbsp;<span class="ident" id="1432136">operator_beg</span>&nbsp;<span class="op" id="1432149">&lt;</span>&nbsp;<span class="ident" id="1432151">tok</span>&nbsp;<span class="op" id="1432155">&amp;&amp;</span>&nbsp;<span class="ident" id="1432158">tok</span>&nbsp;<span class="op" id="1432162">&lt;</span>&nbsp;<span class="ident" id="1432164">operator_end</span>&nbsp;<span class="op" id="1432177">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">305</span><span class="comment" id="1432180">//&nbsp;IsKeyword&nbsp;returns&nbsp;true&nbsp;for&nbsp;tokens&nbsp;corresponding&nbsp;to&nbsp;keywords;</span><br>
+<span class="lineno"></span><span class="comment" id="1432244">//&nbsp;it&nbsp;returns&nbsp;false&nbsp;otherwise.</span><br>
+<span class="lineno"></span><span class="comment" id="1432275">//</span><br>
+<span class="lineno"></span><span class="keyword" id="1432278">func</span>&nbsp;<span class="op" id="1432283">(</span><span class="ident" id="1432284">tok</span>&nbsp;<span class="ident" id="1432288">Token</span><span class="op" id="1432293">)</span>&nbsp;<span class="ident" id="1432295">IsKeyword</span><span class="op" id="1432304">(</span><span class="op" id="1432305">)</span>&nbsp;<span class="builtintype" id="1432307">bool</span>&nbsp;<span class="op" id="1432312">{</span>&nbsp;<span class="keyword" id="1432314">return</span>&nbsp;<span class="ident" id="1432321">keyword_beg</span>&nbsp;<span class="op" id="1432333">&lt;</span>&nbsp;<span class="ident" id="1432335">tok</span>&nbsp;<span class="op" id="1432339">&amp;&amp;</span>&nbsp;<span class="ident" id="1432342">tok</span>&nbsp;<span class="op" id="1432346">&lt;</span>&nbsp;<span class="ident" id="1432348">keyword_end</span>&nbsp;<span class="op" id="1432360">}</span>
+</div>
+</body>
+</html>

@@ -128,6 +128,7 @@ func main() {
 	ps, fset, files := makePkgs()
 	w := &writer{
 		outRoot: "www",
+		outPath: "gostd",
 		
 		pkgs:  ps,
 		fset:  fset,

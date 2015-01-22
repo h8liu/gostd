@@ -1,0 +1,71 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="keyword" id="4354133">package</span>&nbsp;<span class="ident" id="4354141">dasm8</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="4354148">import</span>&nbsp;<span class="op" id="4354155">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="4354158">&#34;bytes&#34;</span><br>
+<span class="lineno">5</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="4354167">&#34;encoding/binary&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="4354186">&#34;fmt&#34;</span><br>
+<span class="lineno"></span><span class="op" id="4354192">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="4354195">//&nbsp;Line&nbsp;is&nbsp;a&nbsp;disassembled&nbsp;line</span><br>
+<span class="lineno">10</span><span class="keyword" id="4354226">type</span>&nbsp;<span class="ident" id="4354231">Line</span>&nbsp;<span class="keyword" id="4354236">struct</span>&nbsp;<span class="op" id="4354243">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="4354246">Addr</span>&nbsp;<span class="builtintype" id="4354251">uint32</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="4354260">Inst</span>&nbsp;<span class="builtintype" id="4354265">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="4354273">Str</span>&nbsp;&nbsp;<span class="builtintype" id="4354278">string</span><br>
+<span class="lineno">15</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="4354287">IsJump</span>&nbsp;<span class="builtintype" id="4354294">bool</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="4354300">To</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="4354307">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="4354315">ToLine</span>&nbsp;<span class="op" id="4354322">*</span><span class="ident" id="4354323">Line</span><br>
+<span class="lineno"></span><span class="op" id="4354328">}</span><br>
+<span class="lineno">20</span><br>
+<span class="lineno"></span><span class="keyword" id="4354331">func</span>&nbsp;<span class="ident" id="4354336">printables</span><span class="op" id="4354346">(</span><span class="ident" id="4354347">bs</span>&nbsp;<span class="op" id="4354350">[</span><span class="op" id="4354351">]</span><span class="builtintype" id="4354352">byte</span><span class="op" id="4354356">)</span>&nbsp;<span class="builtintype" id="4354358">string</span>&nbsp;<span class="op" id="4354365">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="4354368">ret</span>&nbsp;<span class="op" id="4354372">:=</span>&nbsp;<span class="string" id="4354375">&#34;&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="4354379">for</span>&nbsp;<span class="ident" id="4354383">_</span><span class="op" id="4354384">,</span>&nbsp;<span class="ident" id="4354386">b</span>&nbsp;<span class="op" id="4354388">:=</span>&nbsp;<span class="keyword" id="4354391">range</span>&nbsp;<span class="ident" id="4354397">bs</span>&nbsp;<span class="op" id="4354400">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="4354404">r</span>&nbsp;<span class="op" id="4354406">:=</span>&nbsp;<span class="builtintype" id="4354409">rune</span><span class="op" id="4354413">(</span><span class="ident" id="4354414">b</span><span class="op" id="4354415">)</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="4354419">if</span>&nbsp;<span class="ident" id="4354422">r</span>&nbsp;<span class="op" id="4354424">&gt;=</span>&nbsp;<span class="string" id="4354427">&#39;&nbsp;&#39;</span>&nbsp;<span class="op" id="4354431">&amp;&amp;</span>&nbsp;<span class="ident" id="4354434">r</span>&nbsp;<span class="op" id="4354436">&lt;=</span>&nbsp;<span class="string" id="4354439">&#39;~&#39;</span>&nbsp;<span class="op" id="4354443">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="4354448">ret</span>&nbsp;<span class="op" id="4354452">+=</span>&nbsp;<span class="builtintype" id="4354455">string</span><span class="op" id="4354461">(</span><span class="ident" id="4354462">r</span><span class="op" id="4354463">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="4354467">}</span>&nbsp;<span class="keyword" id="4354469">else</span>&nbsp;<span class="op" id="4354474">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="4354479">ret</span>&nbsp;<span class="op" id="4354483">+=</span>&nbsp;<span class="string" id="4354486">&#34;.&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="4354492">}</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="4354495">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="4354498">return</span>&nbsp;<span class="ident" id="4354505">ret</span><br>
+<span class="lineno"></span><span class="op" id="4354509">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="4354512">var</span>&nbsp;<span class="ident" id="4354516">enc</span>&nbsp;<span class="op" id="4354520">=</span>&nbsp;<span class="ident" id="4354522">binary</span><span class="op" id="4354528">.</span><span class="ident" id="4354529">LittleEndian</span><br>
+<span class="lineno">35</span><br>
+<span class="lineno"></span><span class="keyword" id="4354543">func</span>&nbsp;<span class="op" id="4354548">(</span><span class="ident" id="4354549">line</span>&nbsp;<span class="op" id="4354554">*</span><span class="ident" id="4354555">Line</span><span class="op" id="4354559">)</span>&nbsp;<span class="ident" id="4354561">String</span><span class="op" id="4354567">(</span><span class="op" id="4354568">)</span>&nbsp;<span class="builtintype" id="4354570">string</span>&nbsp;<span class="op" id="4354577">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="4354580">ret</span>&nbsp;<span class="op" id="4354584">:=</span>&nbsp;<span class="builtinfunc" id="4354587">new</span><span class="op" id="4354590">(</span><span class="ident" id="4354591">bytes</span><span class="op" id="4354596">.</span><span class="ident" id="4354597">Buffer</span><span class="op" id="4354603">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="4354606">var</span>&nbsp;<span class="ident" id="4354610">buf</span>&nbsp;<span class="op" id="4354614">[</span><span class="num" id="4354615">4</span><span class="op" id="4354616">]</span><span class="builtintype" id="4354617">byte</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="4354623">enc</span><span class="op" id="4354626">.</span><span class="ident" id="4354627">PutUint32</span><span class="op" id="4354636">(</span><span class="ident" id="4354637">buf</span><span class="op" id="4354640">[</span><span class="op" id="4354641">:</span><span class="op" id="4354642">]</span><span class="op" id="4354643">,</span>&nbsp;<span class="ident" id="4354645">line</span><span class="op" id="4354649">.</span><span class="ident" id="4354650">Inst</span><span class="op" id="4354654">)</span><br>
+<span class="lineno">40</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="4354658">fmt</span><span class="op" id="4354661">.</span><span class="ident" id="4354662">Fprintf</span><span class="op" id="4354669">(</span><span class="ident" id="4354670">ret</span><span class="op" id="4354673">,</span>&nbsp;<span class="string" id="4354675">&#34;%08x:&nbsp;&nbsp;%&nbsp;02x&#34;</span><span class="op" id="4354689">,</span>&nbsp;<span class="ident" id="4354691">line</span><span class="op" id="4354695">.</span><span class="ident" id="4354696">Addr</span><span class="op" id="4354700">,</span>&nbsp;<span class="ident" id="4354702">buf</span><span class="op" id="4354705">[</span><span class="op" id="4354706">:</span><span class="op" id="4354707">]</span><span class="op" id="4354708">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="4354711">fmt</span><span class="op" id="4354714">.</span><span class="ident" id="4354715">Fprintf</span><span class="op" id="4354722">(</span><span class="ident" id="4354723">ret</span><span class="op" id="4354726">,</span>&nbsp;<span class="string" id="4354728">&#34;&nbsp;&nbsp;&nbsp;%s&#34;</span><span class="op" id="4354735">,</span>&nbsp;<span class="ident" id="4354737">printables</span><span class="op" id="4354747">(</span><span class="ident" id="4354748">buf</span><span class="op" id="4354751">[</span><span class="op" id="4354752">:</span><span class="op" id="4354753">]</span><span class="op" id="4354754">)</span><span class="op" id="4354755">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="4354758">fmt</span><span class="op" id="4354761">.</span><span class="ident" id="4354762">Fprintf</span><span class="op" id="4354769">(</span><span class="ident" id="4354770">ret</span><span class="op" id="4354773">,</span>&nbsp;<span class="string" id="4354775">&#34;&nbsp;&nbsp;&nbsp;&nbsp;%s&#34;</span><span class="op" id="4354783">,</span>&nbsp;<span class="ident" id="4354785">line</span><span class="op" id="4354789">.</span><span class="ident" id="4354790">Str</span><span class="op" id="4354793">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="4354796">if</span>&nbsp;<span class="ident" id="4354799">line</span><span class="op" id="4354803">.</span><span class="ident" id="4354804">IsJump</span>&nbsp;<span class="op" id="4354811">{</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="4354815">fmt</span><span class="op" id="4354818">.</span><span class="ident" id="4354819">Fprintf</span><span class="op" id="4354826">(</span><span class="ident" id="4354827">ret</span><span class="op" id="4354830">,</span>&nbsp;<span class="string" id="4354832">&#34;&nbsp;&nbsp;&nbsp;//&nbsp;%08x&#34;</span><span class="op" id="4354844">,</span>&nbsp;<span class="ident" id="4354846">line</span><span class="op" id="4354850">.</span><span class="ident" id="4354851">To</span><span class="op" id="4354853">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="4354856">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="4354860">return</span>&nbsp;<span class="ident" id="4354867">ret</span><span class="op" id="4354870">.</span><span class="ident" id="4354871">String</span><span class="op" id="4354877">(</span><span class="op" id="4354878">)</span><br>
+<span class="lineno"></span><span class="op" id="4354880">}</span><br>
+<span class="lineno">50</span><br>
+<span class="lineno"></span><span class="keyword" id="4354883">func</span>&nbsp;<span class="ident" id="4354888">newLine</span><span class="op" id="4354895">(</span><span class="ident" id="4354896">addr</span>&nbsp;<span class="builtintype" id="4354901">uint32</span><span class="op" id="4354907">,</span>&nbsp;<span class="ident" id="4354909">in</span>&nbsp;<span class="builtintype" id="4354912">uint32</span><span class="op" id="4354918">)</span>&nbsp;<span class="op" id="4354920">*</span><span class="ident" id="4354921">Line</span>&nbsp;<span class="op" id="4354926">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="4354929">ret</span>&nbsp;<span class="op" id="4354933">:=</span>&nbsp;<span class="builtinfunc" id="4354936">new</span><span class="op" id="4354939">(</span><span class="ident" id="4354940">Line</span><span class="op" id="4354944">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="4354947">ret</span><span class="op" id="4354950">.</span><span class="ident" id="4354951">Addr</span>&nbsp;<span class="op" id="4354956">=</span>&nbsp;<span class="ident" id="4354958">addr</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="4354964">ret</span><span class="op" id="4354967">.</span><span class="ident" id="4354968">Inst</span>&nbsp;<span class="op" id="4354973">=</span>&nbsp;<span class="ident" id="4354975">in</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="4354979">return</span>&nbsp;<span class="ident" id="4354986">ret</span><br>
+<span class="lineno"></span><span class="op" id="4354990">}</span>
+</div>
+</body>
+</html>

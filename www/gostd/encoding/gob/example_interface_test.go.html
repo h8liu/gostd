@@ -1,0 +1,96 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment" id="169426">//&nbsp;Copyright&nbsp;2013&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment" id="169481">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment" id="169535">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword" id="169586">package</span>&nbsp;<span class="ident" id="169594">gob_test</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="169604">import</span>&nbsp;<span class="op" id="169611">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="169614">&#34;bytes&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="169623">&#34;encoding/gob&#34;</span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="169639">&#34;fmt&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="169646">&#34;log&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="169653">&#34;math&#34;</span><br>
+<span class="lineno"></span><span class="op" id="169660">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">15</span><span class="keyword" id="169663">type</span>&nbsp;<span class="ident" id="169668">Point</span>&nbsp;<span class="keyword" id="169674">struct</span>&nbsp;<span class="op" id="169681">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="169684">X</span><span class="op" id="169685">,</span>&nbsp;<span class="ident" id="169687">Y</span>&nbsp;<span class="builtintype" id="169689">int</span><br>
+<span class="lineno"></span><span class="op" id="169693">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="169696">func</span>&nbsp;<span class="op" id="169701">(</span><span class="ident" id="169702">p</span>&nbsp;<span class="ident" id="169704">Point</span><span class="op" id="169709">)</span>&nbsp;<span class="ident" id="169711">Hypotenuse</span><span class="op" id="169721">(</span><span class="op" id="169722">)</span>&nbsp;<span class="builtintype" id="169724">float64</span>&nbsp;<span class="op" id="169732">{</span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="169735">return</span>&nbsp;<span class="ident" id="169742">math</span><span class="op" id="169746">.</span><span class="ident" id="169747">Hypot</span><span class="op" id="169752">(</span><span class="builtintype" id="169753">float64</span><span class="op" id="169760">(</span><span class="ident" id="169761">p</span><span class="op" id="169762">.</span><span class="ident" id="169763">X</span><span class="op" id="169764">)</span><span class="op" id="169765">,</span>&nbsp;<span class="builtintype" id="169767">float64</span><span class="op" id="169774">(</span><span class="ident" id="169775">p</span><span class="op" id="169776">.</span><span class="ident" id="169777">Y</span><span class="op" id="169778">)</span><span class="op" id="169779">)</span><br>
+<span class="lineno"></span><span class="op" id="169781">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="169784">type</span>&nbsp;<span class="ident" id="169789">Pythagoras</span>&nbsp;<span class="keyword" id="169800">interface</span>&nbsp;<span class="op" id="169810">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="169813">Hypotenuse</span><span class="op" id="169823">(</span><span class="op" id="169824">)</span>&nbsp;<span class="builtintype" id="169826">float64</span><br>
+<span class="lineno">25</span><span class="op" id="169834">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="169837">//&nbsp;This&nbsp;example&nbsp;shows&nbsp;how&nbsp;to&nbsp;encode&nbsp;an&nbsp;interface&nbsp;value.&nbsp;The&nbsp;key</span><br>
+<span class="lineno"></span><span class="comment" id="169901">//&nbsp;distinction&nbsp;from&nbsp;regular&nbsp;types&nbsp;is&nbsp;to&nbsp;register&nbsp;the&nbsp;concrete&nbsp;type&nbsp;that</span><br>
+<span class="lineno"></span><span class="comment" id="169973">//&nbsp;implements&nbsp;the&nbsp;interface.</span><br>
+<span class="lineno">30</span><span class="keyword" id="170002">func</span>&nbsp;<span class="ident" id="170007">Example_interface</span><span class="op" id="170024">(</span><span class="op" id="170025">)</span>&nbsp;<span class="op" id="170027">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="170030">var</span>&nbsp;<span class="ident" id="170034">network</span>&nbsp;<span class="ident" id="170042">bytes</span><span class="op" id="170047">.</span><span class="ident" id="170048">Buffer</span>&nbsp;<span class="comment" id="170055">//&nbsp;Stand-in&nbsp;for&nbsp;the&nbsp;network.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="170086">//&nbsp;We&nbsp;must&nbsp;register&nbsp;the&nbsp;concrete&nbsp;type&nbsp;for&nbsp;the&nbsp;encoder&nbsp;and&nbsp;decoder&nbsp;(which&nbsp;would</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="170166">//&nbsp;normally&nbsp;be&nbsp;on&nbsp;a&nbsp;separate&nbsp;machine&nbsp;from&nbsp;the&nbsp;encoder).&nbsp;On&nbsp;each&nbsp;end,&nbsp;this&nbsp;tells&nbsp;the</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="170251">//&nbsp;engine&nbsp;which&nbsp;concrete&nbsp;type&nbsp;is&nbsp;being&nbsp;sent&nbsp;that&nbsp;implements&nbsp;the&nbsp;interface.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="170327">gob</span><span class="op" id="170330">.</span><span class="ident" id="170331">Register</span><span class="op" id="170339">(</span><span class="ident" id="170340">Point</span><span class="op" id="170345">{</span><span class="op" id="170346">}</span><span class="op" id="170347">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="170351">//&nbsp;Create&nbsp;an&nbsp;encoder&nbsp;and&nbsp;send&nbsp;some&nbsp;values.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="170395">enc</span>&nbsp;<span class="op" id="170399">:=</span>&nbsp;<span class="ident" id="170402">gob</span><span class="op" id="170405">.</span><span class="ident" id="170406">NewEncoder</span><span class="op" id="170416">(</span><span class="op" id="170417">&amp;</span><span class="ident" id="170418">network</span><span class="op" id="170425">)</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="170428">for</span>&nbsp;<span class="ident" id="170432">i</span>&nbsp;<span class="op" id="170434">:=</span>&nbsp;<span class="num" id="170437">1</span><span class="op" id="170438">;</span>&nbsp;<span class="ident" id="170440">i</span>&nbsp;<span class="op" id="170442">&lt;=</span>&nbsp;<span class="num" id="170445">3</span><span class="op" id="170446">;</span>&nbsp;<span class="ident" id="170448">i</span><span class="op" id="170449">++</span>&nbsp;<span class="op" id="170452">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="170456">interfaceEncode</span><span class="op" id="170471">(</span><span class="ident" id="170472">enc</span><span class="op" id="170475">,</span>&nbsp;<span class="ident" id="170477">Point</span><span class="op" id="170482">{</span><span class="num" id="170483">3</span>&nbsp;<span class="op" id="170485">*</span>&nbsp;<span class="ident" id="170487">i</span><span class="op" id="170488">,</span>&nbsp;<span class="num" id="170490">4</span>&nbsp;<span class="op" id="170492">*</span>&nbsp;<span class="ident" id="170494">i</span><span class="op" id="170495">}</span><span class="op" id="170496">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="170499">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="170503">//&nbsp;Create&nbsp;a&nbsp;decoder&nbsp;and&nbsp;receive&nbsp;some&nbsp;values.</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="170549">dec</span>&nbsp;<span class="op" id="170553">:=</span>&nbsp;<span class="ident" id="170556">gob</span><span class="op" id="170559">.</span><span class="ident" id="170560">NewDecoder</span><span class="op" id="170570">(</span><span class="op" id="170571">&amp;</span><span class="ident" id="170572">network</span><span class="op" id="170579">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="170582">for</span>&nbsp;<span class="ident" id="170586">i</span>&nbsp;<span class="op" id="170588">:=</span>&nbsp;<span class="num" id="170591">1</span><span class="op" id="170592">;</span>&nbsp;<span class="ident" id="170594">i</span>&nbsp;<span class="op" id="170596">&lt;=</span>&nbsp;<span class="num" id="170599">3</span><span class="op" id="170600">;</span>&nbsp;<span class="ident" id="170602">i</span><span class="op" id="170603">++</span>&nbsp;<span class="op" id="170606">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="170610">result</span>&nbsp;<span class="op" id="170617">:=</span>&nbsp;<span class="ident" id="170620">interfaceDecode</span><span class="op" id="170635">(</span><span class="ident" id="170636">dec</span><span class="op" id="170639">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="170643">fmt</span><span class="op" id="170646">.</span><span class="ident" id="170647">Println</span><span class="op" id="170654">(</span><span class="ident" id="170655">result</span><span class="op" id="170661">.</span><span class="ident" id="170662">Hypotenuse</span><span class="op" id="170672">(</span><span class="op" id="170673">)</span><span class="op" id="170674">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="170677">}</span><br>
+<span class="lineno">50</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="170681">//&nbsp;Output:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="170693">//&nbsp;5</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="170699">//&nbsp;10</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="170706">//&nbsp;15</span><br>
+<span class="lineno">55</span><span class="op" id="170712">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="170715">//&nbsp;interfaceEncode&nbsp;encodes&nbsp;the&nbsp;interface&nbsp;value&nbsp;into&nbsp;the&nbsp;encoder.</span><br>
+<span class="lineno"></span><span class="keyword" id="170780">func</span>&nbsp;<span class="ident" id="170785">interfaceEncode</span><span class="op" id="170800">(</span><span class="ident" id="170801">enc</span>&nbsp;<span class="op" id="170805">*</span><span class="ident" id="170806">gob</span><span class="op" id="170809">.</span><span class="ident" id="170810">Encoder</span><span class="op" id="170817">,</span>&nbsp;<span class="ident" id="170819">p</span>&nbsp;<span class="ident" id="170821">Pythagoras</span><span class="op" id="170831">)</span>&nbsp;<span class="op" id="170833">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="170836">//&nbsp;The&nbsp;encode&nbsp;will&nbsp;fail&nbsp;unless&nbsp;the&nbsp;concrete&nbsp;type&nbsp;has&nbsp;been</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="170895">//&nbsp;registered.&nbsp;We&nbsp;registered&nbsp;it&nbsp;in&nbsp;the&nbsp;calling&nbsp;function.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="170954">//&nbsp;Pass&nbsp;pointer&nbsp;to&nbsp;interface&nbsp;so&nbsp;Encode&nbsp;sees&nbsp;(and&nbsp;hence&nbsp;sends)&nbsp;a&nbsp;value&nbsp;of</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="171028">//&nbsp;interface&nbsp;type.&nbsp;&nbsp;If&nbsp;we&nbsp;passed&nbsp;p&nbsp;directly&nbsp;it&nbsp;would&nbsp;see&nbsp;the&nbsp;concrete&nbsp;type&nbsp;instead.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="171113">//&nbsp;See&nbsp;the&nbsp;blog&nbsp;post,&nbsp;&#34;The&nbsp;Laws&nbsp;of&nbsp;Reflection&#34;&nbsp;for&nbsp;background.</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="171177">err</span>&nbsp;<span class="op" id="171181">:=</span>&nbsp;<span class="ident" id="171184">enc</span><span class="op" id="171187">.</span><span class="ident" id="171188">Encode</span><span class="op" id="171194">(</span><span class="op" id="171195">&amp;</span><span class="ident" id="171196">p</span><span class="op" id="171197">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="171200">if</span>&nbsp;<span class="ident" id="171203">err</span>&nbsp;<span class="op" id="171207">!=</span>&nbsp;<span class="ident" id="171210">nil</span>&nbsp;<span class="op" id="171214">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="171218">log</span><span class="op" id="171221">.</span><span class="ident" id="171222">Fatal</span><span class="op" id="171227">(</span><span class="string" id="171228">&#34;encode:&#34;</span><span class="op" id="171237">,</span>&nbsp;<span class="ident" id="171239">err</span><span class="op" id="171242">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="171245">}</span><br>
+<span class="lineno"></span><span class="op" id="171247">}</span><br>
+<span class="lineno">70</span><br>
+<span class="lineno"></span><span class="comment" id="171250">//&nbsp;interfaceDecode&nbsp;decodes&nbsp;the&nbsp;next&nbsp;interface&nbsp;value&nbsp;from&nbsp;the&nbsp;stream&nbsp;and&nbsp;returns&nbsp;it.</span><br>
+<span class="lineno"></span><span class="keyword" id="171334">func</span>&nbsp;<span class="ident" id="171339">interfaceDecode</span><span class="op" id="171354">(</span><span class="ident" id="171355">dec</span>&nbsp;<span class="op" id="171359">*</span><span class="ident" id="171360">gob</span><span class="op" id="171363">.</span><span class="ident" id="171364">Decoder</span><span class="op" id="171371">)</span>&nbsp;<span class="ident" id="171373">Pythagoras</span>&nbsp;<span class="op" id="171384">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="171387">//&nbsp;The&nbsp;decode&nbsp;will&nbsp;fail&nbsp;unless&nbsp;the&nbsp;concrete&nbsp;type&nbsp;on&nbsp;the&nbsp;wire&nbsp;has&nbsp;been</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="171458">//&nbsp;registered.&nbsp;We&nbsp;registered&nbsp;it&nbsp;in&nbsp;the&nbsp;calling&nbsp;function.</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="171516">var</span>&nbsp;<span class="ident" id="171520">p</span>&nbsp;<span class="ident" id="171522">Pythagoras</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="171534">err</span>&nbsp;<span class="op" id="171538">:=</span>&nbsp;<span class="ident" id="171541">dec</span><span class="op" id="171544">.</span><span class="ident" id="171545">Decode</span><span class="op" id="171551">(</span><span class="op" id="171552">&amp;</span><span class="ident" id="171553">p</span><span class="op" id="171554">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="171557">if</span>&nbsp;<span class="ident" id="171560">err</span>&nbsp;<span class="op" id="171564">!=</span>&nbsp;<span class="ident" id="171567">nil</span>&nbsp;<span class="op" id="171571">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="171575">log</span><span class="op" id="171578">.</span><span class="ident" id="171579">Fatal</span><span class="op" id="171584">(</span><span class="string" id="171585">&#34;decode:&#34;</span><span class="op" id="171594">,</span>&nbsp;<span class="ident" id="171596">err</span><span class="op" id="171599">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="171602">}</span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="171605">return</span>&nbsp;<span class="ident" id="171612">p</span><br>
+<span class="lineno"></span><span class="op" id="171614">}</span>
+</div>
+</body>
+</html>

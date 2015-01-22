@@ -1,0 +1,220 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment" id="4563678">//&nbsp;Copyright&nbsp;2011&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment" id="4563733">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment" id="4563787">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword" id="4563838">package</span>&nbsp;<span class="ident" id="4563846">template</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="4563856">import</span>&nbsp;<span class="op" id="4563863">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="4563866">&#34;fmt&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="4563873">&#34;text/template/parse&#34;</span><br>
+<span class="lineno">10</span><span class="op" id="4563895">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="4563898">//&nbsp;Error&nbsp;describes&nbsp;a&nbsp;problem&nbsp;encountered&nbsp;during&nbsp;template&nbsp;Escaping.</span><br>
+<span class="lineno"></span><span class="keyword" id="4563965">type</span>&nbsp;<span class="ident" id="4563970">Error</span>&nbsp;<span class="keyword" id="4563976">struct</span>&nbsp;<span class="op" id="4563983">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4563986">//&nbsp;ErrorCode&nbsp;describes&nbsp;the&nbsp;kind&nbsp;of&nbsp;error.</span><br>
+<span class="lineno">15</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="4564029">ErrorCode</span>&nbsp;<span class="ident" id="4564039">ErrorCode</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4564050">//&nbsp;Node&nbsp;is&nbsp;the&nbsp;node&nbsp;that&nbsp;caused&nbsp;the&nbsp;problem,&nbsp;if&nbsp;known.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4564106">//&nbsp;If&nbsp;not&nbsp;nil,&nbsp;it&nbsp;overrides&nbsp;Name&nbsp;and&nbsp;Line.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="4564150">Node</span>&nbsp;<span class="ident" id="4564155">parse</span><span class="op" id="4564160">.</span><span class="ident" id="4564161">Node</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4564167">//&nbsp;Name&nbsp;is&nbsp;the&nbsp;name&nbsp;of&nbsp;the&nbsp;template&nbsp;in&nbsp;which&nbsp;the&nbsp;error&nbsp;was&nbsp;encountered.</span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="4564240">Name</span>&nbsp;<span class="builtintype" id="4564245">string</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4564253">//&nbsp;Line&nbsp;is&nbsp;the&nbsp;line&nbsp;number&nbsp;of&nbsp;the&nbsp;error&nbsp;in&nbsp;the&nbsp;template&nbsp;source&nbsp;or&nbsp;0.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="4564323">Line</span>&nbsp;<span class="builtintype" id="4564328">int</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4564333">//&nbsp;Description&nbsp;is&nbsp;a&nbsp;human-readable&nbsp;description&nbsp;of&nbsp;the&nbsp;problem.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="4564397">Description</span>&nbsp;<span class="builtintype" id="4564409">string</span><br>
+<span class="lineno">25</span><span class="op" id="4564416">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="4564419">//&nbsp;ErrorCode&nbsp;is&nbsp;a&nbsp;code&nbsp;for&nbsp;a&nbsp;kind&nbsp;of&nbsp;error.</span><br>
+<span class="lineno"></span><span class="keyword" id="4564463">type</span>&nbsp;<span class="ident" id="4564468">ErrorCode</span>&nbsp;<span class="builtintype" id="4564478">int</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">30</span><span class="comment" id="4564483">//&nbsp;We&nbsp;define&nbsp;codes&nbsp;for&nbsp;each&nbsp;error&nbsp;that&nbsp;manifests&nbsp;while&nbsp;escaping&nbsp;templates,&nbsp;but</span><br>
+<span class="lineno"></span><span class="comment" id="4564562">//&nbsp;escaped&nbsp;templates&nbsp;may&nbsp;also&nbsp;fail&nbsp;at&nbsp;runtime.</span><br>
+<span class="lineno"></span><span class="comment" id="4564609">//</span><br>
+<span class="lineno"></span><span class="comment" id="4564612">//&nbsp;Output:&nbsp;&#34;ZgotmplZ&#34;</span><br>
+<span class="lineno"></span><span class="comment" id="4564634">//&nbsp;Example:</span><br>
+<span class="lineno">35</span><span class="comment" id="4564646">//&nbsp;&nbsp;&nbsp;&lt;img&nbsp;src=&#34;{{.X}}&#34;&gt;</span><br>
+<span class="lineno"></span><span class="comment" id="4564670">//&nbsp;&nbsp;&nbsp;where&nbsp;{{.X}}&nbsp;evaluates&nbsp;to&nbsp;`javascript:...`</span><br>
+<span class="lineno"></span><span class="comment" id="4564718">//&nbsp;Discussion:</span><br>
+<span class="lineno"></span><span class="comment" id="4564733">//&nbsp;&nbsp;&nbsp;&#34;ZgotmplZ&#34;&nbsp;is&nbsp;a&nbsp;special&nbsp;value&nbsp;that&nbsp;indicates&nbsp;that&nbsp;unsafe&nbsp;content&nbsp;reached&nbsp;a</span><br>
+<span class="lineno"></span><span class="comment" id="4564813">//&nbsp;&nbsp;&nbsp;CSS&nbsp;or&nbsp;URL&nbsp;context&nbsp;at&nbsp;runtime.&nbsp;The&nbsp;output&nbsp;of&nbsp;the&nbsp;example&nbsp;will&nbsp;be</span><br>
+<span class="lineno">40</span><span class="comment" id="4564883">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;img&nbsp;src=&#34;#ZgotmplZ&#34;&gt;</span><br>
+<span class="lineno"></span><span class="comment" id="4564912">//&nbsp;&nbsp;&nbsp;If&nbsp;the&nbsp;data&nbsp;comes&nbsp;from&nbsp;a&nbsp;trusted&nbsp;source,&nbsp;use&nbsp;content&nbsp;types&nbsp;to&nbsp;exempt&nbsp;it</span><br>
+<span class="lineno"></span><span class="comment" id="4564989">//&nbsp;&nbsp;&nbsp;from&nbsp;filtering:&nbsp;URL(`javascript:...`).</span><br>
+<span class="lineno"></span><span class="keyword" id="4565033">const</span>&nbsp;<span class="op" id="4565039">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4565042">//&nbsp;OK&nbsp;indicates&nbsp;the&nbsp;lack&nbsp;of&nbsp;an&nbsp;error.</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="4565081">OK</span>&nbsp;<span class="ident" id="4565084">ErrorCode</span>&nbsp;<span class="op" id="4565094">=</span>&nbsp;<span class="ident" id="4565096">iota</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4565103">//&nbsp;ErrAmbigContext:&nbsp;&#34;...&nbsp;appears&nbsp;in&nbsp;an&nbsp;ambiguous&nbsp;URL&nbsp;context&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4565166">//&nbsp;Example:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4565179">//&nbsp;&nbsp;&nbsp;&lt;a&nbsp;href=&#34;</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4565195">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{{if&nbsp;.C}}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4565214">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/path/</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4565232">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{{else}}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4565250">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/search?q=</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4565272">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{{end}}</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4565289">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{{.X}}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4565305">//&nbsp;&nbsp;&nbsp;&#34;&gt;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4565314">//&nbsp;Discussion:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4565330">//&nbsp;&nbsp;&nbsp;{{.X}}&nbsp;is&nbsp;in&nbsp;an&nbsp;ambiguous&nbsp;URL&nbsp;context&nbsp;since,&nbsp;depending&nbsp;on&nbsp;{{.C}},</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4565402">//&nbsp;&nbsp;it&nbsp;may&nbsp;be&nbsp;either&nbsp;a&nbsp;URL&nbsp;suffix&nbsp;or&nbsp;a&nbsp;query&nbsp;parameter.</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4565459">//&nbsp;&nbsp;&nbsp;Moving&nbsp;{{.X}}&nbsp;into&nbsp;the&nbsp;condition&nbsp;removes&nbsp;the&nbsp;ambiguity:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4565521">//&nbsp;&nbsp;&nbsp;&lt;a&nbsp;href=&#34;{{if&nbsp;.C}}/path/{{.X}}{{else}}/search?q={{.X}}&#34;&gt;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="4565584">ErrAmbigContext</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4565602">//&nbsp;ErrBadHTML:&nbsp;&#34;expected&nbsp;space,&nbsp;attr&nbsp;name,&nbsp;or&nbsp;end&nbsp;of&nbsp;tag,&nbsp;but&nbsp;got&nbsp;...&#34;,</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4565675">//&nbsp;&nbsp;&nbsp;&#34;...&nbsp;in&nbsp;unquoted&nbsp;attr&#34;,&nbsp;&#34;...&nbsp;in&nbsp;attribute&nbsp;name&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4565729">//&nbsp;Example:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4565742">//&nbsp;&nbsp;&nbsp;&lt;a&nbsp;href&nbsp;=&nbsp;/search?q=foo&gt;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4565773">//&nbsp;&nbsp;&nbsp;&lt;href=foo&gt;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4565790">//&nbsp;&nbsp;&nbsp;&lt;form&nbsp;na&lt;e=...&gt;</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4565812">//&nbsp;&nbsp;&nbsp;&lt;option&nbsp;selected&lt;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4565836">//&nbsp;Discussion:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4565852">//&nbsp;&nbsp;&nbsp;This&nbsp;is&nbsp;often&nbsp;due&nbsp;to&nbsp;a&nbsp;typo&nbsp;in&nbsp;an&nbsp;HTML&nbsp;element,&nbsp;but&nbsp;some&nbsp;runes</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4565921">//&nbsp;&nbsp;&nbsp;are&nbsp;banned&nbsp;in&nbsp;tag&nbsp;names,&nbsp;attribute&nbsp;names,&nbsp;and&nbsp;unquoted&nbsp;attribute</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4565992">//&nbsp;&nbsp;&nbsp;values&nbsp;because&nbsp;they&nbsp;can&nbsp;tickle&nbsp;parser&nbsp;ambiguities.</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4566049">//&nbsp;&nbsp;&nbsp;Quoting&nbsp;all&nbsp;attributes&nbsp;is&nbsp;the&nbsp;best&nbsp;policy.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="4566098">ErrBadHTML</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4566111">//&nbsp;ErrBranchEnd:&nbsp;&#34;{{if}}&nbsp;branches&nbsp;end&nbsp;in&nbsp;different&nbsp;contexts&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4566173">//&nbsp;Example:</span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4566186">//&nbsp;&nbsp;&nbsp;{{if&nbsp;.C}}&lt;a&nbsp;href=&#34;{{end}}{{.X}}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4566224">//&nbsp;Discussion:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4566240">//&nbsp;&nbsp;&nbsp;Package&nbsp;html/template&nbsp;statically&nbsp;examines&nbsp;each&nbsp;path&nbsp;through&nbsp;an</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4566309">//&nbsp;&nbsp;&nbsp;{{if}},&nbsp;{{range}},&nbsp;or&nbsp;{{with}}&nbsp;to&nbsp;escape&nbsp;any&nbsp;following&nbsp;pipelines.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4566381">//&nbsp;&nbsp;&nbsp;The&nbsp;example&nbsp;is&nbsp;ambiguous&nbsp;since&nbsp;{{.X}}&nbsp;might&nbsp;be&nbsp;an&nbsp;HTML&nbsp;text&nbsp;node,</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4566453">//&nbsp;&nbsp;&nbsp;or&nbsp;a&nbsp;URL&nbsp;prefix&nbsp;in&nbsp;an&nbsp;HTML&nbsp;attribute.&nbsp;The&nbsp;context&nbsp;of&nbsp;{{.X}}&nbsp;is</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4566522">//&nbsp;&nbsp;&nbsp;used&nbsp;to&nbsp;figure&nbsp;out&nbsp;how&nbsp;to&nbsp;escape&nbsp;it,&nbsp;but&nbsp;that&nbsp;context&nbsp;depends&nbsp;on</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4566593">//&nbsp;&nbsp;&nbsp;the&nbsp;run-time&nbsp;value&nbsp;of&nbsp;{{.C}}&nbsp;which&nbsp;is&nbsp;not&nbsp;statically&nbsp;known.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4566659">//</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4566663">//&nbsp;&nbsp;&nbsp;The&nbsp;problem&nbsp;is&nbsp;usually&nbsp;something&nbsp;like&nbsp;missing&nbsp;quotes&nbsp;or&nbsp;angle</span><br>
+<span class="lineno">90</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4566731">//&nbsp;&nbsp;&nbsp;brackets,&nbsp;or&nbsp;can&nbsp;be&nbsp;avoided&nbsp;by&nbsp;refactoring&nbsp;to&nbsp;put&nbsp;the&nbsp;two&nbsp;contexts</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4566804">//&nbsp;&nbsp;&nbsp;into&nbsp;different&nbsp;branches&nbsp;of&nbsp;an&nbsp;if,&nbsp;range&nbsp;or&nbsp;with.&nbsp;If&nbsp;the&nbsp;problem</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4566874">//&nbsp;&nbsp;&nbsp;is&nbsp;in&nbsp;a&nbsp;{{range}}&nbsp;over&nbsp;a&nbsp;collection&nbsp;that&nbsp;should&nbsp;never&nbsp;be&nbsp;empty,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4566944">//&nbsp;&nbsp;&nbsp;adding&nbsp;a&nbsp;dummy&nbsp;{{else}}&nbsp;can&nbsp;help.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="4566984">ErrBranchEnd</span><br>
+<span class="lineno">95</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4566999">//&nbsp;ErrEndContext:&nbsp;&#34;...&nbsp;ends&nbsp;in&nbsp;a&nbsp;non-text&nbsp;context:&nbsp;...&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4567056">//&nbsp;Examples:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4567070">//&nbsp;&nbsp;&nbsp;&lt;div</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4567081">//&nbsp;&nbsp;&nbsp;&lt;div&nbsp;title=&#34;no&nbsp;close&nbsp;quote&gt;</span><br>
+<span class="lineno">100</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4567115">//&nbsp;&nbsp;&nbsp;&lt;script&gt;f()</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4567133">//&nbsp;Discussion:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4567149">//&nbsp;&nbsp;&nbsp;Executed&nbsp;templates&nbsp;should&nbsp;produce&nbsp;a&nbsp;DocumentFragment&nbsp;of&nbsp;HTML.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4567217">//&nbsp;&nbsp;&nbsp;Templates&nbsp;that&nbsp;end&nbsp;without&nbsp;closing&nbsp;tags&nbsp;will&nbsp;trigger&nbsp;this&nbsp;error.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4567288">//&nbsp;&nbsp;&nbsp;Templates&nbsp;that&nbsp;should&nbsp;not&nbsp;be&nbsp;used&nbsp;in&nbsp;an&nbsp;HTML&nbsp;context&nbsp;or&nbsp;that</span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4567355">//&nbsp;&nbsp;&nbsp;produce&nbsp;incomplete&nbsp;Fragments&nbsp;should&nbsp;not&nbsp;be&nbsp;executed&nbsp;directly.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4567423">//</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4567427">//&nbsp;&nbsp;&nbsp;{{define&nbsp;&#34;main&#34;}}&nbsp;&lt;script&gt;{{template&nbsp;&#34;helper&#34;}}&lt;/script&gt;&nbsp;{{end}}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4567498">//&nbsp;&nbsp;&nbsp;{{define&nbsp;&#34;helper&#34;}}&nbsp;document.write(&#39;&nbsp;&lt;div&nbsp;title=&#34;&nbsp;&#39;)&nbsp;{{end}}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4567565">//</span><br>
+<span class="lineno">110</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4567569">//&nbsp;&nbsp;&nbsp;&#34;helper&#34;&nbsp;does&nbsp;not&nbsp;produce&nbsp;a&nbsp;valid&nbsp;document&nbsp;fragment,&nbsp;so&nbsp;should</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4567638">//&nbsp;&nbsp;&nbsp;not&nbsp;be&nbsp;Executed&nbsp;directly.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="4567670">ErrEndContext</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4567686">//&nbsp;ErrNoSuchTemplate:&nbsp;&#34;no&nbsp;such&nbsp;template&nbsp;...&#34;</span><br>
+<span class="lineno">115</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4567732">//&nbsp;Examples:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4567746">//&nbsp;&nbsp;&nbsp;{{define&nbsp;&#34;main&#34;}}&lt;div&nbsp;{{template&nbsp;&#34;attrs&#34;}}&gt;{{end}}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4567803">//&nbsp;&nbsp;&nbsp;{{define&nbsp;&#34;attrs&#34;}}href=&#34;{{.URL}}&#34;{{end}}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4567850">//&nbsp;Discussion:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4567866">//&nbsp;&nbsp;&nbsp;Package&nbsp;html/template&nbsp;looks&nbsp;through&nbsp;template&nbsp;calls&nbsp;to&nbsp;compute&nbsp;the</span><br>
+<span class="lineno">120</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4567938">//&nbsp;&nbsp;&nbsp;context.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4567953">//&nbsp;&nbsp;&nbsp;Here&nbsp;the&nbsp;{{.URL}}&nbsp;in&nbsp;&#34;attrs&#34;&nbsp;must&nbsp;be&nbsp;treated&nbsp;as&nbsp;a&nbsp;URL&nbsp;when&nbsp;called</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4568025">//&nbsp;&nbsp;&nbsp;from&nbsp;&#34;main&#34;,&nbsp;but&nbsp;you&nbsp;will&nbsp;get&nbsp;this&nbsp;error&nbsp;if&nbsp;&#34;attrs&#34;&nbsp;is&nbsp;not&nbsp;defined</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4568098">//&nbsp;&nbsp;&nbsp;when&nbsp;&#34;main&#34;&nbsp;is&nbsp;parsed.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="4568127">ErrNoSuchTemplate</span><br>
+<span class="lineno">125</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4568147">//&nbsp;ErrOutputContext:&nbsp;&#34;cannot&nbsp;compute&nbsp;output&nbsp;context&nbsp;for&nbsp;template&nbsp;...&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4568218">//&nbsp;Examples:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4568232">//&nbsp;&nbsp;&nbsp;{{define&nbsp;&#34;t&#34;}}{{if&nbsp;.T}}{{template&nbsp;&#34;t&#34;&nbsp;.T}}{{end}}{{.H}}&#34;,{{end}}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4568303">//&nbsp;Discussion:</span><br>
+<span class="lineno">130</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4568319">//&nbsp;&nbsp;&nbsp;A&nbsp;recursive&nbsp;template&nbsp;does&nbsp;not&nbsp;end&nbsp;in&nbsp;the&nbsp;same&nbsp;context&nbsp;in&nbsp;which&nbsp;it</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4568391">//&nbsp;&nbsp;&nbsp;starts,&nbsp;and&nbsp;a&nbsp;reliable&nbsp;output&nbsp;context&nbsp;cannot&nbsp;be&nbsp;computed.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4568455">//&nbsp;&nbsp;&nbsp;Look&nbsp;for&nbsp;typos&nbsp;in&nbsp;the&nbsp;named&nbsp;template.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4568499">//&nbsp;&nbsp;&nbsp;If&nbsp;the&nbsp;template&nbsp;should&nbsp;not&nbsp;be&nbsp;called&nbsp;in&nbsp;the&nbsp;named&nbsp;start&nbsp;context,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4568570">//&nbsp;&nbsp;&nbsp;look&nbsp;for&nbsp;calls&nbsp;to&nbsp;that&nbsp;template&nbsp;in&nbsp;unexpected&nbsp;contexts.</span><br>
+<span class="lineno">135</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4568632">//&nbsp;&nbsp;&nbsp;Maybe&nbsp;refactor&nbsp;recursive&nbsp;templates&nbsp;to&nbsp;not&nbsp;be&nbsp;recursive.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="4568694">ErrOutputContext</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4568713">//&nbsp;ErrPartialCharset:&nbsp;&#34;unfinished&nbsp;JS&nbsp;regexp&nbsp;charset&nbsp;in&nbsp;...&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4568774">//&nbsp;Example:</span><br>
+<span class="lineno">140</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4568787">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;script&gt;var&nbsp;pattern&nbsp;=&nbsp;/foo[{{.Chars}}]/&lt;/script&gt;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4568844">//&nbsp;Discussion:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4568860">//&nbsp;&nbsp;&nbsp;Package&nbsp;html/template&nbsp;does&nbsp;not&nbsp;support&nbsp;interpolation&nbsp;into&nbsp;regular</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4568932">//&nbsp;&nbsp;&nbsp;expression&nbsp;literal&nbsp;character&nbsp;sets.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="4568973">ErrPartialCharset</span><br>
+<span class="lineno">145</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4568993">//&nbsp;ErrPartialEscape:&nbsp;&#34;unfinished&nbsp;escape&nbsp;sequence&nbsp;in&nbsp;...&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4569051">//&nbsp;Example:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4569064">//&nbsp;&nbsp;&nbsp;&lt;script&gt;alert(&#34;\{{.X}}&#34;)&lt;/script&gt;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4569104">//&nbsp;Discussion:</span><br>
+<span class="lineno">150</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4569120">//&nbsp;&nbsp;&nbsp;Package&nbsp;html/template&nbsp;does&nbsp;not&nbsp;support&nbsp;actions&nbsp;following&nbsp;a</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4569185">//&nbsp;&nbsp;&nbsp;backslash.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4569202">//&nbsp;&nbsp;&nbsp;This&nbsp;is&nbsp;usually&nbsp;an&nbsp;error&nbsp;and&nbsp;there&nbsp;are&nbsp;better&nbsp;solutions;&nbsp;for</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4569269">//&nbsp;&nbsp;&nbsp;example</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4569283">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;script&gt;alert(&#34;{{.X}}&#34;)&lt;/script&gt;</span><br>
+<span class="lineno">155</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4569324">//&nbsp;&nbsp;&nbsp;should&nbsp;work,&nbsp;and&nbsp;if&nbsp;{{.X}}&nbsp;is&nbsp;a&nbsp;partial&nbsp;escape&nbsp;sequence&nbsp;such&nbsp;as</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4569394">//&nbsp;&nbsp;&nbsp;&#34;xA0&#34;,&nbsp;mark&nbsp;the&nbsp;whole&nbsp;sequence&nbsp;as&nbsp;safe&nbsp;content:&nbsp;JSStr(`\xA0`)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="4569462">ErrPartialEscape</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4569481">//&nbsp;ErrRangeLoopReentry:&nbsp;&#34;on&nbsp;range&nbsp;loop&nbsp;re-entry:&nbsp;...&#34;</span><br>
+<span class="lineno">160</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4569536">//&nbsp;Example:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4569549">//&nbsp;&nbsp;&nbsp;&lt;script&gt;var&nbsp;x&nbsp;=&nbsp;[{{range&nbsp;.}}&#39;{{.}},{{end}}]&lt;/script&gt;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4569608">//&nbsp;Discussion:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4569624">//&nbsp;&nbsp;&nbsp;If&nbsp;an&nbsp;iteration&nbsp;through&nbsp;a&nbsp;range&nbsp;would&nbsp;cause&nbsp;it&nbsp;to&nbsp;end&nbsp;in&nbsp;a</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4569689">//&nbsp;&nbsp;&nbsp;different&nbsp;context&nbsp;than&nbsp;an&nbsp;earlier&nbsp;pass,&nbsp;there&nbsp;is&nbsp;no&nbsp;single&nbsp;context.</span><br>
+<span class="lineno">165</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4569763">//&nbsp;&nbsp;&nbsp;In&nbsp;the&nbsp;example,&nbsp;there&nbsp;is&nbsp;missing&nbsp;a&nbsp;quote,&nbsp;so&nbsp;it&nbsp;is&nbsp;not&nbsp;clear</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4569830">//&nbsp;&nbsp;&nbsp;whether&nbsp;{{.}}&nbsp;is&nbsp;meant&nbsp;to&nbsp;be&nbsp;inside&nbsp;a&nbsp;JS&nbsp;string&nbsp;or&nbsp;in&nbsp;a&nbsp;JS&nbsp;value</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4569901">//&nbsp;&nbsp;&nbsp;context.&nbsp;&nbsp;The&nbsp;second&nbsp;iteration&nbsp;would&nbsp;produce&nbsp;something&nbsp;like</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4569967">//</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4569971">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&lt;script&gt;var&nbsp;x&nbsp;=&nbsp;[&#39;firstValue,&#39;secondValue]&lt;/script&gt;</span><br>
+<span class="lineno">170</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="4570031">ErrRangeLoopReentry</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4570053">//&nbsp;ErrSlashAmbig:&nbsp;&#39;/&#39;&nbsp;could&nbsp;start&nbsp;a&nbsp;division&nbsp;or&nbsp;regexp.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4570110">//&nbsp;Example:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4570123">//&nbsp;&nbsp;&nbsp;&lt;script&gt;</span><br>
+<span class="lineno">175</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4570138">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;{{if&nbsp;.C}}var&nbsp;x&nbsp;=&nbsp;1{{end}}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4570172">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;/-{{.N}}/i.test(x)&nbsp;?&nbsp;doThis&nbsp;:&nbsp;doThat();</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4570220">//&nbsp;&nbsp;&nbsp;&lt;/script&gt;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4570236">//&nbsp;Discussion:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4570252">//&nbsp;&nbsp;&nbsp;The&nbsp;example&nbsp;above&nbsp;could&nbsp;produce&nbsp;`var&nbsp;x&nbsp;=&nbsp;1/-2/i.test(s)...`</span><br>
+<span class="lineno">180</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4570318">//&nbsp;&nbsp;&nbsp;in&nbsp;which&nbsp;the&nbsp;first&nbsp;&#39;/&#39;&nbsp;is&nbsp;a&nbsp;mathematical&nbsp;division&nbsp;operator&nbsp;or&nbsp;it</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4570389">//&nbsp;&nbsp;&nbsp;could&nbsp;produce&nbsp;`/-2/i.test(s)`&nbsp;in&nbsp;which&nbsp;the&nbsp;first&nbsp;&#39;/&#39;&nbsp;starts&nbsp;a</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4570457">//&nbsp;&nbsp;&nbsp;regexp&nbsp;literal.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4570479">//&nbsp;&nbsp;&nbsp;Look&nbsp;for&nbsp;missing&nbsp;semicolons&nbsp;inside&nbsp;branches,&nbsp;and&nbsp;maybe&nbsp;add</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="4570544">//&nbsp;&nbsp;&nbsp;parentheses&nbsp;to&nbsp;make&nbsp;it&nbsp;clear&nbsp;which&nbsp;interpretation&nbsp;you&nbsp;intend.</span><br>
+<span class="lineno">185</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="4570612">ErrSlashAmbig</span><br>
+<span class="lineno"></span><span class="op" id="4570626">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="4570629">func</span>&nbsp;<span class="op" id="4570634">(</span><span class="ident" id="4570635">e</span>&nbsp;<span class="op" id="4570637">*</span><span class="ident" id="4570638">Error</span><span class="op" id="4570643">)</span>&nbsp;<span class="ident" id="4570645">Error</span><span class="op" id="4570650">(</span><span class="op" id="4570651">)</span>&nbsp;<span class="builtintype" id="4570653">string</span>&nbsp;<span class="op" id="4570660">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="4570663">switch</span>&nbsp;<span class="op" id="4570670">{</span><br>
+<span class="lineno">190</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="4570673">case</span>&nbsp;<span class="ident" id="4570678">e</span><span class="op" id="4570679">.</span><span class="ident" id="4570680">Node</span>&nbsp;<span class="op" id="4570685">!=</span>&nbsp;<span class="ident" id="4570688">nil</span><span class="op" id="4570691">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="4570695">loc</span><span class="op" id="4570698">,</span>&nbsp;<span class="ident" id="4570700">_</span>&nbsp;<span class="op" id="4570702">:=</span>&nbsp;<span class="op" id="4570705">(</span><span class="op" id="4570706">*</span><span class="ident" id="4570707">parse</span><span class="op" id="4570712">.</span><span class="ident" id="4570713">Tree</span><span class="op" id="4570717">)</span><span class="op" id="4570718">(</span><span class="ident" id="4570719">nil</span><span class="op" id="4570722">)</span><span class="op" id="4570723">.</span><span class="ident" id="4570724">ErrorContext</span><span class="op" id="4570736">(</span><span class="ident" id="4570737">e</span><span class="op" id="4570738">.</span><span class="ident" id="4570739">Node</span><span class="op" id="4570743">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="4570747">return</span>&nbsp;<span class="ident" id="4570754">fmt</span><span class="op" id="4570757">.</span><span class="ident" id="4570758">Sprintf</span><span class="op" id="4570765">(</span><span class="string" id="4570766">&#34;html/template:%s:&nbsp;%s&#34;</span><span class="op" id="4570788">,</span>&nbsp;<span class="ident" id="4570790">loc</span><span class="op" id="4570793">,</span>&nbsp;<span class="ident" id="4570795">e</span><span class="op" id="4570796">.</span><span class="ident" id="4570797">Description</span><span class="op" id="4570808">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="4570811">case</span>&nbsp;<span class="ident" id="4570816">e</span><span class="op" id="4570817">.</span><span class="ident" id="4570818">Line</span>&nbsp;<span class="op" id="4570823">!=</span>&nbsp;<span class="num" id="4570826">0</span><span class="op" id="4570827">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="4570831">return</span>&nbsp;<span class="ident" id="4570838">fmt</span><span class="op" id="4570841">.</span><span class="ident" id="4570842">Sprintf</span><span class="op" id="4570849">(</span><span class="string" id="4570850">&#34;html/template:%s:%d:&nbsp;%s&#34;</span><span class="op" id="4570875">,</span>&nbsp;<span class="ident" id="4570877">e</span><span class="op" id="4570878">.</span><span class="ident" id="4570879">Name</span><span class="op" id="4570883">,</span>&nbsp;<span class="ident" id="4570885">e</span><span class="op" id="4570886">.</span><span class="ident" id="4570887">Line</span><span class="op" id="4570891">,</span>&nbsp;<span class="ident" id="4570893">e</span><span class="op" id="4570894">.</span><span class="ident" id="4570895">Description</span><span class="op" id="4570906">)</span><br>
+<span class="lineno">195</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="4570909">case</span>&nbsp;<span class="ident" id="4570914">e</span><span class="op" id="4570915">.</span><span class="ident" id="4570916">Name</span>&nbsp;<span class="op" id="4570921">!=</span>&nbsp;<span class="string" id="4570924">&#34;&#34;</span><span class="op" id="4570926">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="4570930">return</span>&nbsp;<span class="ident" id="4570937">fmt</span><span class="op" id="4570940">.</span><span class="ident" id="4570941">Sprintf</span><span class="op" id="4570948">(</span><span class="string" id="4570949">&#34;html/template:%s:&nbsp;%s&#34;</span><span class="op" id="4570971">,</span>&nbsp;<span class="ident" id="4570973">e</span><span class="op" id="4570974">.</span><span class="ident" id="4570975">Name</span><span class="op" id="4570979">,</span>&nbsp;<span class="ident" id="4570981">e</span><span class="op" id="4570982">.</span><span class="ident" id="4570983">Description</span><span class="op" id="4570994">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="4570997">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="4571000">return</span>&nbsp;<span class="string" id="4571007">&#34;html/template:&nbsp;&#34;</span>&nbsp;<span class="op" id="4571025">+</span>&nbsp;<span class="ident" id="4571027">e</span><span class="op" id="4571028">.</span><span class="ident" id="4571029">Description</span><br>
+<span class="lineno"></span><span class="op" id="4571041">}</span><br>
+<span class="lineno">200</span><br>
+<span class="lineno"></span><span class="comment" id="4571044">//&nbsp;errorf&nbsp;creates&nbsp;an&nbsp;error&nbsp;given&nbsp;a&nbsp;format&nbsp;string&nbsp;f&nbsp;and&nbsp;args.</span><br>
+<span class="lineno"></span><span class="comment" id="4571105">//&nbsp;The&nbsp;template&nbsp;Name&nbsp;still&nbsp;needs&nbsp;to&nbsp;be&nbsp;supplied.</span><br>
+<span class="lineno"></span><span class="keyword" id="4571154">func</span>&nbsp;<span class="ident" id="4571159">errorf</span><span class="op" id="4571165">(</span><span class="ident" id="4571166">k</span>&nbsp;<span class="ident" id="4571168">ErrorCode</span><span class="op" id="4571177">,</span>&nbsp;<span class="ident" id="4571179">node</span>&nbsp;<span class="ident" id="4571184">parse</span><span class="op" id="4571189">.</span><span class="ident" id="4571190">Node</span><span class="op" id="4571194">,</span>&nbsp;<span class="ident" id="4571196">line</span>&nbsp;<span class="builtintype" id="4571201">int</span><span class="op" id="4571204">,</span>&nbsp;<span class="ident" id="4571206">f</span>&nbsp;<span class="builtintype" id="4571208">string</span><span class="op" id="4571214">,</span>&nbsp;<span class="ident" id="4571216">args</span>&nbsp;<span class="op" id="4571221">...</span><span class="keyword" id="4571224">interface</span><span class="op" id="4571233">{</span><span class="op" id="4571234">}</span><span class="op" id="4571235">)</span>&nbsp;<span class="op" id="4571237">*</span><span class="ident" id="4571238">Error</span>&nbsp;<span class="op" id="4571244">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="4571247">return</span>&nbsp;<span class="op" id="4571254">&amp;</span><span class="ident" id="4571255">Error</span><span class="op" id="4571260">{</span><span class="ident" id="4571261">k</span><span class="op" id="4571262">,</span>&nbsp;<span class="ident" id="4571264">node</span><span class="op" id="4571268">,</span>&nbsp;<span class="string" id="4571270">&#34;&#34;</span><span class="op" id="4571272">,</span>&nbsp;<span class="ident" id="4571274">line</span><span class="op" id="4571278">,</span>&nbsp;<span class="ident" id="4571280">fmt</span><span class="op" id="4571283">.</span><span class="ident" id="4571284">Sprintf</span><span class="op" id="4571291">(</span><span class="ident" id="4571292">f</span><span class="op" id="4571293">,</span>&nbsp;<span class="ident" id="4571295">args</span><span class="op" id="4571299">...</span><span class="op" id="4571302">)</span><span class="op" id="4571303">}</span><br>
+<span class="lineno">205</span><span class="op" id="4571305">}</span>
+</div>
+</body>
+</html>

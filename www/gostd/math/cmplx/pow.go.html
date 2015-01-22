@@ -1,0 +1,93 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment" id="5870604">//&nbsp;Copyright&nbsp;2010&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment" id="5870659">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment" id="5870713">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword" id="5870764">package</span>&nbsp;<span class="ident" id="5870772">cmplx</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="5870779">import</span>&nbsp;<span class="string" id="5870786">&#34;math&#34;</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="5870794">//&nbsp;The&nbsp;original&nbsp;C&nbsp;code,&nbsp;the&nbsp;long&nbsp;comment,&nbsp;and&nbsp;the&nbsp;constants</span><br>
+<span class="lineno">10</span><span class="comment" id="5870854">//&nbsp;below&nbsp;are&nbsp;from&nbsp;http://netlib.sandia.gov/cephes/c9x-complex/clog.c.</span><br>
+<span class="lineno"></span><span class="comment" id="5870924">//&nbsp;The&nbsp;go&nbsp;code&nbsp;is&nbsp;a&nbsp;simplified&nbsp;version&nbsp;of&nbsp;the&nbsp;original&nbsp;C.</span><br>
+<span class="lineno"></span><span class="comment" id="5870982">//</span><br>
+<span class="lineno"></span><span class="comment" id="5870985">//&nbsp;Cephes&nbsp;Math&nbsp;Library&nbsp;Release&nbsp;2.8:&nbsp;&nbsp;June,&nbsp;2000</span><br>
+<span class="lineno"></span><span class="comment" id="5871033">//&nbsp;Copyright&nbsp;1984,&nbsp;1987,&nbsp;1989,&nbsp;1992,&nbsp;2000&nbsp;by&nbsp;Stephen&nbsp;L.&nbsp;Moshier</span><br>
+<span class="lineno">15</span><span class="comment" id="5871097">//</span><br>
+<span class="lineno"></span><span class="comment" id="5871100">//&nbsp;The&nbsp;readme&nbsp;file&nbsp;at&nbsp;http://netlib.sandia.gov/cephes/&nbsp;says:</span><br>
+<span class="lineno"></span><span class="comment" id="5871161">//&nbsp;&nbsp;&nbsp;&nbsp;Some&nbsp;software&nbsp;in&nbsp;this&nbsp;archive&nbsp;may&nbsp;be&nbsp;from&nbsp;the&nbsp;book&nbsp;_Methods&nbsp;and</span><br>
+<span class="lineno"></span><span class="comment" id="5871231">//&nbsp;Programs&nbsp;for&nbsp;Mathematical&nbsp;Functions_&nbsp;(Prentice-Hall&nbsp;or&nbsp;Simon&nbsp;&amp;&nbsp;Schuster</span><br>
+<span class="lineno"></span><span class="comment" id="5871306">//&nbsp;International,&nbsp;1989)&nbsp;or&nbsp;from&nbsp;the&nbsp;Cephes&nbsp;Mathematical&nbsp;Library,&nbsp;a</span><br>
+<span class="lineno">20</span><span class="comment" id="5871373">//&nbsp;commercial&nbsp;product.&nbsp;In&nbsp;either&nbsp;event,&nbsp;it&nbsp;is&nbsp;copyrighted&nbsp;by&nbsp;the&nbsp;author.</span><br>
+<span class="lineno"></span><span class="comment" id="5871446">//&nbsp;What&nbsp;you&nbsp;see&nbsp;here&nbsp;may&nbsp;be&nbsp;used&nbsp;freely&nbsp;but&nbsp;it&nbsp;comes&nbsp;with&nbsp;no&nbsp;support&nbsp;or</span><br>
+<span class="lineno"></span><span class="comment" id="5871518">//&nbsp;guarantee.</span><br>
+<span class="lineno"></span><span class="comment" id="5871532">//</span><br>
+<span class="lineno"></span><span class="comment" id="5871535">//&nbsp;&nbsp;&nbsp;The&nbsp;two&nbsp;known&nbsp;misprints&nbsp;in&nbsp;the&nbsp;book&nbsp;are&nbsp;repaired&nbsp;here&nbsp;in&nbsp;the</span><br>
+<span class="lineno">25</span><span class="comment" id="5871601">//&nbsp;source&nbsp;listings&nbsp;for&nbsp;the&nbsp;gamma&nbsp;function&nbsp;and&nbsp;the&nbsp;incomplete&nbsp;beta</span><br>
+<span class="lineno"></span><span class="comment" id="5871667">//&nbsp;integral.</span><br>
+<span class="lineno"></span><span class="comment" id="5871680">//</span><br>
+<span class="lineno"></span><span class="comment" id="5871683">//&nbsp;&nbsp;&nbsp;Stephen&nbsp;L.&nbsp;Moshier</span><br>
+<span class="lineno"></span><span class="comment" id="5871707">//&nbsp;&nbsp;&nbsp;moshier@na-net.ornl.gov</span><br>
+<span class="lineno">30</span><br>
+<span class="lineno"></span><span class="comment" id="5871737">//&nbsp;Complex&nbsp;power&nbsp;function</span><br>
+<span class="lineno"></span><span class="comment" id="5871763">//</span><br>
+<span class="lineno"></span><span class="comment" id="5871766">//&nbsp;DESCRIPTION:</span><br>
+<span class="lineno"></span><span class="comment" id="5871782">//</span><br>
+<span class="lineno">35</span><span class="comment" id="5871785">//&nbsp;Raises&nbsp;complex&nbsp;A&nbsp;to&nbsp;the&nbsp;complex&nbsp;Zth&nbsp;power.</span><br>
+<span class="lineno"></span><span class="comment" id="5871831">//&nbsp;Definition&nbsp;is&nbsp;per&nbsp;AMS55&nbsp;#&nbsp;4.2.8,</span><br>
+<span class="lineno"></span><span class="comment" id="5871867">//&nbsp;analytically&nbsp;equivalent&nbsp;to&nbsp;cpow(a,z)&nbsp;=&nbsp;cexp(z&nbsp;clog(a)).</span><br>
+<span class="lineno"></span><span class="comment" id="5871926">//</span><br>
+<span class="lineno"></span><span class="comment" id="5871929">//&nbsp;ACCURACY:</span><br>
+<span class="lineno">40</span><span class="comment" id="5871942">//</span><br>
+<span class="lineno"></span><span class="comment" id="5871945">//&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Relative&nbsp;error:</span><br>
+<span class="lineno"></span><span class="comment" id="5871985">//&nbsp;arithmetic&nbsp;&nbsp;&nbsp;domain&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;#&nbsp;trials&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;peak&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;rms</span><br>
+<span class="lineno"></span><span class="comment" id="5872043">//&nbsp;&nbsp;&nbsp;&nbsp;IEEE&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;-10,+10&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;30000&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;9.4e-15&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;1.5e-15</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">45</span><span class="comment" id="5872104">//&nbsp;Pow&nbsp;returns&nbsp;x**y,&nbsp;the&nbsp;base-x&nbsp;exponential&nbsp;of&nbsp;y.</span><br>
+<span class="lineno"></span><span class="comment" id="5872154">//&nbsp;For&nbsp;generalized&nbsp;compatibility&nbsp;with&nbsp;math.Pow:</span><br>
+<span class="lineno"></span><span class="comment" id="5872202">//&nbsp;&nbsp;&nbsp;&nbspPow(0,&nbsp;±0)&nbsp;returns&nbsp;1+0i</span><br>
+<span class="lineno"></span><span class="comment" id="5872230">//&nbsp;&nbsp;&nbsp;&nbspPow(0,&nbsp;c)&nbsp;for&nbsp;real(c)&lt;0&nbsp;returns&nbsp;Inf+0i&nbsp;if&nbsp;imag(c)&nbsp;is&nbsp;zero,&nbsp;otherwise&nbsp;Inf+Inf&nbsp;i.</span><br>
+<span class="lineno"></span><span class="keyword" id="5872313">func</span>&nbsp;<span class="ident" id="5872318">Pow</span><span class="op" id="5872321">(</span><span class="ident" id="5872322">x</span><span class="op" id="5872323">,</span>&nbsp;<span class="ident" id="5872325">y</span>&nbsp;<span class="builtintype" id="5872327">complex128</span><span class="op" id="5872337">)</span>&nbsp;<span class="builtintype" id="5872339">complex128</span>&nbsp;<span class="op" id="5872350">{</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="5872353">if</span>&nbsp;<span class="ident" id="5872356">x</span>&nbsp;<span class="op" id="5872358">==</span>&nbsp;<span class="num" id="5872361">0</span>&nbsp;<span class="op" id="5872363">{</span>&nbsp;<span class="comment" id="5872365">//&nbsp;Guaranteed&nbsp;also&nbsp;true&nbsp;for&nbsp;x&nbsp;==&nbsp;-0.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5872404">r</span><span class="op" id="5872405">,</span>&nbsp;<span class="ident" id="5872407">i</span>&nbsp;<span class="op" id="5872409">:=</span>&nbsp;<span class="builtinfunc" id="5872412">real</span><span class="op" id="5872416">(</span><span class="ident" id="5872417">y</span><span class="op" id="5872418">)</span><span class="op" id="5872419">,</span>&nbsp;<span class="builtinfunc" id="5872421">imag</span><span class="op" id="5872425">(</span><span class="ident" id="5872426">y</span><span class="op" id="5872427">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="5872431">switch</span>&nbsp;<span class="op" id="5872438">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="5872442">case</span>&nbsp;<span class="ident" id="5872447">r</span>&nbsp;<span class="op" id="5872449">==</span>&nbsp;<span class="num" id="5872452">0</span><span class="op" id="5872453">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="5872458">return</span>&nbsp;<span class="num" id="5872465">1</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="5872469">case</span>&nbsp;<span class="ident" id="5872474">r</span>&nbsp;<span class="op" id="5872476">&lt;</span>&nbsp;<span class="num" id="5872478">0</span><span class="op" id="5872479">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="5872484">if</span>&nbsp;<span class="ident" id="5872487">i</span>&nbsp;<span class="op" id="5872489">==</span>&nbsp;<span class="num" id="5872492">0</span>&nbsp;<span class="op" id="5872494">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="5872500">return</span>&nbsp;<span class="builtinfunc" id="5872507">complex</span><span class="op" id="5872514">(</span><span class="ident" id="5872515">math</span><span class="op" id="5872519">.</span><span class="ident" id="5872520">Inf</span><span class="op" id="5872523">(</span><span class="num" id="5872524">1</span><span class="op" id="5872525">)</span><span class="op" id="5872526">,</span>&nbsp;<span class="num" id="5872528">0</span><span class="op" id="5872529">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="5872534">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="5872539">return</span>&nbsp;<span class="ident" id="5872546">Inf</span><span class="op" id="5872549">(</span><span class="op" id="5872550">)</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="5872554">case</span>&nbsp;<span class="ident" id="5872559">r</span>&nbsp;<span class="op" id="5872561">&gt;</span>&nbsp;<span class="num" id="5872563">0</span><span class="op" id="5872564">:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="5872569">return</span>&nbsp;<span class="num" id="5872576">0</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="5872580">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc" id="5872584">panic</span><span class="op" id="5872589">(</span><span class="string" id="5872590">&#34;not&nbsp;reached&#34;</span><span class="op" id="5872603">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="5872606">}</span><br>
+<span class="lineno">65</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5872609">modulus</span>&nbsp;<span class="op" id="5872617">:=</span>&nbsp;<span class="ident" id="5872620">Abs</span><span class="op" id="5872623">(</span><span class="ident" id="5872624">x</span><span class="op" id="5872625">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="5872628">if</span>&nbsp;<span class="ident" id="5872631">modulus</span>&nbsp;<span class="op" id="5872639">==</span>&nbsp;<span class="num" id="5872642">0</span>&nbsp;<span class="op" id="5872644">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="5872648">return</span>&nbsp;<span class="builtinfunc" id="5872655">complex</span><span class="op" id="5872662">(</span><span class="num" id="5872663">0</span><span class="op" id="5872664">,</span>&nbsp;<span class="num" id="5872666">0</span><span class="op" id="5872667">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="5872670">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5872673">r</span>&nbsp;<span class="op" id="5872675">:=</span>&nbsp;<span class="ident" id="5872678">math</span><span class="op" id="5872682">.</span><span class="ident" id="5872683">Pow</span><span class="op" id="5872686">(</span><span class="ident" id="5872687">modulus</span><span class="op" id="5872694">,</span>&nbsp;<span class="builtinfunc" id="5872696">real</span><span class="op" id="5872700">(</span><span class="ident" id="5872701">y</span><span class="op" id="5872702">)</span><span class="op" id="5872703">)</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5872706">arg</span>&nbsp;<span class="op" id="5872710">:=</span>&nbsp;<span class="ident" id="5872713">Phase</span><span class="op" id="5872718">(</span><span class="ident" id="5872719">x</span><span class="op" id="5872720">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5872723">theta</span>&nbsp;<span class="op" id="5872729">:=</span>&nbsp;<span class="builtinfunc" id="5872732">real</span><span class="op" id="5872736">(</span><span class="ident" id="5872737">y</span><span class="op" id="5872738">)</span>&nbsp;<span class="op" id="5872740">*</span>&nbsp;<span class="ident" id="5872742">arg</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="5872747">if</span>&nbsp;<span class="builtinfunc" id="5872750">imag</span><span class="op" id="5872754">(</span><span class="ident" id="5872755">y</span><span class="op" id="5872756">)</span>&nbsp;<span class="op" id="5872758">!=</span>&nbsp;<span class="num" id="5872761">0</span>&nbsp;<span class="op" id="5872763">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5872767">r</span>&nbsp;<span class="op" id="5872769">*=</span>&nbsp;<span class="ident" id="5872772">math</span><span class="op" id="5872776">.</span><span class="ident" id="5872777">Exp</span><span class="op" id="5872780">(</span><span class="op" id="5872781">-</span><span class="builtinfunc" id="5872782">imag</span><span class="op" id="5872786">(</span><span class="ident" id="5872787">y</span><span class="op" id="5872788">)</span>&nbsp;<span class="op" id="5872790">*</span>&nbsp;<span class="ident" id="5872792">arg</span><span class="op" id="5872795">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5872799">theta</span>&nbsp;<span class="op" id="5872805">+=</span>&nbsp;<span class="builtinfunc" id="5872808">imag</span><span class="op" id="5872812">(</span><span class="ident" id="5872813">y</span><span class="op" id="5872814">)</span>&nbsp;<span class="op" id="5872816">*</span>&nbsp;<span class="ident" id="5872818">math</span><span class="op" id="5872822">.</span><span class="ident" id="5872823">Log</span><span class="op" id="5872826">(</span><span class="ident" id="5872827">modulus</span><span class="op" id="5872834">)</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="5872837">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5872840">s</span><span class="op" id="5872841">,</span>&nbsp;<span class="ident" id="5872843">c</span>&nbsp;<span class="op" id="5872845">:=</span>&nbsp;<span class="ident" id="5872848">math</span><span class="op" id="5872852">.</span><span class="ident" id="5872853">Sincos</span><span class="op" id="5872859">(</span><span class="ident" id="5872860">theta</span><span class="op" id="5872865">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="5872868">return</span>&nbsp;<span class="builtinfunc" id="5872875">complex</span><span class="op" id="5872882">(</span><span class="ident" id="5872883">r</span><span class="op" id="5872884">*</span><span class="ident" id="5872885">c</span><span class="op" id="5872886">,</span>&nbsp;<span class="ident" id="5872888">r</span><span class="op" id="5872889">*</span><span class="ident" id="5872890">s</span><span class="op" id="5872891">)</span><br>
+<span class="lineno"></span><span class="op" id="5872893">}</span>
+</div>
+</body>
+</html>

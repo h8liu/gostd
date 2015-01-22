@@ -1,0 +1,72 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment" id="153617">//&nbsp;Copyright&nbsp;2014&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment" id="153672">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment" id="153726">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="keyword" id="153777">package</span>&nbsp;<span class="ident" id="153785">tls_test</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="153795">import</span>&nbsp;<span class="op" id="153802">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="153805">&#34;crypto/tls&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="153819">&#34;crypto/x509&#34;</span><br>
+<span class="lineno">10</span><span class="op" id="153833">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="153836">func</span>&nbsp;<span class="ident" id="153841">ExampleDial</span><span class="op" id="153852">(</span><span class="op" id="153853">)</span>&nbsp;<span class="op" id="153855">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="153858">//&nbsp;Connecting&nbsp;with&nbsp;a&nbsp;custom&nbsp;root-certificate&nbsp;set.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">15</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="153910">const</span>&nbsp;<span class="ident" id="153916">rootPEM</span>&nbsp;<span class="op" id="153924">=</span>&nbsp;<span class="string" id="153926">`<br>
+<span class="lineno"></span>-----BEGIN&nbsp;CERTIFICATE-----<br>
+<span class="lineno"></span>MIIEBDCCAuygAwIBAgIDAjppMA0GCSqGSIb3DQEBBQUAMEIxCzAJBgNVBAYTAlVT<br>
+<span class="lineno"></span>MRYwFAYDVQQKEw1HZW9UcnVzdCBJbmMuMRswGQYDVQQDExJHZW9UcnVzdCBHbG9i<br>
+<span class="lineno"></span>YWwgQ0EwHhcNMTMwNDA1MTUxNTU1WhcNMTUwNDA0MTUxNTU1WjBJMQswCQYDVQQG<br>
+<span class="lineno">20</span>EwJVUzETMBEGA1UEChMKR29vZ2xlIEluYzElMCMGA1UEAxMcR29vZ2xlIEludGVy<br>
+<span class="lineno"></span>bmV0IEF1dGhvcml0eSBHMjCCASIwDQYJKoZIhvcNAQEBBQADggEPADCCAQoCggEB<br>
+<span class="lineno"></span>AJwqBHdc2FCROgajguDYUEi8iT/xGXAaiEZ+4I/F8YnOIe5a/mENtzJEiaB0C1NP<br>
+<span class="lineno"></span>VaTOgmKV7utZX8bhBYASxF6UP7xbSDj0U/ck5vuR6RXEz/RTDfRK/J9U3n2+oGtv<br>
+<span class="lineno"></span>h8DQUB8oMANA2ghzUWx//zo8pzcGjr1LEQTrfSTe5vn8MXH7lNVg8y5Kr0LSy+rE<br>
+<span class="lineno">25</span>ahqyzFPdFUuLH8gZYR/Nnag+YyuENWllhMgZxUYi+FOVvuOAShDGKuy6lyARxzmZ<br>
+<span class="lineno"></span>EASg8GF6lSWMTlJ14rbtCMoU/M4iarNOz0YDl5cDfsCx3nuvRTPPuj5xt970JSXC<br>
+<span class="lineno"></span>DTWJnZ37DhF5iR43xa+OcmkCAwEAAaOB+zCB+DAfBgNVHSMEGDAWgBTAephojYn7<br>
+<span class="lineno"></span>qwVkDBF9qn1luMrMTjAdBgNVHQ4EFgQUSt0GFhu89mi1dvWBtrtiGrpagS8wEgYD<br>
+<span class="lineno"></span>VR0TAQH/BAgwBgEB/wIBADAOBgNVHQ8BAf8EBAMCAQYwOgYDVR0fBDMwMTAvoC2g<br>
+<span class="lineno">30</span>K4YpaHR0cDovL2NybC5nZW90cnVzdC5jb20vY3Jscy9ndGdsb2JhbC5jcmwwPQYI<br>
+<span class="lineno"></span>KwYBBQUHAQEEMTAvMC0GCCsGAQUFBzABhiFodHRwOi8vZ3RnbG9iYWwtb2NzcC5n<br>
+<span class="lineno"></span>ZW90cnVzdC5jb20wFwYDVR0gBBAwDjAMBgorBgEEAdZ5AgUBMA0GCSqGSIb3DQEB<br>
+<span class="lineno"></span>BQUAA4IBAQA21waAESetKhSbOHezI6B1WLuxfoNCunLaHtiONgaX4PCVOzf9G0JY<br>
+<span class="lineno"></span>/iLIa704XtE7JW4S615ndkZAkNoUyHgN7ZVm2o6Gb4ChulYylYbc3GrKBIxbf/a/<br>
+<span class="lineno">35</span>zG+FA1jDaFETzf3I93k9mTXwVqO94FntT0QJo544evZG0R0SnU++0ED8Vf4GXjza<br>
+<span class="lineno"></span>HFa9llF7b1cq26KqltyMdMKVvvBulRP/F/A8rLIQjcxz++iPAsbw+zOzlTvjwsto<br>
+<span class="lineno"></span>WHPbqCRiOwY1nQ2pM714A5AuTHhdUDqB1O6gyHA43LL5Z/qHQF1hwFGPa4NrzQU6<br>
+<span class="lineno"></span>yuGnBXj8ytqU0CwIPX4WecigUCAkVDNx<br>
+<span class="lineno"></span>-----END&nbsp;CERTIFICATE-----`</span><br>
+<span class="lineno">40</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="155383">//&nbsp;First,&nbsp;create&nbsp;the&nbsp;set&nbsp;of&nbsp;root&nbsp;certificates.&nbsp;For&nbsp;this&nbsp;example&nbsp;we&nbsp;only</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="155456">//&nbsp;have&nbsp;one.&nbsp;It&#39;s&nbsp;also&nbsp;possible&nbsp;to&nbsp;omit&nbsp;this&nbsp;in&nbsp;order&nbsp;to&nbsp;use&nbsp;the</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="155522">//&nbsp;default&nbsp;root&nbsp;set&nbsp;of&nbsp;the&nbsp;current&nbsp;operating&nbsp;system.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="155576">roots</span>&nbsp;<span class="op" id="155582">:=</span>&nbsp;<span class="ident" id="155585">x509</span><span class="op" id="155589">.</span><span class="ident" id="155590">NewCertPool</span><span class="op" id="155601">(</span><span class="op" id="155602">)</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="155605">ok</span>&nbsp;<span class="op" id="155608">:=</span>&nbsp;<span class="ident" id="155611">roots</span><span class="op" id="155616">.</span><span class="ident" id="155617">AppendCertsFromPEM</span><span class="op" id="155635">(</span><span class="op" id="155636">[</span><span class="op" id="155637">]</span><span class="builtintype" id="155638">byte</span><span class="op" id="155642">(</span><span class="ident" id="155643">rootPEM</span><span class="op" id="155650">)</span><span class="op" id="155651">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="155654">if</span>&nbsp;<span class="op" id="155657">!</span><span class="ident" id="155658">ok</span>&nbsp;<span class="op" id="155661">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc" id="155665">panic</span><span class="op" id="155670">(</span><span class="string" id="155671">&#34;failed&nbsp;to&nbsp;parse&nbsp;root&nbsp;certificate&#34;</span><span class="op" id="155705">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="155708">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="155712">conn</span><span class="op" id="155716">,</span>&nbsp;<span class="ident" id="155718">err</span>&nbsp;<span class="op" id="155722">:=</span>&nbsp;<span class="ident" id="155725">tls</span><span class="op" id="155728">.</span><span class="ident" id="155729">Dial</span><span class="op" id="155733">(</span><span class="string" id="155734">&#34;tcp&#34;</span><span class="op" id="155739">,</span>&nbsp;<span class="string" id="155741">&#34;mail.google.com:443&#34;</span><span class="op" id="155762">,</span>&nbsp;<span class="op" id="155764">&amp;</span><span class="ident" id="155765">tls</span><span class="op" id="155768">.</span><span class="ident" id="155769">Config</span><span class="op" id="155775">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="155779">RootCAs</span><span class="op" id="155786">:</span>&nbsp;<span class="ident" id="155788">roots</span><span class="op" id="155793">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="155796">}</span><span class="op" id="155797">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="155800">if</span>&nbsp;<span class="ident" id="155803">err</span>&nbsp;<span class="op" id="155807">!=</span>&nbsp;<span class="ident" id="155810">nil</span>&nbsp;<span class="op" id="155814">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc" id="155818">panic</span><span class="op" id="155823">(</span><span class="string" id="155824">&#34;failed&nbsp;to&nbsp;connect:&nbsp;&#34;</span>&nbsp;<span class="op" id="155846">+</span>&nbsp;<span class="ident" id="155848">err</span><span class="op" id="155851">.</span><span class="ident" id="155852">Error</span><span class="op" id="155857">(</span><span class="op" id="155858">)</span><span class="op" id="155859">)</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="155862">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="155865">conn</span><span class="op" id="155869">.</span><span class="ident" id="155870">Close</span><span class="op" id="155875">(</span><span class="op" id="155876">)</span><br>
+<span class="lineno"></span><span class="op" id="155878">}</span>
+</div>
+</body>
+</html>

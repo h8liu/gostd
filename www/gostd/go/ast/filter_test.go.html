@@ -1,0 +1,101 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment" id="270338">//&nbsp;Copyright&nbsp;2013&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment" id="270393">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment" id="270447">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="comment" id="270498">//&nbsp;To&nbsp;avoid&nbsp;a&nbsp;cyclic&nbsp;dependency&nbsp;with&nbsp;go/parser,&nbsp;this&nbsp;file&nbsp;is&nbsp;in&nbsp;a&nbsp;separate&nbsp;package.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="270583">package</span>&nbsp;<span class="ident" id="270591">ast_test</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="270601">import</span>&nbsp;<span class="op" id="270608">(</span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="270611">&#34;bytes&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="270620">&#34;go/ast&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="270630">&#34;go/format&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="270643">&#34;go/parser&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="270656">&#34;go/token&#34;</span><br>
+<span class="lineno">15</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="270668">&#34;testing&#34;</span><br>
+<span class="lineno"></span><span class="op" id="270678">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="270681">const</span>&nbsp;<span class="ident" id="270687">input</span>&nbsp;<span class="op" id="270693">=</span>&nbsp;<span class="string" id="270695">`package&nbsp;p<br>
+<span class="lineno"></span><br>
+<span class="lineno">20</span>type&nbsp;t1&nbsp;struct{}<br>
+<span class="lineno"></span>type&nbsp;t2&nbsp;struct{}<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>func&nbsp;f1()&nbsp;{}<br>
+<span class="lineno"></span>func&nbsp;f1()&nbsp;{}<br>
+<span class="lineno">25</span>func&nbsp;f2()&nbsp;{}<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>func&nbsp;(*t1)&nbsp;f1()&nbsp;{}<br>
+<span class="lineno"></span>func&nbsp;(t1)&nbsp;f1()&nbsp;{}<br>
+<span class="lineno"></span>func&nbsp;(t1)&nbsp;f2()&nbsp;{}<br>
+<span class="lineno">30</span><br>
+<span class="lineno"></span>func&nbsp;(t2)&nbsp;f1()&nbsp;{}<br>
+<span class="lineno"></span>func&nbsp;(t2)&nbsp;f2()&nbsp;{}<br>
+<span class="lineno"></span>func&nbsp;(x&nbsp;*t2)&nbsp;f2()&nbsp;{}<br>
+<span class="lineno"></span>`</span><br>
+<span class="lineno">35</span><br>
+<span class="lineno"></span><span class="comment" id="270898">//&nbsp;Calling&nbsp;ast.MergePackageFiles&nbsp;with&nbsp;ast.FilterFuncDuplicates</span><br>
+<span class="lineno"></span><span class="comment" id="270961">//&nbsp;keeps&nbsp;a&nbsp;duplicate&nbsp;entry&nbsp;with&nbsp;attached&nbsp;documentation&nbsp;in&nbsp;favor</span><br>
+<span class="lineno"></span><span class="comment" id="271025">//&nbsp;of&nbsp;one&nbsp;without,&nbsp;and&nbsp;it&nbsp;favors&nbsp;duplicate&nbsp;entries&nbsp;appearing</span><br>
+<span class="lineno"></span><span class="comment" id="271086">//&nbsp;later&nbsp;in&nbsp;the&nbsp;source&nbsp;over&nbsp;ones&nbsp;appearing&nbsp;earlier.&nbsp;This&nbsp;is&nbsp;why</span><br>
+<span class="lineno">40</span><span class="comment" id="271150">//&nbsp;(*t2).f2&nbsp;is&nbsp;kept&nbsp;and&nbsp;t2.f2&nbsp;is&nbsp;eliminated&nbsp;in&nbsp;this&nbsp;test&nbsp;case.</span><br>
+<span class="lineno"></span><span class="comment" id="271213">//</span><br>
+<span class="lineno"></span><span class="keyword" id="271216">const</span>&nbsp;<span class="ident" id="271222">golden</span>&nbsp;<span class="op" id="271229">=</span>&nbsp;<span class="string" id="271231">`package&nbsp;p<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>type&nbsp;t1&nbsp;struct{}<br>
+<span class="lineno">45</span>type&nbsp;t2&nbsp;struct{}<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>func&nbsp;f1()&nbsp;{}<br>
+<span class="lineno"></span>func&nbsp;f2()&nbsp;{}<br>
+<span class="lineno"></span><br>
+<span class="lineno">50</span>func&nbsp;(t1)&nbsp;f1()&nbsp;{}<br>
+<span class="lineno"></span>func&nbsp;(t1)&nbsp;f2()&nbsp;{}<br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>func&nbsp;(t2)&nbsp;f1()&nbsp;{}<br>
+<span class="lineno"></span><br>
+<span class="lineno">55</span>func&nbsp;(x&nbsp;*t2)&nbsp;f2()&nbsp;{}<br>
+<span class="lineno"></span>`</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="271385">func</span>&nbsp;<span class="ident" id="271390">TestFilterDuplicates</span><span class="op" id="271410">(</span><span class="ident" id="271411">t</span>&nbsp;<span class="op" id="271413">*</span><span class="ident" id="271414">testing</span><span class="op" id="271421">.</span><span class="ident" id="271422">T</span><span class="op" id="271423">)</span>&nbsp;<span class="op" id="271425">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="271428">//&nbsp;parse&nbsp;input</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="271444">fset</span>&nbsp;<span class="op" id="271449">:=</span>&nbsp;<span class="ident" id="271452">token</span><span class="op" id="271457">.</span><span class="ident" id="271458">NewFileSet</span><span class="op" id="271468">(</span><span class="op" id="271469">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="271472">file</span><span class="op" id="271476">,</span>&nbsp;<span class="ident" id="271478">err</span>&nbsp;<span class="op" id="271482">:=</span>&nbsp;<span class="ident" id="271485">parser</span><span class="op" id="271491">.</span><span class="ident" id="271492">ParseFile</span><span class="op" id="271501">(</span><span class="ident" id="271502">fset</span><span class="op" id="271506">,</span>&nbsp;<span class="string" id="271508">&#34;&#34;</span><span class="op" id="271510">,</span>&nbsp;<span class="ident" id="271512">input</span><span class="op" id="271517">,</span>&nbsp;<span class="num" id="271519">0</span><span class="op" id="271520">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="271523">if</span>&nbsp;<span class="ident" id="271526">err</span>&nbsp;<span class="op" id="271530">!=</span>&nbsp;<span class="ident" id="271533">nil</span>&nbsp;<span class="op" id="271537">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="271541">t</span><span class="op" id="271542">.</span><span class="ident" id="271543">Fatal</span><span class="op" id="271548">(</span><span class="ident" id="271549">err</span><span class="op" id="271552">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="271555">}</span><br>
+<span class="lineno">65</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="271559">//&nbsp;create&nbsp;package</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="271578">files</span>&nbsp;<span class="op" id="271584">:=</span>&nbsp;<span class="keyword" id="271587">map</span><span class="op" id="271590">[</span><span class="builtintype" id="271591">string</span><span class="op" id="271597">]</span><span class="op" id="271598">*</span><span class="ident" id="271599">ast</span><span class="op" id="271602">.</span><span class="ident" id="271603">File</span><span class="op" id="271607">{</span><span class="string" id="271608">&#34;&#34;</span><span class="op" id="271610">:</span>&nbsp;<span class="ident" id="271612">file</span><span class="op" id="271616">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="271619">pkg</span><span class="op" id="271622">,</span>&nbsp;<span class="ident" id="271624">err</span>&nbsp;<span class="op" id="271628">:=</span>&nbsp;<span class="ident" id="271631">ast</span><span class="op" id="271634">.</span><span class="ident" id="271635">NewPackage</span><span class="op" id="271645">(</span><span class="ident" id="271646">fset</span><span class="op" id="271650">,</span>&nbsp;<span class="ident" id="271652">files</span><span class="op" id="271657">,</span>&nbsp;<span class="ident" id="271659">nil</span><span class="op" id="271662">,</span>&nbsp;<span class="ident" id="271664">nil</span><span class="op" id="271667">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="271670">if</span>&nbsp;<span class="ident" id="271673">err</span>&nbsp;<span class="op" id="271677">!=</span>&nbsp;<span class="ident" id="271680">nil</span>&nbsp;<span class="op" id="271684">{</span><br>
+<span class="lineno">70</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="271688">t</span><span class="op" id="271689">.</span><span class="ident" id="271690">Fatal</span><span class="op" id="271695">(</span><span class="ident" id="271696">err</span><span class="op" id="271699">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="271702">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="271706">//&nbsp;filter</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="271717">merged</span>&nbsp;<span class="op" id="271724">:=</span>&nbsp;<span class="ident" id="271727">ast</span><span class="op" id="271730">.</span><span class="ident" id="271731">MergePackageFiles</span><span class="op" id="271748">(</span><span class="ident" id="271749">pkg</span><span class="op" id="271752">,</span>&nbsp;<span class="ident" id="271754">ast</span><span class="op" id="271757">.</span><span class="ident" id="271758">FilterFuncDuplicates</span><span class="op" id="271778">)</span><br>
+<span class="lineno">75</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="271782">//&nbsp;pretty-print</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="271799">var</span>&nbsp;<span class="ident" id="271803">buf</span>&nbsp;<span class="ident" id="271807">bytes</span><span class="op" id="271812">.</span><span class="ident" id="271813">Buffer</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="271821">if</span>&nbsp;<span class="ident" id="271824">err</span>&nbsp;<span class="op" id="271828">:=</span>&nbsp;<span class="ident" id="271831">format</span><span class="op" id="271837">.</span><span class="ident" id="271838">Node</span><span class="op" id="271842">(</span><span class="op" id="271843">&amp;</span><span class="ident" id="271844">buf</span><span class="op" id="271847">,</span>&nbsp;<span class="ident" id="271849">fset</span><span class="op" id="271853">,</span>&nbsp;<span class="ident" id="271855">merged</span><span class="op" id="271861">)</span><span class="op" id="271862">;</span>&nbsp;<span class="ident" id="271864">err</span>&nbsp;<span class="op" id="271868">!=</span>&nbsp;<span class="ident" id="271871">nil</span>&nbsp;<span class="op" id="271875">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="271879">t</span><span class="op" id="271880">.</span><span class="ident" id="271881">Fatal</span><span class="op" id="271886">(</span><span class="ident" id="271887">err</span><span class="op" id="271890">)</span><br>
+<span class="lineno">80</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="271893">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="271896">output</span>&nbsp;<span class="op" id="271903">:=</span>&nbsp;<span class="ident" id="271906">buf</span><span class="op" id="271909">.</span><span class="ident" id="271910">String</span><span class="op" id="271916">(</span><span class="op" id="271917">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="271921">if</span>&nbsp;<span class="ident" id="271924">output</span>&nbsp;<span class="op" id="271931">!=</span>&nbsp;<span class="ident" id="271934">golden</span>&nbsp;<span class="op" id="271941">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="271945">t</span><span class="op" id="271946">.</span><span class="ident" id="271947">Errorf</span><span class="op" id="271953">(</span><span class="string" id="271954">&#34;incorrect&nbsp;output:\n%s&#34;</span><span class="op" id="271977">,</span>&nbsp;<span class="ident" id="271979">output</span><span class="op" id="271985">)</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="271988">}</span><br>
+<span class="lineno"></span><span class="op" id="271990">}</span>
+</div>
+</body>
+</html>

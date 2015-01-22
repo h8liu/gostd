@@ -1,0 +1,75 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment" id="5585003">//&nbsp;Copyright&nbsp;2010&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment" id="5585059">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment" id="5585113">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="comment" id="5585164">//&nbsp;+build&nbsp;darwin&nbsp;dragonfly&nbsp;freebsd&nbsp;linux&nbsp;nacl&nbsp;netbsd&nbsp;openbsd&nbsp;solaris</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="5585234">package</span>&nbsp;<span class="ident" id="5585242">exec</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="5585248">import</span>&nbsp;<span class="op" id="5585255">(</span><br>
+<span class="lineno">10</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="5585258">&#34;errors&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="5585268">&#34;os&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="5585274">&#34;strings&#34;</span><br>
+<span class="lineno"></span><span class="op" id="5585284">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">15</span><span class="comment" id="5585287">//&nbsp;ErrNotFound&nbsp;is&nbsp;the&nbsp;error&nbsp;resulting&nbsp;if&nbsp;a&nbsp;path&nbsp;search&nbsp;failed&nbsp;to&nbsp;find&nbsp;an&nbsp;executable&nbsp;file.</span><br>
+<span class="lineno"></span><span class="keyword" id="5585377">var</span>&nbsp;<span class="ident" id="5585381">ErrNotFound</span>&nbsp;<span class="op" id="5585393">=</span>&nbsp;<span class="ident" id="5585395">errors</span><span class="op" id="5585401">.</span><span class="ident" id="5585402">New</span><span class="op" id="5585405">(</span><span class="string" id="5585406">&#34;executable&nbsp;file&nbsp;not&nbsp;found&nbsp;in&nbsp;$PATH&#34;</span><span class="op" id="5585442">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="5585445">func</span>&nbsp;<span class="ident" id="5585450">findExecutable</span><span class="op" id="5585464">(</span><span class="ident" id="5585465">file</span>&nbsp;<span class="builtintype" id="5585470">string</span><span class="op" id="5585476">)</span>&nbsp;<span class="builtintype" id="5585478">error</span>&nbsp;<span class="op" id="5585484">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5585487">d</span><span class="op" id="5585488">,</span>&nbsp;<span class="ident" id="5585490">err</span>&nbsp;<span class="op" id="5585494">:=</span>&nbsp;<span class="ident" id="5585497">os</span><span class="op" id="5585499">.</span><span class="ident" id="5585500">Stat</span><span class="op" id="5585504">(</span><span class="ident" id="5585505">file</span><span class="op" id="5585509">)</span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="5585512">if</span>&nbsp;<span class="ident" id="5585515">err</span>&nbsp;<span class="op" id="5585519">!=</span>&nbsp;<span class="ident" id="5585522">nil</span>&nbsp;<span class="op" id="5585526">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="5585530">return</span>&nbsp;<span class="ident" id="5585537">err</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="5585542">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="5585545">if</span>&nbsp;<span class="ident" id="5585548">m</span>&nbsp;<span class="op" id="5585550">:=</span>&nbsp;<span class="ident" id="5585553">d</span><span class="op" id="5585554">.</span><span class="ident" id="5585555">Mode</span><span class="op" id="5585559">(</span><span class="op" id="5585560">)</span><span class="op" id="5585561">;</span>&nbsp;<span class="op" id="5585563">!</span><span class="ident" id="5585564">m</span><span class="op" id="5585565">.</span><span class="ident" id="5585566">IsDir</span><span class="op" id="5585571">(</span><span class="op" id="5585572">)</span>&nbsp;<span class="op" id="5585574">&amp;&amp;</span>&nbsp;<span class="ident" id="5585577">m</span><span class="op" id="5585578">&amp;</span><span class="num" id="5585579">0111</span>&nbsp;<span class="op" id="5585584">!=</span>&nbsp;<span class="num" id="5585587">0</span>&nbsp;<span class="op" id="5585589">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="5585593">return</span>&nbsp;<span class="ident" id="5585600">nil</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="5585605">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="5585608">return</span>&nbsp;<span class="ident" id="5585615">os</span><span class="op" id="5585617">.</span><span class="ident" id="5585618">ErrPermission</span><br>
+<span class="lineno"></span><span class="op" id="5585632">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="5585635">//&nbsp;LookPath&nbsp;searches&nbsp;for&nbsp;an&nbsp;executable&nbsp;binary&nbsp;named&nbsp;file</span><br>
+<span class="lineno">30</span><span class="comment" id="5585692">//&nbsp;in&nbsp;the&nbsp;directories&nbsp;named&nbsp;by&nbsp;the&nbsp;PATH&nbsp;environment&nbsp;variable.</span><br>
+<span class="lineno"></span><span class="comment" id="5585754">//&nbsp;If&nbsp;file&nbsp;contains&nbsp;a&nbsp;slash,&nbsp;it&nbsp;is&nbsp;tried&nbsp;directly&nbsp;and&nbsp;the&nbsp;PATH&nbsp;is&nbsp;not&nbsp;consulted.</span><br>
+<span class="lineno"></span><span class="comment" id="5585835">//&nbsp;The&nbsp;result&nbsp;may&nbsp;be&nbsp;an&nbsp;absolute&nbsp;path&nbsp;or&nbsp;a&nbsp;path&nbsp;relative&nbsp;to&nbsp;the&nbsp;current&nbsp;directory.</span><br>
+<span class="lineno"></span><span class="keyword" id="5585918">func</span>&nbsp;<span class="ident" id="5585923">LookPath</span><span class="op" id="5585931">(</span><span class="ident" id="5585932">file</span>&nbsp;<span class="builtintype" id="5585937">string</span><span class="op" id="5585943">)</span>&nbsp;<span class="op" id="5585945">(</span><span class="builtintype" id="5585946">string</span><span class="op" id="5585952">,</span>&nbsp;<span class="builtintype" id="5585954">error</span><span class="op" id="5585959">)</span>&nbsp;<span class="op" id="5585961">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="5585964">//&nbsp;NOTE(rsc):&nbsp;I&nbsp;wish&nbsp;we&nbsp;could&nbsp;use&nbsp;the&nbsp;Plan&nbsp;9&nbsp;behavior&nbsp;here</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="5586024">//&nbsp;(only&nbsp;bypass&nbsp;the&nbsp;path&nbsp;if&nbsp;file&nbsp;begins&nbsp;with&nbsp;/&nbsp;or&nbsp;./&nbsp;or&nbsp;../)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="5586086">//&nbsp;but&nbsp;that&nbsp;would&nbsp;not&nbsp;match&nbsp;all&nbsp;the&nbsp;Unix&nbsp;shells.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="5586137">if</span>&nbsp;<span class="ident" id="5586140">strings</span><span class="op" id="5586147">.</span><span class="ident" id="5586148">Contains</span><span class="op" id="5586156">(</span><span class="ident" id="5586157">file</span><span class="op" id="5586161">,</span>&nbsp;<span class="string" id="5586163">&#34;/&#34;</span><span class="op" id="5586166">)</span>&nbsp;<span class="op" id="5586168">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5586172">err</span>&nbsp;<span class="op" id="5586176">:=</span>&nbsp;<span class="ident" id="5586179">findExecutable</span><span class="op" id="5586193">(</span><span class="ident" id="5586194">file</span><span class="op" id="5586198">)</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="5586202">if</span>&nbsp;<span class="ident" id="5586205">err</span>&nbsp;<span class="op" id="5586209">==</span>&nbsp;<span class="ident" id="5586212">nil</span>&nbsp;<span class="op" id="5586216">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="5586221">return</span>&nbsp;<span class="ident" id="5586228">file</span><span class="op" id="5586232">,</span>&nbsp;<span class="ident" id="5586234">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="5586240">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="5586244">return</span>&nbsp;<span class="string" id="5586251">&#34;&#34;</span><span class="op" id="5586253">,</span>&nbsp;<span class="op" id="5586255">&amp;</span><span class="ident" id="5586256">Error</span><span class="op" id="5586261">{</span><span class="ident" id="5586262">file</span><span class="op" id="5586266">,</span>&nbsp;<span class="ident" id="5586268">err</span><span class="op" id="5586271">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="5586274">}</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5586277">pathenv</span>&nbsp;<span class="op" id="5586285">:=</span>&nbsp;<span class="ident" id="5586288">os</span><span class="op" id="5586290">.</span><span class="ident" id="5586291">Getenv</span><span class="op" id="5586297">(</span><span class="string" id="5586298">&#34;PATH&#34;</span><span class="op" id="5586304">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="5586307">if</span>&nbsp;<span class="ident" id="5586310">pathenv</span>&nbsp;<span class="op" id="5586318">==</span>&nbsp;<span class="string" id="5586321">&#34;&#34;</span>&nbsp;<span class="op" id="5586324">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="5586328">return</span>&nbsp;<span class="string" id="5586335">&#34;&#34;</span><span class="op" id="5586337">,</span>&nbsp;<span class="op" id="5586339">&amp;</span><span class="ident" id="5586340">Error</span><span class="op" id="5586345">{</span><span class="ident" id="5586346">file</span><span class="op" id="5586350">,</span>&nbsp;<span class="ident" id="5586352">ErrNotFound</span><span class="op" id="5586363">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="5586366">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="5586369">for</span>&nbsp;<span class="ident" id="5586373">_</span><span class="op" id="5586374">,</span>&nbsp;<span class="ident" id="5586376">dir</span>&nbsp;<span class="op" id="5586380">:=</span>&nbsp;<span class="keyword" id="5586383">range</span>&nbsp;<span class="ident" id="5586389">strings</span><span class="op" id="5586396">.</span><span class="ident" id="5586397">Split</span><span class="op" id="5586402">(</span><span class="ident" id="5586403">pathenv</span><span class="op" id="5586410">,</span>&nbsp;<span class="string" id="5586412">&#34;:&#34;</span><span class="op" id="5586415">)</span>&nbsp;<span class="op" id="5586417">{</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="5586421">if</span>&nbsp;<span class="ident" id="5586424">dir</span>&nbsp;<span class="op" id="5586428">==</span>&nbsp;<span class="string" id="5586431">&#34;&#34;</span>&nbsp;<span class="op" id="5586434">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="5586439">//&nbsp;Unix&nbsp;shell&nbsp;semantics:&nbsp;path&nbsp;element&nbsp;&#34;&#34;&nbsp;means&nbsp;&#34;.&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5586493">dir</span>&nbsp;<span class="op" id="5586497">=</span>&nbsp;<span class="string" id="5586499">&#34;.&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="5586505">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="5586509">path</span>&nbsp;<span class="op" id="5586514">:=</span>&nbsp;<span class="ident" id="5586517">dir</span>&nbsp;<span class="op" id="5586521">+</span>&nbsp;<span class="string" id="5586523">&#34;/&#34;</span>&nbsp;<span class="op" id="5586527">+</span>&nbsp;<span class="ident" id="5586529">file</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="5586536">if</span>&nbsp;<span class="ident" id="5586539">err</span>&nbsp;<span class="op" id="5586543">:=</span>&nbsp;<span class="ident" id="5586546">findExecutable</span><span class="op" id="5586560">(</span><span class="ident" id="5586561">path</span><span class="op" id="5586565">)</span><span class="op" id="5586566">;</span>&nbsp;<span class="ident" id="5586568">err</span>&nbsp;<span class="op" id="5586572">==</span>&nbsp;<span class="ident" id="5586575">nil</span>&nbsp;<span class="op" id="5586579">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="5586584">return</span>&nbsp;<span class="ident" id="5586591">path</span><span class="op" id="5586595">,</span>&nbsp;<span class="ident" id="5586597">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="5586603">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="5586606">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="5586609">return</span>&nbsp;<span class="string" id="5586616">&#34;&#34;</span><span class="op" id="5586618">,</span>&nbsp;<span class="op" id="5586620">&amp;</span><span class="ident" id="5586621">Error</span><span class="op" id="5586626">{</span><span class="ident" id="5586627">file</span><span class="op" id="5586631">,</span>&nbsp;<span class="ident" id="5586633">ErrNotFound</span><span class="op" id="5586644">}</span><br>
+<span class="lineno">60</span><span class="op" id="5586646">}</span>
+</div>
+</body>
+</html>

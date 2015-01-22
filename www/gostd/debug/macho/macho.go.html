@@ -1,0 +1,331 @@
+<!doctype html>
+<html>
+
+<head>
+	<meta charset="utf-8" />
+	<title>Go standard library</title>
+	<link rel="stylesheet" type="text/css" href="/style.css">
+</head>
+
+<body>
+
+<div class="code">
+<span class="lineno">1</span><span class="comment" id="6440461">//&nbsp;Copyright&nbsp;2009&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment" id="6440517">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment" id="6440571">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">5</span><span class="comment" id="6440622">//&nbsp;Mach-O&nbsp;header&nbsp;data&nbsp;structures</span><br>
+<span class="lineno"></span><span class="comment" id="6440655">//&nbsp;http://developer.apple.com/mac/library/documentation/DeveloperTools/Conceptual/MachORuntime/Reference/reference.html</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="6440776">package</span>&nbsp;<span class="ident" id="6440784">macho</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">10</span><span class="keyword" id="6440791">import</span>&nbsp;<span class="string" id="6440798">&#34;strconv&#34;</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="6440809">//&nbsp;A&nbsp;FileHeader&nbsp;represents&nbsp;a&nbsp;Mach-O&nbsp;file&nbsp;header.</span><br>
+<span class="lineno"></span><span class="keyword" id="6440858">type</span>&nbsp;<span class="ident" id="6440863">FileHeader</span>&nbsp;<span class="keyword" id="6440874">struct</span>&nbsp;<span class="op" id="6440881">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6440884">Magic</span>&nbsp;&nbsp;<span class="builtintype" id="6440891">uint32</span><br>
+<span class="lineno">15</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6440899">Cpu</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="6440906">Cpu</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6440911">SubCpu</span>&nbsp;<span class="builtintype" id="6440918">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6440926">Type</span>&nbsp;&nbsp;&nbsp;<span class="ident" id="6440933">Type</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6440939">Ncmd</span>&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6440946">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6440954">Cmdsz</span>&nbsp;&nbsp;<span class="builtintype" id="6440961">uint32</span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6440969">Flags</span>&nbsp;&nbsp;<span class="builtintype" id="6440976">uint32</span><br>
+<span class="lineno"></span><span class="op" id="6440983">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="6440986">const</span>&nbsp;<span class="op" id="6440992">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6440995">fileHeaderSize32</span>&nbsp;<span class="op" id="6441012">=</span>&nbsp;<span class="num" id="6441014">7</span>&nbsp;<span class="op" id="6441016">*</span>&nbsp;<span class="num" id="6441018">4</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6441021">fileHeaderSize64</span>&nbsp;<span class="op" id="6441038">=</span>&nbsp;<span class="num" id="6441040">8</span>&nbsp;<span class="op" id="6441042">*</span>&nbsp;<span class="num" id="6441044">4</span><br>
+<span class="lineno"></span><span class="op" id="6441046">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="6441049">const</span>&nbsp;<span class="op" id="6441055">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6441058">Magic32</span>&nbsp;&nbsp;<span class="builtintype" id="6441067">uint32</span>&nbsp;<span class="op" id="6441074">=</span>&nbsp;<span class="num" id="6441076">0xfeedface</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6441088">Magic64</span>&nbsp;&nbsp;<span class="builtintype" id="6441097">uint32</span>&nbsp;<span class="op" id="6441104">=</span>&nbsp;<span class="num" id="6441106">0xfeedfacf</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6441118">MagicFat</span>&nbsp;<span class="builtintype" id="6441127">uint32</span>&nbsp;<span class="op" id="6441134">=</span>&nbsp;<span class="num" id="6441136">0xcafebabe</span><br>
+<span class="lineno"></span><span class="op" id="6441147">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="6441150">//&nbsp;A&nbsp;Type&nbsp;is&nbsp;the&nbsp;Mach-O&nbsp;file&nbsp;type,&nbsp;e.g.&nbsp;an&nbsp;object&nbsp;file,&nbsp;executable,&nbsp;or&nbsp;dynamic&nbsp;library.</span><br>
+<span class="lineno">35</span><span class="keyword" id="6441238">type</span>&nbsp;<span class="ident" id="6441243">Type</span>&nbsp;<span class="builtintype" id="6441248">uint32</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="6441256">const</span>&nbsp;<span class="op" id="6441262">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6441265">TypeObj</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="6441276">Type</span>&nbsp;<span class="op" id="6441281">=</span>&nbsp;<span class="num" id="6441283">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6441286">TypeExec</span>&nbsp;&nbsp;&nbsp;<span class="ident" id="6441297">Type</span>&nbsp;<span class="op" id="6441302">=</span>&nbsp;<span class="num" id="6441304">2</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6441307">TypeDylib</span>&nbsp;&nbsp;<span class="ident" id="6441318">Type</span>&nbsp;<span class="op" id="6441323">=</span>&nbsp;<span class="num" id="6441325">6</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6441328">TypeBundle</span>&nbsp;<span class="ident" id="6441339">Type</span>&nbsp;<span class="op" id="6441344">=</span>&nbsp;<span class="num" id="6441346">8</span><br>
+<span class="lineno"></span><span class="op" id="6441348">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="6441351">//&nbsp;A&nbsp;Cpu&nbsp;is&nbsp;a&nbsp;Mach-O&nbsp;cpu&nbsp;type.</span><br>
+<span class="lineno">45</span><span class="keyword" id="6441382">type</span>&nbsp;<span class="ident" id="6441387">Cpu</span>&nbsp;<span class="builtintype" id="6441391">uint32</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="6441399">const</span>&nbsp;<span class="ident" id="6441405">cpuArch64</span>&nbsp;<span class="op" id="6441415">=</span>&nbsp;<span class="num" id="6441417">0x01000000</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="6441429">const</span>&nbsp;<span class="op" id="6441435">(</span><br>
+<span class="lineno">50</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6441438">Cpu386</span>&nbsp;&nbsp;&nbsp;<span class="ident" id="6441447">Cpu</span>&nbsp;<span class="op" id="6441451">=</span>&nbsp;<span class="num" id="6441453">7</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6441456">CpuAmd64</span>&nbsp;<span class="ident" id="6441465">Cpu</span>&nbsp;<span class="op" id="6441469">=</span>&nbsp;<span class="ident" id="6441471">Cpu386</span>&nbsp;<span class="op" id="6441478">|</span>&nbsp;<span class="ident" id="6441480">cpuArch64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6441491">CpuArm</span>&nbsp;&nbsp;&nbsp;<span class="ident" id="6441500">Cpu</span>&nbsp;<span class="op" id="6441504">=</span>&nbsp;<span class="num" id="6441506">12</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6441510">CpuPpc</span>&nbsp;&nbsp;&nbsp;<span class="ident" id="6441519">Cpu</span>&nbsp;<span class="op" id="6441523">=</span>&nbsp;<span class="num" id="6441525">18</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6441529">CpuPpc64</span>&nbsp;<span class="ident" id="6441538">Cpu</span>&nbsp;<span class="op" id="6441542">=</span>&nbsp;<span class="ident" id="6441544">CpuPpc</span>&nbsp;<span class="op" id="6441551">|</span>&nbsp;<span class="ident" id="6441553">cpuArch64</span><br>
+<span class="lineno">55</span><span class="op" id="6441563">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="6441566">var</span>&nbsp;<span class="ident" id="6441570">cpuStrings</span>&nbsp;<span class="op" id="6441581">=</span>&nbsp;<span class="op" id="6441583">[</span><span class="op" id="6441584">]</span><span class="ident" id="6441585">intName</span><span class="op" id="6441592">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6441595">{</span><span class="builtintype" id="6441596">uint32</span><span class="op" id="6441602">(</span><span class="ident" id="6441603">Cpu386</span><span class="op" id="6441609">)</span><span class="op" id="6441610">,</span>&nbsp;<span class="string" id="6441612">&#34;Cpu386&#34;</span><span class="op" id="6441620">}</span><span class="op" id="6441621">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6441624">{</span><span class="builtintype" id="6441625">uint32</span><span class="op" id="6441631">(</span><span class="ident" id="6441632">CpuAmd64</span><span class="op" id="6441640">)</span><span class="op" id="6441641">,</span>&nbsp;<span class="string" id="6441643">&#34;CpuAmd64&#34;</span><span class="op" id="6441653">}</span><span class="op" id="6441654">,</span><br>
+<span class="lineno">60</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6441657">{</span><span class="builtintype" id="6441658">uint32</span><span class="op" id="6441664">(</span><span class="ident" id="6441665">CpuArm</span><span class="op" id="6441671">)</span><span class="op" id="6441672">,</span>&nbsp;<span class="string" id="6441674">&#34;CpuArm&#34;</span><span class="op" id="6441682">}</span><span class="op" id="6441683">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6441686">{</span><span class="builtintype" id="6441687">uint32</span><span class="op" id="6441693">(</span><span class="ident" id="6441694">CpuPpc</span><span class="op" id="6441700">)</span><span class="op" id="6441701">,</span>&nbsp;<span class="string" id="6441703">&#34;CpuPpc&#34;</span><span class="op" id="6441711">}</span><span class="op" id="6441712">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6441715">{</span><span class="builtintype" id="6441716">uint32</span><span class="op" id="6441722">(</span><span class="ident" id="6441723">CpuPpc64</span><span class="op" id="6441731">)</span><span class="op" id="6441732">,</span>&nbsp;<span class="string" id="6441734">&#34;CpuPpc64&#34;</span><span class="op" id="6441744">}</span><span class="op" id="6441745">,</span><br>
+<span class="lineno"></span><span class="op" id="6441747">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">65</span><span class="keyword" id="6441750">func</span>&nbsp;<span class="op" id="6441755">(</span><span class="ident" id="6441756">i</span>&nbsp;<span class="ident" id="6441758">Cpu</span><span class="op" id="6441761">)</span>&nbsp;<span class="ident" id="6441763">String</span><span class="op" id="6441769">(</span><span class="op" id="6441770">)</span>&nbsp;<span class="builtintype" id="6441772">string</span>&nbsp;&nbsp;&nbsp;<span class="op" id="6441781">{</span>&nbsp;<span class="keyword" id="6441783">return</span>&nbsp;<span class="ident" id="6441790">stringName</span><span class="op" id="6441800">(</span><span class="builtintype" id="6441801">uint32</span><span class="op" id="6441807">(</span><span class="ident" id="6441808">i</span><span class="op" id="6441809">)</span><span class="op" id="6441810">,</span>&nbsp;<span class="ident" id="6441812">cpuStrings</span><span class="op" id="6441822">,</span>&nbsp;<span class="builtintype" id="6441824">false</span><span class="op" id="6441829">)</span>&nbsp;<span class="op" id="6441831">}</span><br>
+<span class="lineno"></span><span class="keyword" id="6441833">func</span>&nbsp;<span class="op" id="6441838">(</span><span class="ident" id="6441839">i</span>&nbsp;<span class="ident" id="6441841">Cpu</span><span class="op" id="6441844">)</span>&nbsp;<span class="ident" id="6441846">GoString</span><span class="op" id="6441854">(</span><span class="op" id="6441855">)</span>&nbsp;<span class="builtintype" id="6441857">string</span>&nbsp;<span class="op" id="6441864">{</span>&nbsp;<span class="keyword" id="6441866">return</span>&nbsp;<span class="ident" id="6441873">stringName</span><span class="op" id="6441883">(</span><span class="builtintype" id="6441884">uint32</span><span class="op" id="6441890">(</span><span class="ident" id="6441891">i</span><span class="op" id="6441892">)</span><span class="op" id="6441893">,</span>&nbsp;<span class="ident" id="6441895">cpuStrings</span><span class="op" id="6441905">,</span>&nbsp;<span class="builtintype" id="6441907">true</span><span class="op" id="6441911">)</span>&nbsp;<span class="op" id="6441913">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="6441916">//&nbsp;A&nbsp;LoadCmd&nbsp;is&nbsp;a&nbsp;Mach-O&nbsp;load&nbsp;command.</span><br>
+<span class="lineno"></span><span class="keyword" id="6441955">type</span>&nbsp;<span class="ident" id="6441960">LoadCmd</span>&nbsp;<span class="builtintype" id="6441968">uint32</span><br>
+<span class="lineno">70</span><br>
+<span class="lineno"></span><span class="keyword" id="6441976">const</span>&nbsp;<span class="op" id="6441982">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6441985">LoadCmdSegment</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="6442003">LoadCmd</span>&nbsp;<span class="op" id="6442011">=</span>&nbsp;<span class="num" id="6442013">1</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6442016">LoadCmdSymtab</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="6442034">LoadCmd</span>&nbsp;<span class="op" id="6442042">=</span>&nbsp;<span class="num" id="6442044">2</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6442047">LoadCmdThread</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="6442065">LoadCmd</span>&nbsp;<span class="op" id="6442073">=</span>&nbsp;<span class="num" id="6442075">4</span><br>
+<span class="lineno">75</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6442078">LoadCmdUnixThread</span>&nbsp;<span class="ident" id="6442096">LoadCmd</span>&nbsp;<span class="op" id="6442104">=</span>&nbsp;<span class="num" id="6442106">5</span>&nbsp;<span class="comment" id="6442108">//&nbsp;thread+stack</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6442125">LoadCmdDysymtab</span>&nbsp;&nbsp;&nbsp;<span class="ident" id="6442143">LoadCmd</span>&nbsp;<span class="op" id="6442151">=</span>&nbsp;<span class="num" id="6442153">11</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6442157">LoadCmdDylib</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="6442175">LoadCmd</span>&nbsp;<span class="op" id="6442183">=</span>&nbsp;<span class="num" id="6442185">12</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6442189">LoadCmdDylinker</span>&nbsp;&nbsp;&nbsp;<span class="ident" id="6442207">LoadCmd</span>&nbsp;<span class="op" id="6442215">=</span>&nbsp;<span class="num" id="6442217">15</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6442221">LoadCmdSegment64</span>&nbsp;&nbsp;<span class="ident" id="6442239">LoadCmd</span>&nbsp;<span class="op" id="6442247">=</span>&nbsp;<span class="num" id="6442249">25</span><br>
+<span class="lineno">80</span><span class="op" id="6442252">)</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="6442255">var</span>&nbsp;<span class="ident" id="6442259">cmdStrings</span>&nbsp;<span class="op" id="6442270">=</span>&nbsp;<span class="op" id="6442272">[</span><span class="op" id="6442273">]</span><span class="ident" id="6442274">intName</span><span class="op" id="6442281">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6442284">{</span><span class="builtintype" id="6442285">uint32</span><span class="op" id="6442291">(</span><span class="ident" id="6442292">LoadCmdSegment</span><span class="op" id="6442306">)</span><span class="op" id="6442307">,</span>&nbsp;<span class="string" id="6442309">&#34;LoadCmdSegment&#34;</span><span class="op" id="6442325">}</span><span class="op" id="6442326">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6442329">{</span><span class="builtintype" id="6442330">uint32</span><span class="op" id="6442336">(</span><span class="ident" id="6442337">LoadCmdThread</span><span class="op" id="6442350">)</span><span class="op" id="6442351">,</span>&nbsp;<span class="string" id="6442353">&#34;LoadCmdThread&#34;</span><span class="op" id="6442368">}</span><span class="op" id="6442369">,</span><br>
+<span class="lineno">85</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6442372">{</span><span class="builtintype" id="6442373">uint32</span><span class="op" id="6442379">(</span><span class="ident" id="6442380">LoadCmdUnixThread</span><span class="op" id="6442397">)</span><span class="op" id="6442398">,</span>&nbsp;<span class="string" id="6442400">&#34;LoadCmdUnixThread&#34;</span><span class="op" id="6442419">}</span><span class="op" id="6442420">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6442423">{</span><span class="builtintype" id="6442424">uint32</span><span class="op" id="6442430">(</span><span class="ident" id="6442431">LoadCmdDylib</span><span class="op" id="6442443">)</span><span class="op" id="6442444">,</span>&nbsp;<span class="string" id="6442446">&#34;LoadCmdDylib&#34;</span><span class="op" id="6442460">}</span><span class="op" id="6442461">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6442464">{</span><span class="builtintype" id="6442465">uint32</span><span class="op" id="6442471">(</span><span class="ident" id="6442472">LoadCmdSegment64</span><span class="op" id="6442488">)</span><span class="op" id="6442489">,</span>&nbsp;<span class="string" id="6442491">&#34;LoadCmdSegment64&#34;</span><span class="op" id="6442509">}</span><span class="op" id="6442510">,</span><br>
+<span class="lineno"></span><span class="op" id="6442512">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">90</span><span class="keyword" id="6442515">func</span>&nbsp;<span class="op" id="6442520">(</span><span class="ident" id="6442521">i</span>&nbsp;<span class="ident" id="6442523">LoadCmd</span><span class="op" id="6442530">)</span>&nbsp;<span class="ident" id="6442532">String</span><span class="op" id="6442538">(</span><span class="op" id="6442539">)</span>&nbsp;<span class="builtintype" id="6442541">string</span>&nbsp;&nbsp;&nbsp;<span class="op" id="6442550">{</span>&nbsp;<span class="keyword" id="6442552">return</span>&nbsp;<span class="ident" id="6442559">stringName</span><span class="op" id="6442569">(</span><span class="builtintype" id="6442570">uint32</span><span class="op" id="6442576">(</span><span class="ident" id="6442577">i</span><span class="op" id="6442578">)</span><span class="op" id="6442579">,</span>&nbsp;<span class="ident" id="6442581">cmdStrings</span><span class="op" id="6442591">,</span>&nbsp;<span class="builtintype" id="6442593">false</span><span class="op" id="6442598">)</span>&nbsp;<span class="op" id="6442600">}</span><br>
+<span class="lineno"></span><span class="keyword" id="6442602">func</span>&nbsp;<span class="op" id="6442607">(</span><span class="ident" id="6442608">i</span>&nbsp;<span class="ident" id="6442610">LoadCmd</span><span class="op" id="6442617">)</span>&nbsp;<span class="ident" id="6442619">GoString</span><span class="op" id="6442627">(</span><span class="op" id="6442628">)</span>&nbsp;<span class="builtintype" id="6442630">string</span>&nbsp;<span class="op" id="6442637">{</span>&nbsp;<span class="keyword" id="6442639">return</span>&nbsp;<span class="ident" id="6442646">stringName</span><span class="op" id="6442656">(</span><span class="builtintype" id="6442657">uint32</span><span class="op" id="6442663">(</span><span class="ident" id="6442664">i</span><span class="op" id="6442665">)</span><span class="op" id="6442666">,</span>&nbsp;<span class="ident" id="6442668">cmdStrings</span><span class="op" id="6442678">,</span>&nbsp;<span class="builtintype" id="6442680">true</span><span class="op" id="6442684">)</span>&nbsp;<span class="op" id="6442686">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="6442689">//&nbsp;A&nbsp;Segment64&nbsp;is&nbsp;a&nbsp;64-bit&nbsp;Mach-O&nbsp;segment&nbsp;load&nbsp;command.</span><br>
+<span class="lineno"></span><span class="keyword" id="6442745">type</span>&nbsp;<span class="ident" id="6442750">Segment64</span>&nbsp;<span class="keyword" id="6442760">struct</span>&nbsp;<span class="op" id="6442767">{</span><br>
+<span class="lineno">95</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6442770">Cmd</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="6442778">LoadCmd</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6442787">Len</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6442795">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6442803">Name</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="op" id="6442811">[</span><span class="num" id="6442812">16</span><span class="op" id="6442814">]</span><span class="builtintype" id="6442815">byte</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6442821">Addr</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="6442829">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6442837">Memsz</span>&nbsp;&nbsp;&nbsp;<span class="ident" id="6442845">uint64</span><br>
+<span class="lineno">100</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6442853">Offset</span>&nbsp;&nbsp;<span class="ident" id="6442861">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6442869">Filesz</span>&nbsp;&nbsp;<span class="ident" id="6442877">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6442885">Maxprot</span>&nbsp;<span class="builtintype" id="6442893">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6442901">Prot</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6442909">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6442917">Nsect</span>&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6442925">uint32</span><br>
+<span class="lineno">105</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6442933">Flag</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6442941">uint32</span><br>
+<span class="lineno"></span><span class="op" id="6442948">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="6442951">//&nbsp;A&nbsp;Segment32&nbsp;is&nbsp;a&nbsp;32-bit&nbsp;Mach-O&nbsp;segment&nbsp;load&nbsp;command.</span><br>
+<span class="lineno"></span><span class="keyword" id="6443007">type</span>&nbsp;<span class="ident" id="6443012">Segment32</span>&nbsp;<span class="keyword" id="6443022">struct</span>&nbsp;<span class="op" id="6443029">{</span><br>
+<span class="lineno">110</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6443032">Cmd</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="6443040">LoadCmd</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6443049">Len</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6443057">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6443065">Name</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="op" id="6443073">[</span><span class="num" id="6443074">16</span><span class="op" id="6443076">]</span><span class="builtintype" id="6443077">byte</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6443083">Addr</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6443091">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6443099">Memsz</span>&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6443107">uint32</span><br>
+<span class="lineno">115</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6443115">Offset</span>&nbsp;&nbsp;<span class="builtintype" id="6443123">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6443131">Filesz</span>&nbsp;&nbsp;<span class="builtintype" id="6443139">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6443147">Maxprot</span>&nbsp;<span class="builtintype" id="6443155">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6443163">Prot</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6443171">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6443179">Nsect</span>&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6443187">uint32</span><br>
+<span class="lineno">120</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6443195">Flag</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6443203">uint32</span><br>
+<span class="lineno"></span><span class="op" id="6443210">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="6443213">//&nbsp;A&nbsp;DylibCmd&nbsp;is&nbsp;a&nbsp;Mach-O&nbsp;load&nbsp;dynamic&nbsp;library&nbsp;command.</span><br>
+<span class="lineno"></span><span class="keyword" id="6443269">type</span>&nbsp;<span class="ident" id="6443274">DylibCmd</span>&nbsp;<span class="keyword" id="6443283">struct</span>&nbsp;<span class="op" id="6443290">{</span><br>
+<span class="lineno">125</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6443293">Cmd</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="6443308">LoadCmd</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6443317">Len</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6443332">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6443340">Name</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6443355">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6443363">Time</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6443378">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6443386">CurrentVersion</span>&nbsp;<span class="builtintype" id="6443401">uint32</span><br>
+<span class="lineno">130</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6443409">CompatVersion</span>&nbsp;&nbsp;<span class="builtintype" id="6443424">uint32</span><br>
+<span class="lineno"></span><span class="op" id="6443431">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="6443434">//&nbsp;A&nbsp;Section32&nbsp;is&nbsp;a&nbsp;32-bit&nbsp;Mach-O&nbsp;section&nbsp;header.</span><br>
+<span class="lineno"></span><span class="keyword" id="6443484">type</span>&nbsp;<span class="ident" id="6443489">Section32</span>&nbsp;<span class="keyword" id="6443499">struct</span>&nbsp;<span class="op" id="6443506">{</span><br>
+<span class="lineno">135</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6443509">Name</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op" id="6443518">[</span><span class="num" id="6443519">16</span><span class="op" id="6443521">]</span><span class="builtintype" id="6443522">byte</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6443528">Seg</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op" id="6443537">[</span><span class="num" id="6443538">16</span><span class="op" id="6443540">]</span><span class="builtintype" id="6443541">byte</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6443547">Addr</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6443556">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6443564">Size</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6443573">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6443581">Offset</span>&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6443590">uint32</span><br>
+<span class="lineno">140</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6443598">Align</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6443607">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6443615">Reloff</span>&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6443624">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6443632">Nreloc</span>&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6443641">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6443649">Flags</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6443658">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6443666">Reserve1</span>&nbsp;<span class="builtintype" id="6443675">uint32</span><br>
+<span class="lineno">145</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6443683">Reserve2</span>&nbsp;<span class="builtintype" id="6443692">uint32</span><br>
+<span class="lineno"></span><span class="op" id="6443699">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="6443702">//&nbsp;A&nbsp;Section32&nbsp;is&nbsp;a&nbsp;64-bit&nbsp;Mach-O&nbsp;section&nbsp;header.</span><br>
+<span class="lineno"></span><span class="keyword" id="6443752">type</span>&nbsp;<span class="ident" id="6443757">Section64</span>&nbsp;<span class="keyword" id="6443767">struct</span>&nbsp;<span class="op" id="6443774">{</span><br>
+<span class="lineno">150</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6443777">Name</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op" id="6443786">[</span><span class="num" id="6443787">16</span><span class="op" id="6443789">]</span><span class="builtintype" id="6443790">byte</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6443796">Seg</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="op" id="6443805">[</span><span class="num" id="6443806">16</span><span class="op" id="6443808">]</span><span class="builtintype" id="6443809">byte</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6443815">Addr</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="6443824">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6443832">Size</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="6443841">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6443849">Offset</span>&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6443858">uint32</span><br>
+<span class="lineno">155</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6443866">Align</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6443875">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6443883">Reloff</span>&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6443892">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6443900">Nreloc</span>&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6443909">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6443917">Flags</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6443926">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6443934">Reserve1</span>&nbsp;<span class="builtintype" id="6443943">uint32</span><br>
+<span class="lineno">160</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6443951">Reserve2</span>&nbsp;<span class="builtintype" id="6443960">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6443968">Reserve3</span>&nbsp;<span class="builtintype" id="6443977">uint32</span><br>
+<span class="lineno"></span><span class="op" id="6443984">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="6443987">//&nbsp;A&nbsp;SymtabCmd&nbsp;is&nbsp;a&nbsp;Mach-O&nbsp;symbol&nbsp;table&nbsp;command.</span><br>
+<span class="lineno">165</span><span class="keyword" id="6444036">type</span>&nbsp;<span class="ident" id="6444041">SymtabCmd</span>&nbsp;<span class="keyword" id="6444051">struct</span>&nbsp;<span class="op" id="6444058">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6444061">Cmd</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="6444069">LoadCmd</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6444078">Len</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6444086">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6444094">Symoff</span>&nbsp;&nbsp;<span class="builtintype" id="6444102">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6444110">Nsyms</span>&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6444118">uint32</span><br>
+<span class="lineno">170</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6444126">Stroff</span>&nbsp;&nbsp;<span class="builtintype" id="6444134">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6444142">Strsize</span>&nbsp;<span class="builtintype" id="6444150">uint32</span><br>
+<span class="lineno"></span><span class="op" id="6444157">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="6444160">//&nbsp;A&nbsp;DysymtabCmd&nbsp;is&nbsp;a&nbsp;Mach-O&nbsp;dynamic&nbsp;symbol&nbsp;table&nbsp;command.</span><br>
+<span class="lineno">175</span><span class="keyword" id="6444219">type</span>&nbsp;<span class="ident" id="6444224">DysymtabCmd</span>&nbsp;<span class="keyword" id="6444236">struct</span>&nbsp;<span class="op" id="6444243">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6444246">Cmd</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="6444261">LoadCmd</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6444270">Len</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6444285">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6444293">Ilocalsym</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6444308">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6444316">Nlocalsym</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6444331">uint32</span><br>
+<span class="lineno">180</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6444339">Iextdefsym</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6444354">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6444362">Nextdefsym</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6444377">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6444385">Iundefsym</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6444400">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6444408">Nundefsym</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6444423">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6444431">Tocoffset</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6444446">uint32</span><br>
+<span class="lineno">185</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6444454">Ntoc</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6444469">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6444477">Modtaboff</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6444492">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6444500">Nmodtab</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6444515">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6444523">Extrefsymoff</span>&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6444538">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6444546">Nextrefsyms</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6444561">uint32</span><br>
+<span class="lineno">190</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6444569">Indirectsymoff</span>&nbsp;<span class="builtintype" id="6444584">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6444592">Nindirectsyms</span>&nbsp;&nbsp;<span class="builtintype" id="6444607">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6444615">Extreloff</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6444630">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6444638">Nextrel</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6444653">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6444661">Locreloff</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6444676">uint32</span><br>
+<span class="lineno">195</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6444684">Nlocrel</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6444699">uint32</span><br>
+<span class="lineno"></span><span class="op" id="6444706">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="6444709">//&nbsp;An&nbsp;Nlist32&nbsp;is&nbsp;a&nbsp;Mach-O&nbsp;32-bit&nbsp;symbol&nbsp;table&nbsp;entry.</span><br>
+<span class="lineno"></span><span class="keyword" id="6444762">type</span>&nbsp;<span class="ident" id="6444767">Nlist32</span>&nbsp;<span class="keyword" id="6444775">struct</span>&nbsp;<span class="op" id="6444782">{</span><br>
+<span class="lineno">200</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6444785">Name</span>&nbsp;&nbsp;<span class="builtintype" id="6444791">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6444799">Type</span>&nbsp;&nbsp;<span class="builtintype" id="6444805">uint8</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6444812">Sect</span>&nbsp;&nbsp;<span class="builtintype" id="6444818">uint8</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6444825">Desc</span>&nbsp;&nbsp;<span class="builtintype" id="6444831">uint16</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6444839">Value</span>&nbsp;<span class="builtintype" id="6444845">uint32</span><br>
+<span class="lineno">205</span><span class="op" id="6444852">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="6444855">//&nbsp;An&nbsp;Nlist64&nbsp;is&nbsp;a&nbsp;Mach-O&nbsp;64-bit&nbsp;symbol&nbsp;table&nbsp;entry.</span><br>
+<span class="lineno"></span><span class="keyword" id="6444908">type</span>&nbsp;<span class="ident" id="6444913">Nlist64</span>&nbsp;<span class="keyword" id="6444921">struct</span>&nbsp;<span class="op" id="6444928">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6444931">Name</span>&nbsp;&nbsp;<span class="builtintype" id="6444937">uint32</span><br>
+<span class="lineno">210</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6444945">Type</span>&nbsp;&nbsp;<span class="builtintype" id="6444951">uint8</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6444958">Sect</span>&nbsp;&nbsp;<span class="builtintype" id="6444964">uint8</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6444971">Desc</span>&nbsp;&nbsp;<span class="builtintype" id="6444977">uint16</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6444985">Value</span>&nbsp;<span class="ident" id="6444991">uint64</span><br>
+<span class="lineno"></span><span class="op" id="6444998">}</span><br>
+<span class="lineno">215</span><br>
+<span class="lineno"></span><span class="comment" id="6445001">//&nbsp;A&nbsp;Symbol&nbsp;is&nbsp;a&nbsp;Mach-O&nbsp;32-bit&nbsp;or&nbsp;64-bit&nbsp;symbol&nbsp;table&nbsp;entry.</span><br>
+<span class="lineno"></span><span class="keyword" id="6445062">type</span>&nbsp;<span class="ident" id="6445067">Symbol</span>&nbsp;<span class="keyword" id="6445074">struct</span>&nbsp;<span class="op" id="6445081">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6445084">Name</span>&nbsp;&nbsp;<span class="builtintype" id="6445090">string</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6445098">Type</span>&nbsp;&nbsp;<span class="builtintype" id="6445104">uint8</span><br>
+<span class="lineno">220</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6445111">Sect</span>&nbsp;&nbsp;<span class="builtintype" id="6445117">uint8</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6445124">Desc</span>&nbsp;&nbsp;<span class="builtintype" id="6445130">uint16</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6445138">Value</span>&nbsp;<span class="ident" id="6445144">uint64</span><br>
+<span class="lineno"></span><span class="op" id="6445151">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">225</span><span class="comment" id="6445154">//&nbsp;A&nbsp;Thread&nbsp;is&nbsp;a&nbsp;Mach-O&nbsp;thread&nbsp;state&nbsp;command.</span><br>
+<span class="lineno"></span><span class="keyword" id="6445200">type</span>&nbsp;<span class="ident" id="6445205">Thread</span>&nbsp;<span class="keyword" id="6445212">struct</span>&nbsp;<span class="op" id="6445219">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6445222">Cmd</span>&nbsp;&nbsp;<span class="ident" id="6445227">LoadCmd</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6445236">Len</span>&nbsp;&nbsp;<span class="builtintype" id="6445241">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6445249">Type</span>&nbsp;<span class="builtintype" id="6445254">uint32</span><br>
+<span class="lineno">230</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6445262">Data</span>&nbsp;<span class="op" id="6445267">[</span><span class="op" id="6445268">]</span><span class="builtintype" id="6445269">uint32</span><br>
+<span class="lineno"></span><span class="op" id="6445276">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="6445279">//&nbsp;Regs386&nbsp;is&nbsp;the&nbsp;Mach-O&nbsp;386&nbsp;register&nbsp;structure.</span><br>
+<span class="lineno"></span><span class="keyword" id="6445328">type</span>&nbsp;<span class="ident" id="6445333">Regs386</span>&nbsp;<span class="keyword" id="6445341">struct</span>&nbsp;<span class="op" id="6445348">{</span><br>
+<span class="lineno">235</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6445351">AX</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6445357">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6445365">BX</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6445371">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6445379">CX</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6445385">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6445393">DX</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6445399">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6445407">DI</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6445413">uint32</span><br>
+<span class="lineno">240</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6445421">SI</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6445427">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6445435">BP</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6445441">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6445449">SP</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6445455">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6445463">SS</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6445469">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6445477">FLAGS</span>&nbsp;<span class="builtintype" id="6445483">uint32</span><br>
+<span class="lineno">245</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6445491">IP</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6445497">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6445505">CS</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6445511">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6445519">DS</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6445525">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6445533">ES</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6445539">uint32</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6445547">FS</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6445553">uint32</span><br>
+<span class="lineno">250</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6445561">GS</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="builtintype" id="6445567">uint32</span><br>
+<span class="lineno"></span><span class="op" id="6445574">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="comment" id="6445577">//&nbsp;RegsAMD64&nbsp;is&nbsp;the&nbsp;Mach-O&nbsp;AMD64&nbsp;register&nbsp;structure.</span><br>
+<span class="lineno"></span><span class="keyword" id="6445630">type</span>&nbsp;<span class="ident" id="6445635">RegsAMD64</span>&nbsp;<span class="keyword" id="6445645">struct</span>&nbsp;<span class="op" id="6445652">{</span><br>
+<span class="lineno">255</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6445655">AX</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="6445661">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6445669">BX</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="6445675">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6445683">CX</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="6445689">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6445697">DX</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="6445703">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6445711">DI</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="6445717">uint64</span><br>
+<span class="lineno">260</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6445725">SI</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="6445731">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6445739">BP</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="6445745">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6445753">SP</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="6445759">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6445767">R8</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="6445773">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6445781">R9</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="6445787">uint64</span><br>
+<span class="lineno">265</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6445795">R10</span>&nbsp;&nbsp;&nbsp;<span class="ident" id="6445801">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6445809">R11</span>&nbsp;&nbsp;&nbsp;<span class="ident" id="6445815">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6445823">R12</span>&nbsp;&nbsp;&nbsp;<span class="ident" id="6445829">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6445837">R13</span>&nbsp;&nbsp;&nbsp;<span class="ident" id="6445843">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6445851">R14</span>&nbsp;&nbsp;&nbsp;<span class="ident" id="6445857">uint64</span><br>
+<span class="lineno">270</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6445865">R15</span>&nbsp;&nbsp;&nbsp;<span class="ident" id="6445871">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6445879">IP</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="6445885">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6445893">FLAGS</span>&nbsp;<span class="ident" id="6445899">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6445907">CS</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="6445913">uint64</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6445921">FS</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="6445927">uint64</span><br>
+<span class="lineno">275</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6445935">GS</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="6445941">uint64</span><br>
+<span class="lineno"></span><span class="op" id="6445948">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="6445951">type</span>&nbsp;<span class="ident" id="6445956">intName</span>&nbsp;<span class="keyword" id="6445964">struct</span>&nbsp;<span class="op" id="6445971">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6445974">i</span>&nbsp;<span class="builtintype" id="6445976">uint32</span><br>
+<span class="lineno">280</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6445984">s</span>&nbsp;<span class="builtintype" id="6445986">string</span><br>
+<span class="lineno"></span><span class="op" id="6445993">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno"></span><span class="keyword" id="6445996">func</span>&nbsp;<span class="ident" id="6446001">stringName</span><span class="op" id="6446011">(</span><span class="ident" id="6446012">i</span>&nbsp;<span class="builtintype" id="6446014">uint32</span><span class="op" id="6446020">,</span>&nbsp;<span class="ident" id="6446022">names</span>&nbsp;<span class="op" id="6446028">[</span><span class="op" id="6446029">]</span><span class="ident" id="6446030">intName</span><span class="op" id="6446037">,</span>&nbsp;<span class="ident" id="6446039">goSyntax</span>&nbsp;<span class="builtintype" id="6446048">bool</span><span class="op" id="6446052">)</span>&nbsp;<span class="builtintype" id="6446054">string</span>&nbsp;<span class="op" id="6446061">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="6446064">for</span>&nbsp;<span class="ident" id="6446068">_</span><span class="op" id="6446069">,</span>&nbsp;<span class="ident" id="6446071">n</span>&nbsp;<span class="op" id="6446073">:=</span>&nbsp;<span class="keyword" id="6446076">range</span>&nbsp;<span class="ident" id="6446082">names</span>&nbsp;<span class="op" id="6446088">{</span><br>
+<span class="lineno">285</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="6446092">if</span>&nbsp;<span class="ident" id="6446095">n</span><span class="op" id="6446096">.</span><span class="ident" id="6446097">i</span>&nbsp;<span class="op" id="6446099">==</span>&nbsp;<span class="ident" id="6446102">i</span>&nbsp;<span class="op" id="6446104">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="6446109">if</span>&nbsp;<span class="ident" id="6446112">goSyntax</span>&nbsp;<span class="op" id="6446121">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="6446127">return</span>&nbsp;<span class="string" id="6446134">&#34;macho.&#34;</span>&nbsp;<span class="op" id="6446143">+</span>&nbsp;<span class="ident" id="6446145">n</span><span class="op" id="6446146">.</span><span class="ident" id="6446147">s</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6446152">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="6446157">return</span>&nbsp;<span class="ident" id="6446164">n</span><span class="op" id="6446165">.</span><span class="ident" id="6446166">s</span><br>
+<span class="lineno">290</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6446170">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6446173">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="6446176">return</span>&nbsp;<span class="ident" id="6446183">strconv</span><span class="op" id="6446190">.</span><span class="ident" id="6446191">FormatUint</span><span class="op" id="6446201">(</span><span class="ident" id="6446202">uint64</span><span class="op" id="6446208">(</span><span class="ident" id="6446209">i</span><span class="op" id="6446210">)</span><span class="op" id="6446211">,</span>&nbsp;<span class="num" id="6446213">10</span><span class="op" id="6446215">)</span><br>
+<span class="lineno"></span><span class="op" id="6446217">}</span><br>
+<span class="lineno"></span><br>
+<span class="lineno">295</span><span class="keyword" id="6446220">func</span>&nbsp;<span class="ident" id="6446225">flagName</span><span class="op" id="6446233">(</span><span class="ident" id="6446234">i</span>&nbsp;<span class="builtintype" id="6446236">uint32</span><span class="op" id="6446242">,</span>&nbsp;<span class="ident" id="6446244">names</span>&nbsp;<span class="op" id="6446250">[</span><span class="op" id="6446251">]</span><span class="ident" id="6446252">intName</span><span class="op" id="6446259">,</span>&nbsp;<span class="ident" id="6446261">goSyntax</span>&nbsp;<span class="builtintype" id="6446270">bool</span><span class="op" id="6446274">)</span>&nbsp;<span class="builtintype" id="6446276">string</span>&nbsp;<span class="op" id="6446283">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6446286">s</span>&nbsp;<span class="op" id="6446288">:=</span>&nbsp;<span class="string" id="6446291">&#34;&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="6446295">for</span>&nbsp;<span class="ident" id="6446299">_</span><span class="op" id="6446300">,</span>&nbsp;<span class="ident" id="6446302">n</span>&nbsp;<span class="op" id="6446304">:=</span>&nbsp;<span class="keyword" id="6446307">range</span>&nbsp;<span class="ident" id="6446313">names</span>&nbsp;<span class="op" id="6446319">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="6446323">if</span>&nbsp;<span class="ident" id="6446326">n</span><span class="op" id="6446327">.</span><span class="ident" id="6446328">i</span><span class="op" id="6446329">&amp;</span><span class="ident" id="6446330">i</span>&nbsp;<span class="op" id="6446332">==</span>&nbsp;<span class="ident" id="6446335">n</span><span class="op" id="6446336">.</span><span class="ident" id="6446337">i</span>&nbsp;<span class="op" id="6446339">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="6446344">if</span>&nbsp;<span class="builtinfunc" id="6446347">len</span><span class="op" id="6446350">(</span><span class="ident" id="6446351">s</span><span class="op" id="6446352">)</span>&nbsp;<span class="op" id="6446354">&gt;</span>&nbsp;<span class="num" id="6446356">0</span>&nbsp;<span class="op" id="6446358">{</span><br>
+<span class="lineno">300</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6446364">s</span>&nbsp;<span class="op" id="6446366">+=</span>&nbsp;<span class="string" id="6446369">&#34;+&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6446376">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="6446381">if</span>&nbsp;<span class="ident" id="6446384">goSyntax</span>&nbsp;<span class="op" id="6446393">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6446399">s</span>&nbsp;<span class="op" id="6446401">+=</span>&nbsp;<span class="string" id="6446404">&#34;macho.&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6446416">}</span><br>
+<span class="lineno">305</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6446421">s</span>&nbsp;<span class="op" id="6446423">+=</span>&nbsp;<span class="ident" id="6446426">n</span><span class="op" id="6446427">.</span><span class="ident" id="6446428">s</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6446433">i</span>&nbsp;<span class="op" id="6446435">-=</span>&nbsp;<span class="ident" id="6446438">n</span><span class="op" id="6446439">.</span><span class="ident" id="6446440">i</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6446444">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6446447">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="6446450">if</span>&nbsp;<span class="builtinfunc" id="6446453">len</span><span class="op" id="6446456">(</span><span class="ident" id="6446457">s</span><span class="op" id="6446458">)</span>&nbsp;<span class="op" id="6446460">==</span>&nbsp;<span class="num" id="6446463">0</span>&nbsp;<span class="op" id="6446465">{</span><br>
+<span class="lineno">310</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="6446469">return</span>&nbsp;<span class="string" id="6446476">&#34;0x&#34;</span>&nbsp;<span class="op" id="6446481">+</span>&nbsp;<span class="ident" id="6446483">strconv</span><span class="op" id="6446490">.</span><span class="ident" id="6446491">FormatUint</span><span class="op" id="6446501">(</span><span class="ident" id="6446502">uint64</span><span class="op" id="6446508">(</span><span class="ident" id="6446509">i</span><span class="op" id="6446510">)</span><span class="op" id="6446511">,</span>&nbsp;<span class="num" id="6446513">16</span><span class="op" id="6446515">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6446518">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="6446521">if</span>&nbsp;<span class="ident" id="6446524">i</span>&nbsp;<span class="op" id="6446526">!=</span>&nbsp;<span class="num" id="6446529">0</span>&nbsp;<span class="op" id="6446531">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6446535">s</span>&nbsp;<span class="op" id="6446537">+=</span>&nbsp;<span class="string" id="6446540">&#34;+0x&#34;</span>&nbsp;<span class="op" id="6446546">+</span>&nbsp;<span class="ident" id="6446548">strconv</span><span class="op" id="6446555">.</span><span class="ident" id="6446556">FormatUint</span><span class="op" id="6446566">(</span><span class="ident" id="6446567">uint64</span><span class="op" id="6446573">(</span><span class="ident" id="6446574">i</span><span class="op" id="6446575">)</span><span class="op" id="6446576">,</span>&nbsp;<span class="num" id="6446578">16</span><span class="op" id="6446580">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6446583">}</span><br>
+<span class="lineno">315</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="6446586">return</span>&nbsp;<span class="ident" id="6446593">s</span><br>
+<span class="lineno"></span><span class="op" id="6446595">}</span>
+</div>
+</body>
+</html>

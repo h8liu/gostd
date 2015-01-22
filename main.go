@@ -1,11 +1,8 @@
 package main
 
 import (
-	"fmt"
 	"go/build"
 	"go/token"
-	"io/ioutil"
-	"os"
 	"path/filepath"
 	"strings"
 
@@ -129,20 +126,13 @@ func makePkgs() ([]*pkg, *token.FileSet, map[int]*file) {
 
 func main() {
 	ps, fset, files := makePkgs()
-	for _, p := range ps {
-		fmt.Printf("[%s]\n", p.path)
-		outPath := filepath.Join("www", p.savePath)
-		e := os.MkdirAll(outPath, 0700)
-		ne(e)
-
-		for _, f := range p.files {
-			fmt.Printf("   %s (%s)\n", f.name, f.path)
-			f.parseToks()
-
-			bs := f.html(fset, files)
-			pout := filepath.Join(outPath, f.name+".html")
-			e := ioutil.WriteFile(pout, bs, 0700)
-			ne(e)
-		}
+	w := &writer{
+		outRoot: "www",
+		
+		pkgs:  ps,
+		fset:  fset,
+		files: files,
 	}
+
+	w.writePkgs(ps)
 }

@@ -28,7 +28,9 @@ type writer struct {
 }
 
 func (w *writer) writePkgs() {
-	e := os.MkdirAll(filepath.Join(w.outRoot, w.outPath), 0700)
+	const perm = 0755
+
+	e := os.MkdirAll(filepath.Join(w.outRoot, w.outPath), perm)
 	ne(e)
 
 	for _, p := range w.pkgs {
@@ -38,7 +40,7 @@ func (w *writer) writePkgs() {
 
 		outPath := filepath.Join(w.outRoot, w.outPath, p.savePath)
 
-		e := os.MkdirAll(outPath, 0700)
+		e := os.MkdirAll(outPath, perm)
 		ne(e)
 
 		for _, f := range p.files {
@@ -50,19 +52,19 @@ func (w *writer) writePkgs() {
 
 			bs := w.html(p, f)
 			pout := filepath.Join(outPath, f.name+".html")
-			e := ioutil.WriteFile(pout, bs, 0700)
+			e := ioutil.WriteFile(pout, bs, perm)
 			ne(e)
 		}
 
 		bs := w.pkgHtml(p)
 		pout := filepath.Join(outPath, "index.html")
-		e = ioutil.WriteFile(pout, bs, 0700)
+		e = ioutil.WriteFile(pout, bs, perm)
 		ne(e)
 	}
 
 	bs := w.homepage()
 	pout := filepath.Join(w.outRoot, w.outPath, "index.html")
-	e = ioutil.WriteFile(pout, bs, 0700)
+	e = ioutil.WriteFile(pout, bs, perm)
 	ne(e)
 }
 

@@ -8,7 +8,7 @@ import (
 
 func runeHtml(ch rune) string {
 	if ch == '\t' {
-		return "&nbsp;&nbsp;&nbsp;&nbsp"
+		return "&nbsp;&nbsp;&nbsp;&nbsp;"
 	} else if ch == ' ' {
 		return "&nbsp;"
 	} else if ch == '\n' {

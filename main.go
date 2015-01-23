@@ -49,14 +49,14 @@ func loadPackages(pkgs []string) (*loader.Program, error) {
 func makePkgs() (map[string]*pkg, *token.FileSet, map[int]*file) {
 	pkgs := listPackages()
 	/*
-	pkgs = append(pkgs,
-		"lonnie.io/e8vm",
-		"lonnie.io/e8vm/arch8",
-		"lonnie.io/e8vm/dasm8",
-		"lonnie.io/e8vm/lex8",
-		"lonnie.io/e8vm/link8",
-		"lonnie.io/e8vm/asm8",
-	)
+		pkgs = append(pkgs,
+			"lonnie.io/e8vm",
+			"lonnie.io/e8vm/arch8",
+			"lonnie.io/e8vm/dasm8",
+			"lonnie.io/e8vm/lex8",
+			"lonnie.io/e8vm/link8",
+			"lonnie.io/e8vm/asm8",
+		)
 	*/
 
 	prog, e := loadPackages(pkgs)

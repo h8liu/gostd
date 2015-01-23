@@ -28,6 +28,9 @@ type writer struct {
 }
 
 func (w *writer) writePkgs() {
+	e := os.MkdirAll(filepath.Join(w.outRoot, w.outPath), 0700)
+	ne(e)
+
 	for _, p := range w.pkgs {
 		if !w.quiet {
 			fmt.Printf("[%s]\n", p.path)
@@ -56,6 +59,11 @@ func (w *writer) writePkgs() {
 		e = ioutil.WriteFile(pout, bs, 0700)
 		ne(e)
 	}
+
+	bs := w.homepage()
+	pout := filepath.Join(w.outRoot, w.outPath, "index.html")
+	e = ioutil.WriteFile(pout, bs, 0700)
+	ne(e)
 }
 
 func (w *writer) htmlPkgNavi(p *pkg, out io.Writer) {
@@ -235,6 +243,44 @@ func (w *writer) pkgHtml(p *pkg) []byte {
 	w.htmlPkgNavi(p, out)
 	fmt.Fprint(out, htmlFooter)
 
+	return out.Bytes()
+}
+
+func (w *writer) homepage() []byte {
+	out := new(bytes.Buffer)
+	fmt.Fprint(out, htmlHeader)
+
+	fmt.Fprintf(out, `<h1><a href="%s">Go Standard Library</a></h1>`+"\n",
+		html.EscapeString(path.Join("/", w.outPath, "index.html")),
+	)
+
+	if len(w.pkgs) == 0 {
+		panic("no package")
+	}
+
+	var pkgs []string
+	hits := make(map[string]struct{})
+
+	for _, p := range w.pkgs {
+		if _, found := hits[p.savePath]; found {
+			continue
+		}
+		pkgs = append(pkgs, p.savePath)
+		hits[p.savePath] = struct{}{}
+	}
+
+	sort.Strings(pkgs)
+
+	fmt.Fprintln(out, `<div class="pkgs"><ul class="pkgs">`)
+	for _, p := range pkgs {
+		fmt.Fprintf(out, `<li><a href="%s">%s</a></li>`+"\n",
+			html.EscapeString(path.Join("/", w.outPath, p)),
+			html.EscapeString(p),
+		)
+	}
+	fmt.Fprintln(out, `</ul></div>`)
+
+	fmt.Fprint(out, htmlFooter)
 	return out.Bytes()
 }
 

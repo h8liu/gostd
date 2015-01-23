@@ -6,7 +6,7 @@ const htmlHeader = `<!doctype html>
 <head>
 	<meta charset="utf-8" />
 	<title>Go standard library</title>
-	<link rel="stylesheet" type="text/css" href="/style.css">
+	<link rel="stylesheet" type="text/css" href="/gostd.css">
 </head>
 
 <body>

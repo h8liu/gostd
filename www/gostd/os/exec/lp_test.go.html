@@ -9,40 +9,52 @@
 
 <body>
 
+<div class="pkgnavi">
+<h1><a href="/gostd/index.html">Go Standard Library</a></h1>
+<h2>os/exec</h2>
+<ul>
+<li><a href="/gostd/os/exec/example_test.go.html">example_test.go</a></li>
+<li><a href="/gostd/os/exec/exec.go.html">exec.go</a></li>
+<li><a href="/gostd/os/exec/exec_test.go.html">exec_test.go</a></li>
+<li><a href="/gostd/os/exec/lp_test.go.html">lp_test.go</a></li>
+<li><a href="/gostd/os/exec/lp_unix.go.html">lp_unix.go</a></li>
+<li><a href="/gostd/os/exec/lp_unix_test.go.html">lp_unix_test.go</a></li>
+</ul>
+</div>
 <div class="code">
-<span class="lineno">1</span><span class="comment" id="6791582">//&nbsp;Copyright&nbsp;2011&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
-<span class="lineno"></span><span class="comment" id="6791637">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
-<span class="lineno"></span><span class="comment" id="6791691">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno">1</span><span class="comment" id="7523646">//&nbsp;Copyright&nbsp;2011&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment" id="7523701">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment" id="7523755">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
 <span class="lineno"></span><br>
-<span class="lineno">5</span><span class="keyword" id="6791742">package</span>&nbsp;<span class="ident" id="6791750">exec</span><br>
+<span class="lineno">5</span><span class="keyword" id="7523806">package</span>&nbsp;<span class="ident" id="7523814">exec</span><br>
 <span class="lineno"></span><br>
-<span class="lineno"></span><span class="keyword" id="6791756">import</span>&nbsp;<span class="op" id="6791763">(</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6791766">&#34;testing&#34;</span><br>
-<span class="lineno"></span><span class="op" id="6791776">)</span><br>
+<span class="lineno"></span><span class="keyword" id="7523820">import</span>&nbsp;<span class="op" id="7523827">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="7523830">&#34;testing&#34;</span><br>
+<span class="lineno"></span><span class="op" id="7523840">)</span><br>
 <span class="lineno">10</span><br>
-<span class="lineno"></span><span class="keyword" id="6791779">var</span>&nbsp;<span class="ident" id="6791783">nonExistentPaths</span>&nbsp;<span class="op" id="6791800">=</span>&nbsp;<span class="op" id="6791802">[</span><span class="op" id="6791803">]</span><span class="builtintype" id="6791804">string</span><span class="op" id="6791810">{</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6791813">&#34;some-non-existent-path&#34;</span><span class="op" id="6791837">,</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="6791840">&#34;non-existent-path/slashed&#34;</span><span class="op" id="6791867">,</span><br>
-<span class="lineno"></span><span class="op" id="6791869">}</span><br>
+<span class="lineno"></span><span class="keyword" id="7523843">var</span>&nbsp;<span class="ident" id="7523847">nonExistentPaths</span>&nbsp;<span class="op" id="7523864">=</span>&nbsp;<span class="op" id="7523866">[</span><span class="op" id="7523867">]</span><span class="builtintype" id="7523868">string</span><span class="op" id="7523874">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="7523877">&#34;some-non-existent-path&#34;</span><span class="op" id="7523901">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="7523904">&#34;non-existent-path/slashed&#34;</span><span class="op" id="7523931">,</span><br>
+<span class="lineno"></span><span class="op" id="7523933">}</span><br>
 <span class="lineno">15</span><br>
-<span class="lineno"></span><span class="keyword" id="6791872">func</span>&nbsp;<span class="ident" id="6791877">TestLookPathNotFound</span><span class="op" id="6791897">(</span><span class="ident" id="6791898">t</span>&nbsp;<span class="op" id="6791900">*</span><span class="ident" id="6791901">testing</span><span class="op" id="6791908">.</span><span class="ident" id="6791909">T</span><span class="op" id="6791910">)</span>&nbsp;<span class="op" id="6791912">{</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="6791915">for</span>&nbsp;<span class="ident" id="6791919">_</span><span class="op" id="6791920">,</span>&nbsp;<span class="ident" id="6791922">name</span>&nbsp;<span class="op" id="6791927">:=</span>&nbsp;<span class="keyword" id="6791930">range</span>&nbsp;<span class="ident" id="6791936">nonExistentPaths</span>&nbsp;<span class="op" id="6791953">{</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6791957">path</span><span class="op" id="6791961">,</span>&nbsp;<span class="ident" id="6791963">err</span>&nbsp;<span class="op" id="6791967">:=</span>&nbsp;<span class="ident" id="6791970">LookPath</span><span class="op" id="6791978">(</span><span class="ident" id="6791979">name</span><span class="op" id="6791983">)</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="6791987">if</span>&nbsp;<span class="ident" id="6791990">err</span>&nbsp;<span class="op" id="6791994">==</span>&nbsp;<span class="ident" id="6791997">nil</span>&nbsp;<span class="op" id="6792001">{</span><br>
-<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6792006">t</span><span class="op" id="6792007">.</span><span class="ident" id="6792008">Fatalf</span><span class="op" id="6792014">(</span><span class="string" id="6792015">&#34;LookPath&nbsp;found&nbsp;%q&nbsp;in&nbsp;$PATH&#34;</span><span class="op" id="6792043">,</span>&nbsp;<span class="ident" id="6792045">name</span><span class="op" id="6792049">)</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6792053">}</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="6792057">if</span>&nbsp;<span class="ident" id="6792060">path</span>&nbsp;<span class="op" id="6792065">!=</span>&nbsp;<span class="string" id="6792068">&#34;&#34;</span>&nbsp;<span class="op" id="6792071">{</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6792076">t</span><span class="op" id="6792077">.</span><span class="ident" id="6792078">Fatalf</span><span class="op" id="6792084">(</span><span class="string" id="6792085">&#34;LookPath&nbsp;path&nbsp;==&nbsp;%q&nbsp;when&nbsp;err&nbsp;!=&nbsp;nil&#34;</span><span class="op" id="6792122">,</span>&nbsp;<span class="ident" id="6792124">path</span><span class="op" id="6792128">)</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6792132">}</span><br>
-<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6792136">perr</span><span class="op" id="6792140">,</span>&nbsp;<span class="ident" id="6792142">ok</span>&nbsp;<span class="op" id="6792145">:=</span>&nbsp;<span class="ident" id="6792148">err</span><span class="op" id="6792151">.</span><span class="op" id="6792152">(</span><span class="op" id="6792153">*</span><span class="ident" id="6792154">Error</span><span class="op" id="6792159">)</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="6792163">if</span>&nbsp;<span class="op" id="6792166">!</span><span class="ident" id="6792167">ok</span>&nbsp;<span class="op" id="6792170">{</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6792175">t</span><span class="op" id="6792176">.</span><span class="ident" id="6792177">Fatal</span><span class="op" id="6792182">(</span><span class="string" id="6792183">&#34;LookPath&nbsp;error&nbsp;is&nbsp;not&nbsp;an&nbsp;exec.Error&#34;</span><span class="op" id="6792220">)</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6792224">}</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="6792228">if</span>&nbsp;<span class="ident" id="6792231">perr</span><span class="op" id="6792235">.</span><span class="ident" id="6792236">Name</span>&nbsp;<span class="op" id="6792241">!=</span>&nbsp;<span class="ident" id="6792244">name</span>&nbsp;<span class="op" id="6792249">{</span><br>
-<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="6792254">t</span><span class="op" id="6792255">.</span><span class="ident" id="6792256">Fatalf</span><span class="op" id="6792262">(</span><span class="string" id="6792263">&#34;want&nbsp;Error&nbsp;name&nbsp;%q,&nbsp;got&nbsp;%q&#34;</span><span class="op" id="6792291">,</span>&nbsp;<span class="ident" id="6792293">name</span><span class="op" id="6792297">,</span>&nbsp;<span class="ident" id="6792299">perr</span><span class="op" id="6792303">.</span><span class="ident" id="6792304">Name</span><span class="op" id="6792308">)</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6792312">}</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="6792315">}</span><br>
-<span class="lineno"></span><span class="op" id="6792317">}</span>
+<span class="lineno"></span><span class="keyword" id="7523936">func</span>&nbsp;<span class="ident" id="7523941">TestLookPathNotFound</span><span class="op" id="7523961">(</span><span class="ident" id="7523962">t</span>&nbsp;<span class="op" id="7523964">*</span><span class="ident" id="7523965">testing</span><span class="op" id="7523972">.</span><span class="ident" id="7523973">T</span><span class="op" id="7523974">)</span>&nbsp;<span class="op" id="7523976">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="7523979">for</span>&nbsp;<span class="ident" id="7523983">_</span><span class="op" id="7523984">,</span>&nbsp;<span class="ident" id="7523986">name</span>&nbsp;<span class="op" id="7523991">:=</span>&nbsp;<span class="keyword" id="7523994">range</span>&nbsp;<span class="ident" id="7524000">nonExistentPaths</span>&nbsp;<span class="op" id="7524017">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7524021">path</span><span class="op" id="7524025">,</span>&nbsp;<span class="ident" id="7524027">err</span>&nbsp;<span class="op" id="7524031">:=</span>&nbsp;<span class="ident" id="7524034">LookPath</span><span class="op" id="7524042">(</span><span class="ident" id="7524043">name</span><span class="op" id="7524047">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="7524051">if</span>&nbsp;<span class="ident" id="7524054">err</span>&nbsp;<span class="op" id="7524058">==</span>&nbsp;<span class="ident" id="7524061">nil</span>&nbsp;<span class="op" id="7524065">{</span><br>
+<span class="lineno">20</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7524070">t</span><span class="op" id="7524071">.</span><span class="ident" id="7524072">Fatalf</span><span class="op" id="7524078">(</span><span class="string" id="7524079">&#34;LookPath&nbsp;found&nbsp;%q&nbsp;in&nbsp;$PATH&#34;</span><span class="op" id="7524107">,</span>&nbsp;<span class="ident" id="7524109">name</span><span class="op" id="7524113">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="7524117">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="7524121">if</span>&nbsp;<span class="ident" id="7524124">path</span>&nbsp;<span class="op" id="7524129">!=</span>&nbsp;<span class="string" id="7524132">&#34;&#34;</span>&nbsp;<span class="op" id="7524135">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7524140">t</span><span class="op" id="7524141">.</span><span class="ident" id="7524142">Fatalf</span><span class="op" id="7524148">(</span><span class="string" id="7524149">&#34;LookPath&nbsp;path&nbsp;==&nbsp;%q&nbsp;when&nbsp;err&nbsp;!=&nbsp;nil&#34;</span><span class="op" id="7524186">,</span>&nbsp;<span class="ident" id="7524188">path</span><span class="op" id="7524192">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="7524196">}</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7524200">perr</span><span class="op" id="7524204">,</span>&nbsp;<span class="ident" id="7524206">ok</span>&nbsp;<span class="op" id="7524209">:=</span>&nbsp;<span class="ident" id="7524212">err</span><span class="op" id="7524215">.</span><span class="op" id="7524216">(</span><span class="op" id="7524217">*</span><span class="ident" id="7524218">Error</span><span class="op" id="7524223">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="7524227">if</span>&nbsp;<span class="op" id="7524230">!</span><span class="ident" id="7524231">ok</span>&nbsp;<span class="op" id="7524234">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7524239">t</span><span class="op" id="7524240">.</span><span class="ident" id="7524241">Fatal</span><span class="op" id="7524246">(</span><span class="string" id="7524247">&#34;LookPath&nbsp;error&nbsp;is&nbsp;not&nbsp;an&nbsp;exec.Error&#34;</span><span class="op" id="7524284">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="7524288">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="7524292">if</span>&nbsp;<span class="ident" id="7524295">perr</span><span class="op" id="7524299">.</span><span class="ident" id="7524300">Name</span>&nbsp;<span class="op" id="7524305">!=</span>&nbsp;<span class="ident" id="7524308">name</span>&nbsp;<span class="op" id="7524313">{</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="7524318">t</span><span class="op" id="7524319">.</span><span class="ident" id="7524320">Fatalf</span><span class="op" id="7524326">(</span><span class="string" id="7524327">&#34;want&nbsp;Error&nbsp;name&nbsp;%q,&nbsp;got&nbsp;%q&#34;</span><span class="op" id="7524355">,</span>&nbsp;<span class="ident" id="7524357">name</span><span class="op" id="7524361">,</span>&nbsp;<span class="ident" id="7524363">perr</span><span class="op" id="7524367">.</span><span class="ident" id="7524368">Name</span><span class="op" id="7524372">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="7524376">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="7524379">}</span><br>
+<span class="lineno"></span><span class="op" id="7524381">}</span>
 </div>
 </body>
 </html>

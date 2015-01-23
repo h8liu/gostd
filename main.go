@@ -46,7 +46,7 @@ func loadPackages(pkgs []string) (*loader.Program, error) {
 	return conf.Load()
 }
 
-func makePkgs() ([]*pkg, *token.FileSet, map[int]*file) {
+func makePkgs() (map[string]*pkg, *token.FileSet, map[int]*file) {
 	pkgs := listPackages()
 	pkgs = append(pkgs,
 		"lonnie.io/e8vm",
@@ -61,7 +61,7 @@ func makePkgs() ([]*pkg, *token.FileSet, map[int]*file) {
 
 	fset := prog.Fset
 
-	var ps []*pkg
+	ps := make(map[string]*pkg)
 	files := make(map[int]*file)
 
 	for tpkg, pinfo := range prog.AllPackages {
@@ -101,7 +101,7 @@ func makePkgs() ([]*pkg, *token.FileSet, map[int]*file) {
 			continue
 		}
 
-		ps = append(ps, p)
+		ps[p.path] = p
 	}
 
 	for tpkg, pinfo := range prog.AllPackages {
@@ -129,11 +129,11 @@ func main() {
 	w := &writer{
 		outRoot: "www",
 		outPath: "gostd",
-		
+
 		pkgs:  ps,
 		fset:  fset,
 		files: files,
 	}
 
-	w.writePkgs(ps)
+	w.writePkgs()
 }

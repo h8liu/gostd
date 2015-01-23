@@ -21,7 +21,7 @@
 <li><a href="/gostd/time/sleep.go.html">sleep.go</a></li>
 <li><a href="/gostd/time/sleep_test.go.html">sleep_test.go</a></li>
 <li><a href="/gostd/time/sys_unix.go.html">sys_unix.go</a></li>
-<li><a href="/gostd/time/tick.go.html">tick.go</a></li>
+<li><a href="/gostd/time/tick.go.html" class="current">tick.go</a></li>
 <li><a href="/gostd/time/tick_test.go.html">tick_test.go</a></li>
 <li><a href="/gostd/time/time.go.html">time.go</a></li>
 <li><a href="/gostd/time/time_test.go.html">time_test.go</a></li>
@@ -32,62 +32,62 @@
 </ul>
 </div>
 <div class="code">
-<span class="lineno">1</span><span class="comment" id="2603316">//&nbsp;Copyright&nbsp;2009&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
-<span class="lineno"></span><span class="comment" id="2603371">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
-<span class="lineno"></span><span class="comment" id="2603425">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno">1</span><span class="comment" id="2822029">//&nbsp;Copyright&nbsp;2009&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment" id="2822084">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment" id="2822138">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
 <span class="lineno"></span><br>
-<span class="lineno">5</span><span class="keyword" id="2603476">package</span>&nbsp;<span class="ident" id="2603484">time</span><br>
+<span class="lineno">5</span><span class="keyword" id="2822189">package</span>&nbsp;<span class="ident" id="2822197">time</span><br>
 <span class="lineno"></span><br>
-<span class="lineno"></span><span class="keyword" id="2603490">import</span>&nbsp;<span class="string" id="2603497">&#34;errors&#34;</span><br>
+<span class="lineno"></span><span class="keyword" id="2822203">import</span>&nbsp;<span class="string" id="2822210">&#34;errors&#34;</span><br>
 <span class="lineno"></span><br>
-<span class="lineno"></span><span class="comment" id="2603507">//&nbsp;A&nbsp;Ticker&nbsp;holds&nbsp;a&nbsp;channel&nbsp;that&nbsp;delivers&nbsp;`ticks&#39;&nbsp;of&nbsp;a&nbsp;clock</span><br>
-<span class="lineno">10</span><span class="comment" id="2603568">//&nbsp;at&nbsp;intervals.</span><br>
-<span class="lineno"></span><span class="keyword" id="2603585">type</span>&nbsp;<span class="ident" id="2603590">Ticker</span>&nbsp;<span class="keyword" id="2603597">struct</span>&nbsp;<span class="op" id="2603604">{</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2603607">C</span>&nbsp;<span class="op" id="2603609">&lt;-</span><span class="keyword" id="2603611">chan</span>&nbsp;<span class="ident" id="2603616">Time</span>&nbsp;<span class="comment" id="2603621">//&nbsp;The&nbsp;channel&nbsp;on&nbsp;which&nbsp;the&nbsp;ticks&nbsp;are&nbsp;delivered.</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2603671">r</span>&nbsp;<span class="ident" id="2603673">runtimeTimer</span><br>
-<span class="lineno"></span><span class="op" id="2603686">}</span><br>
+<span class="lineno"></span><span class="comment" id="2822220">//&nbsp;A&nbsp;Ticker&nbsp;holds&nbsp;a&nbsp;channel&nbsp;that&nbsp;delivers&nbsp;`ticks&#39;&nbsp;of&nbsp;a&nbsp;clock</span><br>
+<span class="lineno">10</span><span class="comment" id="2822281">//&nbsp;at&nbsp;intervals.</span><br>
+<span class="lineno"></span><span class="keyword" id="2822298">type</span>&nbsp;<span class="ident" id="2822303">Ticker</span>&nbsp;<span class="keyword" id="2822310">struct</span>&nbsp;<span class="op" id="2822317">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2822320">C</span>&nbsp;<span class="op" id="2822322">&lt;-</span><span class="keyword" id="2822324">chan</span>&nbsp;<span class="ident" id="2822329">Time</span>&nbsp;<span class="comment" id="2822334">//&nbsp;The&nbsp;channel&nbsp;on&nbsp;which&nbsp;the&nbsp;ticks&nbsp;are&nbsp;delivered.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2822384">r</span>&nbsp;<span class="ident" id="2822386">runtimeTimer</span><br>
+<span class="lineno"></span><span class="op" id="2822399">}</span><br>
 <span class="lineno">15</span><br>
-<span class="lineno"></span><span class="comment" id="2603689">//&nbsp;NewTicker&nbsp;returns&nbsp;a&nbsp;new&nbsp;Ticker&nbsp;containing&nbsp;a&nbsp;channel&nbsp;that&nbsp;will&nbsp;send&nbsp;the</span><br>
-<span class="lineno"></span><span class="comment" id="2603763">//&nbsp;time&nbsp;with&nbsp;a&nbsp;period&nbsp;specified&nbsp;by&nbsp;the&nbsp;duration&nbsp;argument.</span><br>
-<span class="lineno"></span><span class="comment" id="2603821">//&nbsp;It&nbsp;adjusts&nbsp;the&nbsp;intervals&nbsp;or&nbsp;drops&nbsp;ticks&nbsp;to&nbsp;make&nbsp;up&nbsp;for&nbsp;slow&nbsp;receivers.</span><br>
-<span class="lineno"></span><span class="comment" id="2603895">//&nbsp;The&nbsp;duration&nbsp;d&nbsp;must&nbsp;be&nbsp;greater&nbsp;than&nbsp;zero;&nbsp;if&nbsp;not,&nbsp;NewTicker&nbsp;will&nbsp;panic.</span><br>
-<span class="lineno">20</span><span class="comment" id="2603970">//&nbsp;Stop&nbsp;the&nbsp;ticker&nbsp;to&nbsp;release&nbsp;associated&nbsp;resources.</span><br>
-<span class="lineno"></span><span class="keyword" id="2604022">func</span>&nbsp;<span class="ident" id="2604027">NewTicker</span><span class="op" id="2604036">(</span><span class="ident" id="2604037">d</span>&nbsp;<span class="ident" id="2604039">Duration</span><span class="op" id="2604047">)</span>&nbsp;<span class="op" id="2604049">*</span><span class="ident" id="2604050">Ticker</span>&nbsp;<span class="op" id="2604057">{</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="2604060">if</span>&nbsp;<span class="ident" id="2604063">d</span>&nbsp;<span class="op" id="2604065">&lt;=</span>&nbsp;<span class="num" id="2604068">0</span>&nbsp;<span class="op" id="2604070">{</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc" id="2604074">panic</span><span class="op" id="2604079">(</span><span class="ident" id="2604080">errors</span><span class="op" id="2604086">.</span><span class="ident" id="2604087">New</span><span class="op" id="2604090">(</span><span class="string" id="2604091">&#34;non-positive&nbsp;interval&nbsp;for&nbsp;NewTicker&#34;</span><span class="op" id="2604128">)</span><span class="op" id="2604129">)</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="2604132">}</span><br>
-<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="2604135">//&nbsp;Give&nbsp;the&nbsp;channel&nbsp;a&nbsp;1-element&nbsp;time&nbsp;buffer.</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="2604181">//&nbsp;If&nbsp;the&nbsp;client&nbsp;falls&nbsp;behind&nbsp;while&nbsp;reading,&nbsp;we&nbsp;drop&nbsp;ticks</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="2604241">//&nbsp;on&nbsp;the&nbsp;floor&nbsp;until&nbsp;the&nbsp;client&nbsp;catches&nbsp;up.</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2604287">c</span>&nbsp;<span class="op" id="2604289">:=</span>&nbsp;<span class="builtinfunc" id="2604292">make</span><span class="op" id="2604296">(</span><span class="keyword" id="2604297">chan</span>&nbsp;<span class="ident" id="2604302">Time</span><span class="op" id="2604306">,</span>&nbsp;<span class="num" id="2604308">1</span><span class="op" id="2604309">)</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2604312">t</span>&nbsp;<span class="op" id="2604314">:=</span>&nbsp;<span class="op" id="2604317">&amp;</span><span class="ident" id="2604318">Ticker</span><span class="op" id="2604324">{</span><br>
-<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2604328">C</span><span class="op" id="2604329">:</span>&nbsp;<span class="ident" id="2604331">c</span><span class="op" id="2604332">,</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2604336">r</span><span class="op" id="2604337">:</span>&nbsp;<span class="ident" id="2604339">runtimeTimer</span><span class="op" id="2604351">{</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2604356">when</span><span class="op" id="2604360">:</span>&nbsp;&nbsp;&nbsp;<span class="ident" id="2604364">when</span><span class="op" id="2604368">(</span><span class="ident" id="2604369">d</span><span class="op" id="2604370">)</span><span class="op" id="2604371">,</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2604376">period</span><span class="op" id="2604382">:</span>&nbsp;<span class="ident" id="2604384">int64</span><span class="op" id="2604389">(</span><span class="ident" id="2604390">d</span><span class="op" id="2604391">)</span><span class="op" id="2604392">,</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2604397">f</span><span class="op" id="2604398">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="2604405">sendTime</span><span class="op" id="2604413">,</span><br>
-<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2604418">arg</span><span class="op" id="2604421">:</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="2604426">c</span><span class="op" id="2604427">,</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="2604431">}</span><span class="op" id="2604432">,</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="2604435">}</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2604438">startTimer</span><span class="op" id="2604448">(</span><span class="op" id="2604449">&amp;</span><span class="ident" id="2604450">t</span><span class="op" id="2604451">.</span><span class="ident" id="2604452">r</span><span class="op" id="2604453">)</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="2604456">return</span>&nbsp;<span class="ident" id="2604463">t</span><br>
-<span class="lineno">40</span><span class="op" id="2604465">}</span><br>
+<span class="lineno"></span><span class="comment" id="2822402">//&nbsp;NewTicker&nbsp;returns&nbsp;a&nbsp;new&nbsp;Ticker&nbsp;containing&nbsp;a&nbsp;channel&nbsp;that&nbsp;will&nbsp;send&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment" id="2822476">//&nbsp;time&nbsp;with&nbsp;a&nbsp;period&nbsp;specified&nbsp;by&nbsp;the&nbsp;duration&nbsp;argument.</span><br>
+<span class="lineno"></span><span class="comment" id="2822534">//&nbsp;It&nbsp;adjusts&nbsp;the&nbsp;intervals&nbsp;or&nbsp;drops&nbsp;ticks&nbsp;to&nbsp;make&nbsp;up&nbsp;for&nbsp;slow&nbsp;receivers.</span><br>
+<span class="lineno"></span><span class="comment" id="2822608">//&nbsp;The&nbsp;duration&nbsp;d&nbsp;must&nbsp;be&nbsp;greater&nbsp;than&nbsp;zero;&nbsp;if&nbsp;not,&nbsp;NewTicker&nbsp;will&nbsp;panic.</span><br>
+<span class="lineno">20</span><span class="comment" id="2822683">//&nbsp;Stop&nbsp;the&nbsp;ticker&nbsp;to&nbsp;release&nbsp;associated&nbsp;resources.</span><br>
+<span class="lineno"></span><span class="keyword" id="2822735">func</span>&nbsp;<span class="ident" id="2822740">NewTicker</span><span class="op" id="2822749">(</span><span class="ident" id="2822750">d</span>&nbsp;<span class="ident" id="2822752">Duration</span><span class="op" id="2822760">)</span>&nbsp;<span class="op" id="2822762">*</span><span class="ident" id="2822763">Ticker</span>&nbsp;<span class="op" id="2822770">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="2822773">if</span>&nbsp;<span class="ident" id="2822776">d</span>&nbsp;<span class="op" id="2822778">&lt;=</span>&nbsp;<span class="num" id="2822781">0</span>&nbsp;<span class="op" id="2822783">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="builtinfunc" id="2822787">panic</span><span class="op" id="2822792">(</span><span class="ident" id="2822793">errors</span><span class="op" id="2822799">.</span><span class="ident" id="2822800">New</span><span class="op" id="2822803">(</span><span class="string" id="2822804">&#34;non-positive&nbsp;interval&nbsp;for&nbsp;NewTicker&#34;</span><span class="op" id="2822841">)</span><span class="op" id="2822842">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="2822845">}</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="2822848">//&nbsp;Give&nbsp;the&nbsp;channel&nbsp;a&nbsp;1-element&nbsp;time&nbsp;buffer.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="2822894">//&nbsp;If&nbsp;the&nbsp;client&nbsp;falls&nbsp;behind&nbsp;while&nbsp;reading,&nbsp;we&nbsp;drop&nbsp;ticks</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="2822954">//&nbsp;on&nbsp;the&nbsp;floor&nbsp;until&nbsp;the&nbsp;client&nbsp;catches&nbsp;up.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2823000">c</span>&nbsp;<span class="op" id="2823002">:=</span>&nbsp;<span class="builtinfunc" id="2823005">make</span><span class="op" id="2823009">(</span><span class="keyword" id="2823010">chan</span>&nbsp;<span class="ident" id="2823015">Time</span><span class="op" id="2823019">,</span>&nbsp;<span class="num" id="2823021">1</span><span class="op" id="2823022">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2823025">t</span>&nbsp;<span class="op" id="2823027">:=</span>&nbsp;<span class="op" id="2823030">&amp;</span><span class="ident" id="2823031">Ticker</span><span class="op" id="2823037">{</span><br>
+<span class="lineno">30</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2823041">C</span><span class="op" id="2823042">:</span>&nbsp;<span class="ident" id="2823044">c</span><span class="op" id="2823045">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2823049">r</span><span class="op" id="2823050">:</span>&nbsp;<span class="ident" id="2823052">runtimeTimer</span><span class="op" id="2823064">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2823069">when</span><span class="op" id="2823073">:</span>&nbsp;&nbsp;&nbsp;<span class="ident" id="2823077">when</span><span class="op" id="2823081">(</span><span class="ident" id="2823082">d</span><span class="op" id="2823083">)</span><span class="op" id="2823084">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2823089">period</span><span class="op" id="2823095">:</span>&nbsp;<span class="ident" id="2823097">int64</span><span class="op" id="2823102">(</span><span class="ident" id="2823103">d</span><span class="op" id="2823104">)</span><span class="op" id="2823105">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2823110">f</span><span class="op" id="2823111">:</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="2823118">sendTime</span><span class="op" id="2823126">,</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2823131">arg</span><span class="op" id="2823134">:</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="2823139">c</span><span class="op" id="2823140">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="2823144">}</span><span class="op" id="2823145">,</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="2823148">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2823151">startTimer</span><span class="op" id="2823161">(</span><span class="op" id="2823162">&amp;</span><span class="ident" id="2823163">t</span><span class="op" id="2823164">.</span><span class="ident" id="2823165">r</span><span class="op" id="2823166">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="2823169">return</span>&nbsp;<span class="ident" id="2823176">t</span><br>
+<span class="lineno">40</span><span class="op" id="2823178">}</span><br>
 <span class="lineno"></span><br>
-<span class="lineno"></span><span class="comment" id="2604468">//&nbsp;Stop&nbsp;turns&nbsp;off&nbsp;a&nbsp;ticker.&nbsp;&nbsp;After&nbsp;Stop,&nbsp;no&nbsp;more&nbsp;ticks&nbsp;will&nbsp;be&nbsp;sent.</span><br>
-<span class="lineno"></span><span class="comment" id="2604537">//&nbsp;Stop&nbsp;does&nbsp;not&nbsp;close&nbsp;the&nbsp;channel,&nbsp;to&nbsp;prevent&nbsp;a&nbsp;read&nbsp;from&nbsp;the&nbsp;channel&nbsp;succeeding</span><br>
-<span class="lineno"></span><span class="comment" id="2604619">//&nbsp;incorrectly.</span><br>
-<span class="lineno">45</span><span class="keyword" id="2604635">func</span>&nbsp;<span class="op" id="2604640">(</span><span class="ident" id="2604641">t</span>&nbsp;<span class="op" id="2604643">*</span><span class="ident" id="2604644">Ticker</span><span class="op" id="2604650">)</span>&nbsp;<span class="ident" id="2604652">Stop</span><span class="op" id="2604656">(</span><span class="op" id="2604657">)</span>&nbsp;<span class="op" id="2604659">{</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2604662">stopTimer</span><span class="op" id="2604671">(</span><span class="op" id="2604672">&amp;</span><span class="ident" id="2604673">t</span><span class="op" id="2604674">.</span><span class="ident" id="2604675">r</span><span class="op" id="2604676">)</span><br>
-<span class="lineno"></span><span class="op" id="2604678">}</span><br>
+<span class="lineno"></span><span class="comment" id="2823181">//&nbsp;Stop&nbsp;turns&nbsp;off&nbsp;a&nbsp;ticker.&nbsp;&nbsp;After&nbsp;Stop,&nbsp;no&nbsp;more&nbsp;ticks&nbsp;will&nbsp;be&nbsp;sent.</span><br>
+<span class="lineno"></span><span class="comment" id="2823250">//&nbsp;Stop&nbsp;does&nbsp;not&nbsp;close&nbsp;the&nbsp;channel,&nbsp;to&nbsp;prevent&nbsp;a&nbsp;read&nbsp;from&nbsp;the&nbsp;channel&nbsp;succeeding</span><br>
+<span class="lineno"></span><span class="comment" id="2823332">//&nbsp;incorrectly.</span><br>
+<span class="lineno">45</span><span class="keyword" id="2823348">func</span>&nbsp;<span class="op" id="2823353">(</span><span class="ident" id="2823354">t</span>&nbsp;<span class="op" id="2823356">*</span><span class="ident" id="2823357">Ticker</span><span class="op" id="2823363">)</span>&nbsp;<span class="ident" id="2823365">Stop</span><span class="op" id="2823369">(</span><span class="op" id="2823370">)</span>&nbsp;<span class="op" id="2823372">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="2823375">stopTimer</span><span class="op" id="2823384">(</span><span class="op" id="2823385">&amp;</span><span class="ident" id="2823386">t</span><span class="op" id="2823387">.</span><span class="ident" id="2823388">r</span><span class="op" id="2823389">)</span><br>
+<span class="lineno"></span><span class="op" id="2823391">}</span><br>
 <span class="lineno"></span><br>
-<span class="lineno"></span><span class="comment" id="2604681">//&nbsp;Tick&nbsp;is&nbsp;a&nbsp;convenience&nbsp;wrapper&nbsp;for&nbsp;NewTicker&nbsp;providing&nbsp;access&nbsp;to&nbsp;the&nbsp;ticking</span><br>
-<span class="lineno">50</span><span class="comment" id="2604760">//&nbsp;channel&nbsp;only.&nbsp;&nbsp;Useful&nbsp;for&nbsp;clients&nbsp;that&nbsp;have&nbsp;no&nbsp;need&nbsp;to&nbsp;shut&nbsp;down&nbsp;the&nbsp;ticker.</span><br>
-<span class="lineno"></span><span class="keyword" id="2604840">func</span>&nbsp;<span class="ident" id="2604845">Tick</span><span class="op" id="2604849">(</span><span class="ident" id="2604850">d</span>&nbsp;<span class="ident" id="2604852">Duration</span><span class="op" id="2604860">)</span>&nbsp;<span class="op" id="2604862">&lt;-</span><span class="keyword" id="2604864">chan</span>&nbsp;<span class="ident" id="2604869">Time</span>&nbsp;<span class="op" id="2604874">{</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="2604877">if</span>&nbsp;<span class="ident" id="2604880">d</span>&nbsp;<span class="op" id="2604882">&lt;=</span>&nbsp;<span class="num" id="2604885">0</span>&nbsp;<span class="op" id="2604887">{</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="2604891">return</span>&nbsp;<span class="ident" id="2604898">nil</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="2604903">}</span><br>
-<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="2604906">return</span>&nbsp;<span class="ident" id="2604913">NewTicker</span><span class="op" id="2604922">(</span><span class="ident" id="2604923">d</span><span class="op" id="2604924">)</span><span class="op" id="2604925">.</span><span class="ident" id="2604926">C</span><br>
-<span class="lineno"></span><span class="op" id="2604928">}</span>
+<span class="lineno"></span><span class="comment" id="2823394">//&nbsp;Tick&nbsp;is&nbsp;a&nbsp;convenience&nbsp;wrapper&nbsp;for&nbsp;NewTicker&nbsp;providing&nbsp;access&nbsp;to&nbsp;the&nbsp;ticking</span><br>
+<span class="lineno">50</span><span class="comment" id="2823473">//&nbsp;channel&nbsp;only.&nbsp;&nbsp;Useful&nbsp;for&nbsp;clients&nbsp;that&nbsp;have&nbsp;no&nbsp;need&nbsp;to&nbsp;shut&nbsp;down&nbsp;the&nbsp;ticker.</span><br>
+<span class="lineno"></span><span class="keyword" id="2823553">func</span>&nbsp;<span class="ident" id="2823558">Tick</span><span class="op" id="2823562">(</span><span class="ident" id="2823563">d</span>&nbsp;<span class="ident" id="2823565">Duration</span><span class="op" id="2823573">)</span>&nbsp;<span class="op" id="2823575">&lt;-</span><span class="keyword" id="2823577">chan</span>&nbsp;<span class="ident" id="2823582">Time</span>&nbsp;<span class="op" id="2823587">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="2823590">if</span>&nbsp;<span class="ident" id="2823593">d</span>&nbsp;<span class="op" id="2823595">&lt;=</span>&nbsp;<span class="num" id="2823598">0</span>&nbsp;<span class="op" id="2823600">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="2823604">return</span>&nbsp;<span class="ident" id="2823611">nil</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="2823616">}</span><br>
+<span class="lineno">55</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="2823619">return</span>&nbsp;<span class="ident" id="2823626">NewTicker</span><span class="op" id="2823635">(</span><span class="ident" id="2823636">d</span><span class="op" id="2823637">)</span><span class="op" id="2823638">.</span><span class="ident" id="2823639">C</span><br>
+<span class="lineno"></span><span class="op" id="2823641">}</span>
 </div>
 </body>
 </html>

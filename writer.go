@@ -66,7 +66,7 @@ func (w *writer) writePkgs() {
 	ne(e)
 }
 
-func (w *writer) htmlPkgNavi(p *pkg, out io.Writer) {
+func (w *writer) htmlPkgNavi(p *pkg, curFile string, out io.Writer) {
 	var files []string
 
 	ppath := p.path
@@ -105,8 +105,14 @@ func (w *writer) htmlPkgNavi(p *pkg, out io.Writer) {
 		sort.Strings(files)
 		fmt.Fprintln(out, `<ul>`)
 		for _, f := range files {
-			fmt.Fprintf(out, `<li><a href="%s">%s</a></li>`+"\n",
+			var extra string
+			if f == curFile {
+				extra = ` class="current"`
+			}
+
+			fmt.Fprintf(out, `<li><a href="%s"%s>%s</a></li>`+"\n",
 				html.EscapeString(w.href(path.Join(p.savePath, f))),
+				extra,
 				html.EscapeString(f),
 			)
 		}
@@ -230,7 +236,7 @@ func (w *writer) html(p *pkg, f *file) []byte {
 	out := new(bytes.Buffer)
 
 	fmt.Fprint(out, htmlHeader)
-	w.htmlPkgNavi(p, out)
+	w.htmlPkgNavi(p, f.name, out)
 	w.htmlBody(f, out)
 	fmt.Fprint(out, htmlFooter)
 
@@ -240,7 +246,7 @@ func (w *writer) html(p *pkg, f *file) []byte {
 func (w *writer) pkgHtml(p *pkg) []byte {
 	out := new(bytes.Buffer)
 	fmt.Fprint(out, htmlHeader)
-	w.htmlPkgNavi(p, out)
+	w.htmlPkgNavi(p, "", out)
 	fmt.Fprint(out, htmlFooter)
 
 	return out.Bytes()

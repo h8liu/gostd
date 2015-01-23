@@ -19,7 +19,7 @@
 <li><a href="/gostd/sync/export_test.go.html">export_test.go</a></li>
 <li><a href="/gostd/sync/mutex.go.html">mutex.go</a></li>
 <li><a href="/gostd/sync/mutex_test.go.html">mutex_test.go</a></li>
-<li><a href="/gostd/sync/once.go.html">once.go</a></li>
+<li><a href="/gostd/sync/once.go.html" class="current">once.go</a></li>
 <li><a href="/gostd/sync/once_test.go.html">once_test.go</a></li>
 <li><a href="/gostd/sync/pool.go.html">pool.go</a></li>
 <li><a href="/gostd/sync/pool_test.go.html">pool_test.go</a></li>
@@ -33,52 +33,52 @@
 </ul>
 </div>
 <div class="code">
-<span class="lineno">1</span><span class="comment" id="1367553">//&nbsp;Copyright&nbsp;2009&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
-<span class="lineno"></span><span class="comment" id="1367608">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
-<span class="lineno"></span><span class="comment" id="1367662">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno">1</span><span class="comment" id="1615901">//&nbsp;Copyright&nbsp;2009&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment" id="1615956">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment" id="1616010">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
 <span class="lineno"></span><br>
-<span class="lineno">5</span><span class="keyword" id="1367713">package</span>&nbsp;<span class="ident" id="1367721">sync</span><br>
+<span class="lineno">5</span><span class="keyword" id="1616061">package</span>&nbsp;<span class="ident" id="1616069">sync</span><br>
 <span class="lineno"></span><br>
-<span class="lineno"></span><span class="keyword" id="1367727">import</span>&nbsp;<span class="op" id="1367734">(</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="1367737">&#34;sync/atomic&#34;</span><br>
-<span class="lineno"></span><span class="op" id="1367751">)</span><br>
+<span class="lineno"></span><span class="keyword" id="1616075">import</span>&nbsp;<span class="op" id="1616082">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="string" id="1616085">&#34;sync/atomic&#34;</span><br>
+<span class="lineno"></span><span class="op" id="1616099">)</span><br>
 <span class="lineno">10</span><br>
-<span class="lineno"></span><span class="comment" id="1367754">//&nbsp;Once&nbsp;is&nbsp;an&nbsp;object&nbsp;that&nbsp;will&nbsp;perform&nbsp;exactly&nbsp;one&nbsp;action.</span><br>
-<span class="lineno"></span><span class="keyword" id="1367813">type</span>&nbsp;<span class="ident" id="1367818">Once</span>&nbsp;<span class="keyword" id="1367823">struct</span>&nbsp;<span class="op" id="1367830">{</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1367833">m</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="1367838">Mutex</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1367845">done</span>&nbsp;<span class="builtintype" id="1367850">uint32</span><br>
-<span class="lineno">15</span><span class="op" id="1367857">}</span><br>
+<span class="lineno"></span><span class="comment" id="1616102">//&nbsp;Once&nbsp;is&nbsp;an&nbsp;object&nbsp;that&nbsp;will&nbsp;perform&nbsp;exactly&nbsp;one&nbsp;action.</span><br>
+<span class="lineno"></span><span class="keyword" id="1616161">type</span>&nbsp;<span class="ident" id="1616166">Once</span>&nbsp;<span class="keyword" id="1616171">struct</span>&nbsp;<span class="op" id="1616178">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1616181">m</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="1616186">Mutex</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1616193">done</span>&nbsp;<span class="builtintype" id="1616198">uint32</span><br>
+<span class="lineno">15</span><span class="op" id="1616205">}</span><br>
 <span class="lineno"></span><br>
-<span class="lineno"></span><span class="comment" id="1367860">//&nbsp;Do&nbsp;calls&nbsp;the&nbsp;function&nbsp;f&nbsp;if&nbsp;and&nbsp;only&nbsp;if&nbsp;Do&nbsp;is&nbsp;being&nbsp;called&nbsp;for&nbsp;the</span><br>
-<span class="lineno"></span><span class="comment" id="1367929">//&nbsp;first&nbsp;time&nbsp;for&nbsp;this&nbsp;instance&nbsp;of&nbsp;Once.&nbsp;In&nbsp;other&nbsp;words,&nbsp;given</span><br>
-<span class="lineno"></span><span class="comment" id="1367992">//&nbsp;&nbsp;&nbsp;&nbsp;&nbspvar&nbsp;once&nbsp;Once</span><br>
-<span class="lineno">20</span><span class="comment" id="1368010">//&nbsp;if&nbsp;once.Do(f)&nbsp;is&nbsp;called&nbsp;multiple&nbsp;times,&nbsp;only&nbsp;the&nbsp;first&nbsp;call&nbsp;will&nbsp;invoke&nbsp;f,</span><br>
-<span class="lineno"></span><span class="comment" id="1368088">//&nbsp;even&nbsp;if&nbsp;f&nbsp;has&nbsp;a&nbsp;different&nbsp;value&nbsp;in&nbsp;each&nbsp;invocation.&nbsp;&nbsp;A&nbsp;new&nbsp;instance&nbsp;of</span><br>
-<span class="lineno"></span><span class="comment" id="1368162">//&nbsp;Once&nbsp;is&nbsp;required&nbsp;for&nbsp;each&nbsp;function&nbsp;to&nbsp;execute.</span><br>
-<span class="lineno"></span><span class="comment" id="1368212">//</span><br>
-<span class="lineno"></span><span class="comment" id="1368215">//&nbsp;Do&nbsp;is&nbsp;intended&nbsp;for&nbsp;initialization&nbsp;that&nbsp;must&nbsp;be&nbsp;run&nbsp;exactly&nbsp;once.&nbsp;&nbsp;Since&nbsp;f</span><br>
-<span class="lineno">25</span><span class="comment" id="1368292">//&nbsp;is&nbsp;niladic,&nbsp;it&nbsp;may&nbsp;be&nbsp;necessary&nbsp;to&nbsp;use&nbsp;a&nbsp;function&nbsp;literal&nbsp;to&nbsp;capture&nbsp;the</span><br>
-<span class="lineno"></span><span class="comment" id="1368368">//&nbsp;arguments&nbsp;to&nbsp;a&nbsp;function&nbsp;to&nbsp;be&nbsp;invoked&nbsp;by&nbsp;Do:</span><br>
-<span class="lineno"></span><span class="comment" id="1368416">//&nbsp;&nbsp;&nbsp;&nbsp;&nbspconfig.once.Do(func()&nbsp;{&nbsp;config.init(filename)&nbsp;})</span><br>
-<span class="lineno"></span><span class="comment" id="1368469">//</span><br>
-<span class="lineno"></span><span class="comment" id="1368472">//&nbsp;Because&nbsp;no&nbsp;call&nbsp;to&nbsp;Do&nbsp;returns&nbsp;until&nbsp;the&nbsp;one&nbsp;call&nbsp;to&nbsp;f&nbsp;returns,&nbsp;if&nbsp;f&nbsp;causes</span><br>
-<span class="lineno">30</span><span class="comment" id="1368550">//&nbsp;Do&nbsp;to&nbsp;be&nbsp;called,&nbsp;it&nbsp;will&nbsp;deadlock.</span><br>
-<span class="lineno"></span><span class="comment" id="1368588">//</span><br>
-<span class="lineno"></span><span class="comment" id="1368591">//&nbsp;If&nbsp;f&nbsp;panics,&nbsp;Do&nbsp;considers&nbsp;it&nbsp;to&nbsp;have&nbsp;returned;&nbsp;future&nbsp;calls&nbsp;of&nbsp;Do&nbsp;return</span><br>
-<span class="lineno"></span><span class="comment" id="1368667">//&nbsp;without&nbsp;calling&nbsp;f.</span><br>
-<span class="lineno"></span><span class="comment" id="1368689">//</span><br>
-<span class="lineno">35</span><span class="keyword" id="1368692">func</span>&nbsp;<span class="op" id="1368697">(</span><span class="ident" id="1368698">o</span>&nbsp;<span class="op" id="1368700">*</span><span class="ident" id="1368701">Once</span><span class="op" id="1368705">)</span>&nbsp;<span class="ident" id="1368707">Do</span><span class="op" id="1368709">(</span><span class="ident" id="1368710">f</span>&nbsp;<span class="keyword" id="1368712">func</span><span class="op" id="1368716">(</span><span class="op" id="1368717">)</span><span class="op" id="1368718">)</span>&nbsp;<span class="op" id="1368720">{</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1368723">if</span>&nbsp;<span class="ident" id="1368726">atomic</span><span class="op" id="1368732">.</span><span class="ident" id="1368733">LoadUint32</span><span class="op" id="1368743">(</span><span class="op" id="1368744">&amp;</span><span class="ident" id="1368745">o</span><span class="op" id="1368746">.</span><span class="ident" id="1368747">done</span><span class="op" id="1368751">)</span>&nbsp;<span class="op" id="1368753">==</span>&nbsp;<span class="num" id="1368756">1</span>&nbsp;<span class="op" id="1368758">{</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1368762">return</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1368770">}</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1368773">//&nbsp;Slow-path.</span><br>
-<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1368788">o</span><span class="op" id="1368789">.</span><span class="ident" id="1368790">m</span><span class="op" id="1368791">.</span><span class="ident" id="1368792">Lock</span><span class="op" id="1368796">(</span><span class="op" id="1368797">)</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1368800">defer</span>&nbsp;<span class="ident" id="1368806">o</span><span class="op" id="1368807">.</span><span class="ident" id="1368808">m</span><span class="op" id="1368809">.</span><span class="ident" id="1368810">Unlock</span><span class="op" id="1368816">(</span><span class="op" id="1368817">)</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1368820">if</span>&nbsp;<span class="ident" id="1368823">o</span><span class="op" id="1368824">.</span><span class="ident" id="1368825">done</span>&nbsp;<span class="op" id="1368830">==</span>&nbsp;<span class="num" id="1368833">0</span>&nbsp;<span class="op" id="1368835">{</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1368839">defer</span>&nbsp;<span class="ident" id="1368845">atomic</span><span class="op" id="1368851">.</span><span class="ident" id="1368852">StoreUint32</span><span class="op" id="1368863">(</span><span class="op" id="1368864">&amp;</span><span class="ident" id="1368865">o</span><span class="op" id="1368866">.</span><span class="ident" id="1368867">done</span><span class="op" id="1368871">,</span>&nbsp;<span class="num" id="1368873">1</span><span class="op" id="1368874">)</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1368878">f</span><span class="op" id="1368879">(</span><span class="op" id="1368880">)</span><br>
-<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1368883">}</span><br>
-<span class="lineno"></span><span class="op" id="1368885">}</span>
+<span class="lineno"></span><span class="comment" id="1616208">//&nbsp;Do&nbsp;calls&nbsp;the&nbsp;function&nbsp;f&nbsp;if&nbsp;and&nbsp;only&nbsp;if&nbsp;Do&nbsp;is&nbsp;being&nbsp;called&nbsp;for&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment" id="1616277">//&nbsp;first&nbsp;time&nbsp;for&nbsp;this&nbsp;instance&nbsp;of&nbsp;Once.&nbsp;In&nbsp;other&nbsp;words,&nbsp;given</span><br>
+<span class="lineno"></span><span class="comment" id="1616340">//&nbsp;&nbsp;&nbsp;&nbsp;&nbspvar&nbsp;once&nbsp;Once</span><br>
+<span class="lineno">20</span><span class="comment" id="1616358">//&nbsp;if&nbsp;once.Do(f)&nbsp;is&nbsp;called&nbsp;multiple&nbsp;times,&nbsp;only&nbsp;the&nbsp;first&nbsp;call&nbsp;will&nbsp;invoke&nbsp;f,</span><br>
+<span class="lineno"></span><span class="comment" id="1616436">//&nbsp;even&nbsp;if&nbsp;f&nbsp;has&nbsp;a&nbsp;different&nbsp;value&nbsp;in&nbsp;each&nbsp;invocation.&nbsp;&nbsp;A&nbsp;new&nbsp;instance&nbsp;of</span><br>
+<span class="lineno"></span><span class="comment" id="1616510">//&nbsp;Once&nbsp;is&nbsp;required&nbsp;for&nbsp;each&nbsp;function&nbsp;to&nbsp;execute.</span><br>
+<span class="lineno"></span><span class="comment" id="1616560">//</span><br>
+<span class="lineno"></span><span class="comment" id="1616563">//&nbsp;Do&nbsp;is&nbsp;intended&nbsp;for&nbsp;initialization&nbsp;that&nbsp;must&nbsp;be&nbsp;run&nbsp;exactly&nbsp;once.&nbsp;&nbsp;Since&nbsp;f</span><br>
+<span class="lineno">25</span><span class="comment" id="1616640">//&nbsp;is&nbsp;niladic,&nbsp;it&nbsp;may&nbsp;be&nbsp;necessary&nbsp;to&nbsp;use&nbsp;a&nbsp;function&nbsp;literal&nbsp;to&nbsp;capture&nbsp;the</span><br>
+<span class="lineno"></span><span class="comment" id="1616716">//&nbsp;arguments&nbsp;to&nbsp;a&nbsp;function&nbsp;to&nbsp;be&nbsp;invoked&nbsp;by&nbsp;Do:</span><br>
+<span class="lineno"></span><span class="comment" id="1616764">//&nbsp;&nbsp;&nbsp;&nbsp;&nbspconfig.once.Do(func()&nbsp;{&nbsp;config.init(filename)&nbsp;})</span><br>
+<span class="lineno"></span><span class="comment" id="1616817">//</span><br>
+<span class="lineno"></span><span class="comment" id="1616820">//&nbsp;Because&nbsp;no&nbsp;call&nbsp;to&nbsp;Do&nbsp;returns&nbsp;until&nbsp;the&nbsp;one&nbsp;call&nbsp;to&nbsp;f&nbsp;returns,&nbsp;if&nbsp;f&nbsp;causes</span><br>
+<span class="lineno">30</span><span class="comment" id="1616898">//&nbsp;Do&nbsp;to&nbsp;be&nbsp;called,&nbsp;it&nbsp;will&nbsp;deadlock.</span><br>
+<span class="lineno"></span><span class="comment" id="1616936">//</span><br>
+<span class="lineno"></span><span class="comment" id="1616939">//&nbsp;If&nbsp;f&nbsp;panics,&nbsp;Do&nbsp;considers&nbsp;it&nbsp;to&nbsp;have&nbsp;returned;&nbsp;future&nbsp;calls&nbsp;of&nbsp;Do&nbsp;return</span><br>
+<span class="lineno"></span><span class="comment" id="1617015">//&nbsp;without&nbsp;calling&nbsp;f.</span><br>
+<span class="lineno"></span><span class="comment" id="1617037">//</span><br>
+<span class="lineno">35</span><span class="keyword" id="1617040">func</span>&nbsp;<span class="op" id="1617045">(</span><span class="ident" id="1617046">o</span>&nbsp;<span class="op" id="1617048">*</span><span class="ident" id="1617049">Once</span><span class="op" id="1617053">)</span>&nbsp;<span class="ident" id="1617055">Do</span><span class="op" id="1617057">(</span><span class="ident" id="1617058">f</span>&nbsp;<span class="keyword" id="1617060">func</span><span class="op" id="1617064">(</span><span class="op" id="1617065">)</span><span class="op" id="1617066">)</span>&nbsp;<span class="op" id="1617068">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1617071">if</span>&nbsp;<span class="ident" id="1617074">atomic</span><span class="op" id="1617080">.</span><span class="ident" id="1617081">LoadUint32</span><span class="op" id="1617091">(</span><span class="op" id="1617092">&amp;</span><span class="ident" id="1617093">o</span><span class="op" id="1617094">.</span><span class="ident" id="1617095">done</span><span class="op" id="1617099">)</span>&nbsp;<span class="op" id="1617101">==</span>&nbsp;<span class="num" id="1617104">1</span>&nbsp;<span class="op" id="1617106">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1617110">return</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1617118">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="comment" id="1617121">//&nbsp;Slow-path.</span><br>
+<span class="lineno">40</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1617136">o</span><span class="op" id="1617137">.</span><span class="ident" id="1617138">m</span><span class="op" id="1617139">.</span><span class="ident" id="1617140">Lock</span><span class="op" id="1617144">(</span><span class="op" id="1617145">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1617148">defer</span>&nbsp;<span class="ident" id="1617154">o</span><span class="op" id="1617155">.</span><span class="ident" id="1617156">m</span><span class="op" id="1617157">.</span><span class="ident" id="1617158">Unlock</span><span class="op" id="1617164">(</span><span class="op" id="1617165">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1617168">if</span>&nbsp;<span class="ident" id="1617171">o</span><span class="op" id="1617172">.</span><span class="ident" id="1617173">done</span>&nbsp;<span class="op" id="1617178">==</span>&nbsp;<span class="num" id="1617181">0</span>&nbsp;<span class="op" id="1617183">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="keyword" id="1617187">defer</span>&nbsp;<span class="ident" id="1617193">atomic</span><span class="op" id="1617199">.</span><span class="ident" id="1617200">StoreUint32</span><span class="op" id="1617211">(</span><span class="op" id="1617212">&amp;</span><span class="ident" id="1617213">o</span><span class="op" id="1617214">.</span><span class="ident" id="1617215">done</span><span class="op" id="1617219">,</span>&nbsp;<span class="num" id="1617221">1</span><span class="op" id="1617222">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp&nbsp;&nbsp;&nbsp;&nbsp<span class="ident" id="1617226">f</span><span class="op" id="1617227">(</span><span class="op" id="1617228">)</span><br>
+<span class="lineno">45</span>&nbsp;&nbsp;&nbsp;&nbsp<span class="op" id="1617231">}</span><br>
+<span class="lineno"></span><span class="op" id="1617233">}</span>
 </div>
 </body>
 </html>

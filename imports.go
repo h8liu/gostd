@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	"golang.org/x/tools/go/types"
@@ -144,12 +145,14 @@ func (m *importMap) levels() [][]*importNode {
 
 func (m *importMap) export() map[string][]string {
 	ret := make(map[string][]string)
+
 	for name, node := range m.nodes {
 		outs := make([]string, 0, 10)
 		for p := range node.outs {
 			outs = append(outs, p)
 		}
 
+		sort.Strings(outs)
 		ret[name] = outs
 	}
 

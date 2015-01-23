@@ -141,3 +141,17 @@ func (m *importMap) levels() [][]*importNode {
 
 	return rev
 }
+
+func (m *importMap) export() map[string][]string {
+	ret := make(map[string][]string)
+	for name, node := range m.nodes {
+		outs := make([]string, 0, 10)
+		for p := range node.outs {
+			outs = append(outs, p)
+		}
+
+		ret[name] = outs
+	}
+
+	return ret
+}

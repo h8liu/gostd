@@ -1,9 +1,11 @@
 package main
 
 import (
+	"encoding/json"
 	"flag"
 	"go/build"
 	"go/token"
+	"io/ioutil"
 	"path/filepath"
 	"strings"
 
@@ -137,6 +139,7 @@ func makePkgs(withTests bool) (map[string]*pkg, *token.FileSet, map[int]*file) {
 func main() {
 	doHtmls := flag.Bool("html", false, "create html files")
 	doLevels := flag.Bool("lvl", true, "create level mapping")
+	depOut := flag.String("dep", "gostd.dep", "output of dependency file")
 	flag.Parse()
 
 	if *doHtmls {
@@ -167,13 +170,20 @@ func main() {
 		*/
 
 		lvls := m.levels()
-
 		for lvl, nodes := range lvls {
 			fmt.Printf("%d:", lvl+1)
 			for _, node := range nodes {
 				fmt.Printf(" %s", node.name)
 			}
 			fmt.Printf("\n")
+		}
+
+		if *depOut != "" {
+			deps := m.export()
+			bs, e := json.MarshalIndent(deps, "", "    ")
+			ne(e)
+			e = ioutil.WriteFile(*depOut, bs, 0644)
+			ne(e)
 		}
 	}
 }

@@ -20,6 +20,8 @@ func runeHtml(ch rune) string {
 var builtinTypes = []string{
 	"int",
 	"uint",
+	"int64",
+	"uint64",
 	"int32",
 	"uint32",
 	"int16",

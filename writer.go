@@ -250,7 +250,7 @@ func (w *writer) homepage() []byte {
 	out := new(bytes.Buffer)
 	fmt.Fprint(out, htmlHeader)
 
-	fmt.Fprintf(out, `<h1><a href="%s">Go Standard Library</a></h1>`+"\n",
+	fmt.Fprintf(out, `<h1 class="home"><a href="%s">Go Standard Library</a></h1>`+"\n",
 		html.EscapeString(path.Join("/", w.outPath, "index.html")),
 	)
 

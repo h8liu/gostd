@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"go/build"
 	"go/token"
 	"path/filepath"
@@ -134,7 +135,11 @@ func makePkgs(withTests bool) (map[string]*pkg, *token.FileSet, map[int]*file) {
 }
 
 func main() {
-	if false {
+	doHtmls := flag.Bool("html", false, "create html files")
+	doLevels := flag.Bool("lvl", true, "create level mapping")
+	flag.Parse()
+
+	if *doHtmls {
 		ps, fset, files := makePkgs(true)
 		w := &writer{
 			outRoot: "www",
@@ -148,7 +153,7 @@ func main() {
 		w.writePkgs()
 	}
 
-	if true {
+	if *doLevels {
 		ps, _, _ := makePkgs(false)
 		m := newImportMap(ps)
 

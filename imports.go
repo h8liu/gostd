@@ -8,17 +8,17 @@ import (
 )
 
 type importNode struct {
-	name       string
-	imports    map[string]*importNode
-	importedBy map[string]*importNode
-	nimported  int
+	name      string
+	outs      map[string]*importNode
+	ins       map[string]*importNode
+	nimported int
 }
 
 func newImportNode(name string) *importNode {
 	ret := new(importNode)
 	ret.name = name
-	ret.imports = make(map[string]*importNode)
-	ret.importedBy = make(map[string]*importNode)
+	ret.ins = make(map[string]*importNode)
+	ret.outs = make(map[string]*importNode)
 
 	return ret
 }
@@ -68,8 +68,8 @@ func newImportMap(pkgs map[string]*pkg) *importMap {
 			m.registerNode(imported)
 			nodeImported := m.nodes[imported]
 
-			nodeImporting.imports[imported] = nodeImported
-			nodeImported.importedBy[importing] = nodeImporting
+			nodeImporting.outs[imported] = nodeImported
+			nodeImported.ins[importing] = nodeImporting
 		}
 	}
 
@@ -86,7 +86,7 @@ func (m *importMap) levels() [][]*importNode {
 	total := 0
 
 	for _, node := range m.nodes {
-		if len(node.imports) == 0 {
+		if len(node.ins) == 0 {
 			cur = append(cur, node)
 		}
 	}
@@ -105,11 +105,11 @@ func (m *importMap) levels() [][]*importNode {
 
 		var next []*importNode
 		for _, node := range cur {
-			for _, child := range node.importedBy {
+			for _, child := range node.outs {
 				child.nimported++
 				// fmt.Printf("hitting %s %d/%d\n", child.name,
 				//	child.nimported, len(child.imports))
-				if child.nimported == len(child.imports) {
+				if child.nimported == len(child.ins) {
 					next = append(next, child)
 				}
 			}
@@ -120,12 +120,12 @@ func (m *importMap) levels() [][]*importNode {
 
 	if total != len(m.nodes) {
 		for _, node := range m.nodes {
-			if node.nimported < len(node.imports) {
+			if node.nimported < len(node.ins) {
 				fmt.Println(node.name)
 			}
 
-			for _, imp := range node.imports {
-				if imp.nimported < len(imp.imports) {
+			for _, imp := range node.ins {
+				if imp.nimported < len(imp.ins) {
 					fmt.Println("    ", imp.name)
 				}
 			}
@@ -133,5 +133,11 @@ func (m *importMap) levels() [][]*importNode {
 		panic("have circles")
 	}
 
-	return ret
+	nlevel := len(ret)
+	rev := make([][]*importNode, nlevel)
+	for i, nodes := range ret {
+		rev[nlevel-1-i] = nodes
+	}
+
+	return rev
 }

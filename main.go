@@ -9,6 +9,8 @@ import (
 	"golang.org/x/tools/go/buildutil"
 	"golang.org/x/tools/go/loader"
 	"golang.org/x/tools/refactor/lexical"
+
+	"fmt"
 )
 
 func listPackages() []string {
@@ -30,23 +32,27 @@ func listPackages() []string {
 	return ret
 }
 
-func loadPackages(pkgs []string) (*loader.Program, error) {
+func loadPackages(pkgs []string, withTests bool) (*loader.Program, error) {
 	conf := loader.Config{
 		Build:         &build.Default,
 		SourceImports: true,
 	}
 
 	for _, p := range pkgs {
-		e := conf.ImportWithTests(p)
-		if e != nil {
-			return nil, e
+		if withTests {
+			e := conf.ImportWithTests(p)
+			if e != nil {
+				return nil, e
+			}
+		} else {
+			conf.Import(p)
 		}
 	}
 
 	return conf.Load()
 }
 
-func makePkgs() (map[string]*pkg, *token.FileSet, map[int]*file) {
+func makePkgs(withTests bool) (map[string]*pkg, *token.FileSet, map[int]*file) {
 	pkgs := listPackages()
 	/*
 		pkgs = append(pkgs,
@@ -59,7 +65,7 @@ func makePkgs() (map[string]*pkg, *token.FileSet, map[int]*file) {
 		)
 	*/
 
-	prog, e := loadPackages(pkgs)
+	prog, e := loadPackages(pkgs, withTests)
 	ne(e)
 
 	fset := prog.Fset
@@ -128,15 +134,41 @@ func makePkgs() (map[string]*pkg, *token.FileSet, map[int]*file) {
 }
 
 func main() {
-	ps, fset, files := makePkgs()
-	w := &writer{
-		outRoot: "www",
-		outPath: "gostd",
+	if false {
+		ps, fset, files := makePkgs(true)
+		w := &writer{
+			outRoot: "www",
+			outPath: "gostd",
 
-		pkgs:  ps,
-		fset:  fset,
-		files: files,
+			pkgs:  ps,
+			fset:  fset,
+			files: files,
+		}
+
+		w.writePkgs()
 	}
 
-	w.writePkgs()
+	if true {
+		ps, _, _ := makePkgs(false)
+		m := newImportMap(ps)
+
+		/*
+			for _, node := range m.nodes {
+				fmt.Println(node.name)
+				for _, imp := range node.imports {
+					fmt.Println("   ", imp.name)
+				}
+			}
+		*/
+
+		lvls := m.levels()
+
+		for lvl, nodes := range lvls {
+			fmt.Printf("%d:", lvl+1)
+			for _, node := range nodes {
+				fmt.Printf(" %s", node.name)
+			}
+			fmt.Printf("\n")
+		}
+	}
 }

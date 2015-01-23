@@ -23,45 +23,55 @@
 </ul>
 </div>
 <div class="code">
-<span class="lineno">1</span><span class="comment" id="3526879">//&nbsp;Copyright&nbsp;2014&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
-<span class="lineno"></span><span class="comment" id="3526935">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
-<span class="lineno"></span><span class="comment" id="3526989">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
+<span class="lineno">1</span><span class="comment" id="3067206">//&nbsp;Copyright&nbsp;2014&nbsp;The&nbsp;Go&nbsp;Authors.&nbsp;&nbsp;All&nbsp;rights&nbsp;reserved.</span><br>
+<span class="lineno"></span><span class="comment" id="3067262">//&nbsp;Use&nbsp;of&nbsp;this&nbsp;source&nbsp;code&nbsp;is&nbsp;governed&nbsp;by&nbsp;a&nbsp;BSD-style</span><br>
+<span class="lineno"></span><span class="comment" id="3067316">//&nbsp;license&nbsp;that&nbsp;can&nbsp;be&nbsp;found&nbsp;in&nbsp;the&nbsp;LICENSE&nbsp;file.</span><br>
 <span class="lineno"></span><br>
-<span class="lineno">5</span><span class="keyword" id="3527040">package</span>&nbsp;<span class="ident" id="3527048">rand</span><br>
+<span class="lineno">5</span><span class="keyword" id="3067367">package</span>&nbsp;<span class="ident" id="3067375">rand</span><br>
 <span class="lineno"></span><br>
-<span class="lineno"></span><span class="keyword" id="3527054">import</span>&nbsp;<span class="op" id="3527061">(</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="string" id="3527064">&#34;internal/syscall&#34;</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="string" id="3527084">&#34;sync&#34;</span><br>
-<span class="lineno">10</span><span class="op" id="3527091">)</span><br>
+<span class="lineno"></span><span class="keyword" id="3067381">import</span>&nbsp;<span class="op" id="3067388">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="string" id="3067391">&#34;internal/syscall&#34;</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="string" id="3067411">&#34;sync&#34;</span><br>
+<span class="lineno">10</span><span class="op" id="3067418">)</span><br>
 <span class="lineno"></span><br>
-<span class="lineno"></span><span class="keyword" id="3527094">func</span>&nbsp;<span class="ident" id="3527099">init</span><span class="op" id="3527103">(</span><span class="op" id="3527104">)</span>&nbsp;<span class="op" id="3527106">{</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="3527109">altGetRandom</span>&nbsp;<span class="op" id="3527122">=</span>&nbsp;<span class="ident" id="3527124">getRandomLinux</span><br>
-<span class="lineno"></span><span class="op" id="3527139">}</span><br>
+<span class="lineno"></span><span class="keyword" id="3067421">func</span>&nbsp;<span class="ident" id="3067426">init</span><span class="op" id="3067430">(</span><span class="op" id="3067431">)</span>&nbsp;<span class="op" id="3067433">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="3067436">altGetRandom</span>&nbsp;<span class="op" id="3067449">=</span>&nbsp;<span class="ident" id="3067451">getRandomLinux</span><br>
+<span class="lineno"></span><span class="op" id="3067466">}</span><br>
 <span class="lineno">15</span><br>
-<span class="lineno"></span><span class="keyword" id="3527142">var</span>&nbsp;<span class="op" id="3527146">(</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="3527149">once</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="3527160">sync</span><span class="op" id="3527164">.</span><span class="ident" id="3527165">Once</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="3527171">useSyscall</span>&nbsp;<span class="builtintype" id="3527182">bool</span><br>
-<span class="lineno"></span><span class="op" id="3527187">)</span><br>
+<span class="lineno"></span><span class="keyword" id="3067469">var</span>&nbsp;<span class="op" id="3067473">(</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="3067476">once</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="3067487">sync</span><span class="op" id="3067491">.</span><span class="ident" id="3067492">Once</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="3067498">useSyscall</span>&nbsp;<span class="builtintype" id="3067509">bool</span><br>
+<span class="lineno"></span><span class="op" id="3067514">)</span><br>
 <span class="lineno">20</span><br>
-<span class="lineno"></span><span class="keyword" id="3527190">func</span>&nbsp;<span class="ident" id="3527195">pickStrategy</span><span class="op" id="3527207">(</span><span class="op" id="3527208">)</span>&nbsp;<span class="op" id="3527210">{</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment" id="3527213">//&nbsp;Test&nbsp;whether&nbsp;we&nbsp;should&nbsp;use&nbsp;the&nbsp;system&nbsp;call&nbsp;or&nbsp;/dev/urandom.</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment" id="3527277">//&nbsp;We&#39;ll&nbsp;fall&nbsp;back&nbsp;to&nbsp;urandom&nbsp;if:</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment" id="3527312">//&nbsp;-&nbsp;the&nbsp;kernel&nbsp;is&nbsp;too&nbsp;old&nbsp;(before&nbsp;3.17)</span><br>
-<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment" id="3527354">//&nbsp;-&nbsp;the&nbsp;machine&nbsp;has&nbsp;no&nbsp;entropy&nbsp;available&nbsp;(early&nbsp;boot&nbsp;+&nbsp;no&nbsp;hardware</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment" id="3527423">//&nbsp;&nbsp;&nbsp;entropy&nbsp;source?)&nbsp;and&nbsp;we&nbsp;want&nbsp;to&nbsp;avoid&nbsp;blocking&nbsp;later.</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword" id="3527483">var</span>&nbsp;<span class="ident" id="3527487">buf</span>&nbsp;<span class="op" id="3527491">[</span><span class="num" id="3527492">1</span><span class="op" id="3527493">]</span><span class="builtintype" id="3527494">byte</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="3527500">n</span><span class="op" id="3527501">,</span>&nbsp;<span class="ident" id="3527503">err</span>&nbsp;<span class="op" id="3527507">:=</span>&nbsp;<span class="ident" id="3527510">syscall</span><span class="op" id="3527517">.</span><span class="ident" id="3527518">GetRandom</span><span class="op" id="3527527">(</span><span class="ident" id="3527528">buf</span><span class="op" id="3527531">[</span><span class="op" id="3527532">:</span><span class="op" id="3527533">]</span><span class="op" id="3527534">,</span>&nbsp;<span class="ident" id="3527536">syscall</span><span class="op" id="3527543">.</span><span class="ident" id="3527544">GRND_NONBLOCK</span><span class="op" id="3527557">)</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="3527560">useSyscall</span>&nbsp;<span class="op" id="3527571">=</span>&nbsp;<span class="ident" id="3527573">n</span>&nbsp;<span class="op" id="3527575">==</span>&nbsp;<span class="num" id="3527578">1</span>&nbsp;<span class="op" id="3527580">&amp;&amp;</span>&nbsp;<span class="ident" id="3527583">err</span>&nbsp;<span class="op" id="3527587">==</span>&nbsp;<span class="builtintype" id="3527590">nil</span><br>
-<span class="lineno">30</span><span class="op" id="3527594">}</span><br>
+<span class="lineno"></span><span class="keyword" id="3067517">func</span>&nbsp;<span class="ident" id="3067522">pickStrategy</span><span class="op" id="3067534">(</span><span class="op" id="3067535">)</span>&nbsp;<span class="op" id="3067537">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment" id="3067540">//&nbsp;Test&nbsp;whether&nbsp;we&nbsp;should&nbsp;use&nbsp;the&nbsp;system&nbsp;call&nbsp;or&nbsp;/dev/urandom.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment" id="3067604">//&nbsp;We&#39;ll&nbsp;fall&nbsp;back&nbsp;to&nbsp;urandom&nbsp;if:</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment" id="3067639">//&nbsp;-&nbsp;the&nbsp;kernel&nbsp;is&nbsp;too&nbsp;old&nbsp;(before&nbsp;3.17)</span><br>
+<span class="lineno">25</span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment" id="3067681">//&nbsp;-&nbsp;the&nbsp;machine&nbsp;has&nbsp;no&nbsp;entropy&nbsp;available&nbsp;(early&nbsp;boot&nbsp;+&nbsp;no&nbsp;hardware</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="comment" id="3067750">//&nbsp;&nbsp;&nbsp;entropy&nbsp;source?)&nbsp;and&nbsp;we&nbsp;want&nbsp;to&nbsp;avoid&nbsp;blocking&nbsp;later.</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword" id="3067810">var</span>&nbsp;<span class="ident" id="3067814">buf</span>&nbsp;<span class="op" id="3067818">[</span><span class="num" id="3067819">1</span><span class="op" id="3067820">]</span><span class="builtintype" id="3067821">byte</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="3067827">n</span><span class="op" id="3067828">,</span>&nbsp;<span class="ident" id="3067830">err</span>&nbsp;<span class="op" id="3067834">:=</span>&nbsp;<span class="ident" id="3067837">syscall</span><span class="op" id="3067844">.</span><span class="ident" id="3067845">GetRandom</span><span class="op" id="3067854">(</span><span class="ident" id="3067855">buf</span><span class="op" id="3067858">[</span><span class="op" id="3067859">:</span><span class="op" id="3067860">]</span><span class="op" id="3067861">,</span>&nbsp;<span class="ident" id="3067863">syscall</span><span class="op" id="3067870">.</span><span class="ident" id="3067871">GRND_NONBLOCK</span><span class="op" id="3067884">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="3067887">useSyscall</span>&nbsp;<span class="op" id="3067898">=</span>&nbsp;<span class="ident" id="3067900">n</span>&nbsp;<span class="op" id="3067902">==</span>&nbsp;<span class="num" id="3067905">1</span>&nbsp;<span class="op" id="3067907">&amp;&amp;</span>&nbsp;<span class="ident" id="3067910">err</span>&nbsp;<span class="op" id="3067914">==</span>&nbsp;<span class="builtintype" id="3067917">nil</span><br>
+<span class="lineno">30</span><span class="op" id="3067921">}</span><br>
 <span class="lineno"></span><br>
-<span class="lineno"></span><span class="keyword" id="3527597">func</span>&nbsp;<span class="ident" id="3527602">getRandomLinux</span><span class="op" id="3527616">(</span><span class="ident" id="3527617">p</span>&nbsp;<span class="op" id="3527619">[</span><span class="op" id="3527620">]</span><span class="builtintype" id="3527621">byte</span><span class="op" id="3527625">)</span>&nbsp;<span class="op" id="3527627">(</span><span class="ident" id="3527628">ok</span>&nbsp;<span class="builtintype" id="3527631">bool</span><span class="op" id="3527635">)</span>&nbsp;<span class="op" id="3527637">{</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="3527640">once</span><span class="op" id="3527644">.</span><span class="ident" id="3527645">Do</span><span class="op" id="3527647">(</span><span class="ident" id="3527648">pickStrategy</span><span class="op" id="3527660">)</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword" id="3527663">if</span>&nbsp;<span class="op" id="3527666">!</span><span class="ident" id="3527667">useSyscall</span>&nbsp;<span class="op" id="3527678">{</span><br>
-<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword" id="3527682">return</span>&nbsp;<span class="builtintype" id="3527689">false</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="op" id="3527696">}</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="3527699">n</span><span class="op" id="3527700">,</span>&nbsp;<span class="ident" id="3527702">err</span>&nbsp;<span class="op" id="3527706">:=</span>&nbsp;<span class="ident" id="3527709">syscall</span><span class="op" id="3527716">.</span><span class="ident" id="3527717">GetRandom</span><span class="op" id="3527726">(</span><span class="ident" id="3527727">p</span><span class="op" id="3527728">,</span>&nbsp;<span class="num" id="3527730">0</span><span class="op" id="3527731">)</span><br>
-<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword" id="3527734">return</span>&nbsp;<span class="ident" id="3527741">n</span>&nbsp;<span class="op" id="3527743">==</span>&nbsp;<span class="builtinfunc" id="3527746">len</span><span class="op" id="3527749">(</span><span class="ident" id="3527750">p</span><span class="op" id="3527751">)</span>&nbsp;<span class="op" id="3527753">&amp;&amp;</span>&nbsp;<span class="ident" id="3527756">err</span>&nbsp;<span class="op" id="3527760">==</span>&nbsp;<span class="builtintype" id="3527763">nil</span><br>
-<span class="lineno"></span><span class="op" id="3527767">}</span>
+<span class="lineno"></span><span class="keyword" id="3067924">func</span>&nbsp;<span class="ident" id="3067929">getRandomLinux</span><span class="op" id="3067943">(</span><span class="ident" id="3067944">p</span>&nbsp;<span class="op" id="3067946">[</span><span class="op" id="3067947">]</span><span class="builtintype" id="3067948">byte</span><span class="op" id="3067952">)</span>&nbsp;<span class="op" id="3067954">(</span><span class="ident" id="3067955">ok</span>&nbsp;<span class="builtintype" id="3067958">bool</span><span class="op" id="3067962">)</span>&nbsp;<span class="op" id="3067964">{</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="3067967">once</span><span class="op" id="3067971">.</span><span class="ident" id="3067972">Do</span><span class="op" id="3067974">(</span><span class="ident" id="3067975">pickStrategy</span><span class="op" id="3067987">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword" id="3067990">if</span>&nbsp;<span class="op" id="3067993">!</span><span class="ident" id="3067994">useSyscall</span>&nbsp;<span class="op" id="3068005">{</span><br>
+<span class="lineno">35</span>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword" id="3068009">return</span>&nbsp;<span class="builtintype" id="3068016">false</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="op" id="3068023">}</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="ident" id="3068026">n</span><span class="op" id="3068027">,</span>&nbsp;<span class="ident" id="3068029">err</span>&nbsp;<span class="op" id="3068033">:=</span>&nbsp;<span class="ident" id="3068036">syscall</span><span class="op" id="3068043">.</span><span class="ident" id="3068044">GetRandom</span><span class="op" id="3068053">(</span><span class="ident" id="3068054">p</span><span class="op" id="3068055">,</span>&nbsp;<span class="num" id="3068057">0</span><span class="op" id="3068058">)</span><br>
+<span class="lineno"></span>&nbsp;&nbsp;&nbsp;&nbsp;<span class="keyword" id="3068061">return</span>&nbsp;<span class="ident" id="3068068">n</span>&nbsp;<span class="op" id="3068070">==</span>&nbsp;<span class="builtinfunc" id="3068073">len</span><span class="op" id="3068076">(</span><span class="ident" id="3068077">p</span><span class="op" id="3068078">)</span>&nbsp;<span class="op" id="3068080">&amp;&amp;</span>&nbsp;<span class="ident" id="3068083">err</span>&nbsp;<span class="op" id="3068087">==</span>&nbsp;<span class="builtintype" id="3068090">nil</span><br>
+<span class="lineno"></span><span class="op" id="3068094">}</span>
 </div>
+
+<script>
+  (function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+  (i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+  m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+  })(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+  ga('create', 'UA-19116218-3', 'auto');
+  ga('send', 'pageview');
+</script>
 </body>
 </html>

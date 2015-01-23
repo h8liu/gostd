@@ -39,6 +39,7 @@ var builtinTypes = []string{
 	"map",
 	"true",
 	"false",
+	"nil",
 }
 
 var builtinFuncs = []string{

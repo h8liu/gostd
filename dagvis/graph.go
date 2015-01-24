@@ -198,9 +198,9 @@ func (g *Graph) layout() {
 
 func (g *Graph) exportLayout() []byte {
 	type N struct {
-		X   float64  `json:x`
-		Y   float64  `json:y`
-		Ins []string `json:ins`
+		X   float64  `json:"x"`
+		Y   float64  `json:"y"`
+		Ins []string `json:"ins"`
 	}
 
 	ns := make(map[string]*N)

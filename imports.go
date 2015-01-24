@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
@@ -157,4 +158,58 @@ func (m *importMap) export() map[string][]string {
 	}
 
 	return ret
+}
+
+func (m *importMap) export2() []byte {
+	type Label struct {
+		Label string `json:"label"`
+	}
+
+	type Node struct {
+		Id    string `json:"id"`
+		Value Label  `json:"value"`
+	}
+
+	type Link struct {
+		U     string `json:"u"`
+		V     string `json:"v"`
+		Value Label  `json:"value"`
+	}
+
+	type Data struct {
+		Name  string  `json:"name"`
+		Nodes []*Node `json:"nodes"`
+		Links []*Link `json:"links"`
+	}
+
+	ret := m.export()
+
+	var froms []string
+	for from := range ret {
+		froms = append(froms, from)
+	}
+	sort.Strings(froms)
+
+	obj := new(Data)
+	obj.Name = "gostd"
+
+	for _, from := range froms {
+		obj.Nodes = append(obj.Nodes, &Node{
+			Id:    from,
+			Value: Label{from},
+		})
+
+		tos := ret[from]
+		for _, to := range tos {
+			obj.Links = append(obj.Links, &Link{
+				V:     from,
+				U:     to,
+				Value: Label{""},
+			})
+		}
+	}
+
+	bs, e := json.MarshalIndent(obj, "", "   ")
+	ne(e)
+	return bs
 }

@@ -182,6 +182,8 @@ func main() {
 			deps := m.export()
 			bs, e := json.MarshalIndent(deps, "", "    ")
 			ne(e)
+
+			// bs := m.export2()
 			e = ioutil.WriteFile(*depOut, bs, 0644)
 			ne(e)
 		}

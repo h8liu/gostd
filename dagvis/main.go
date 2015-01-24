@@ -30,10 +30,17 @@ func main() {
 	}
 
 	for from, tos := range m {
+		nEdge += len(tos)
 		for _, to := range tos {
-			g.addEdge(from, to)
+			g.addEdge(to, from)
 		}
 	}
 
-	fmt.Printf("%d nodes, %d edges\n", nNode, nEdge)
+	g.buildDAG()
+	g.printLevels()
+
+	fmt.Printf("%d nodes, %d edges, %d crit edges\n",
+		nNode, nEdge, g.ncrit,
+	)
+
 }

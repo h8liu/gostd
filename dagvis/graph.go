@@ -1,7 +1,9 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
+	"sort"
 )
 
 type Node struct {
@@ -183,4 +185,44 @@ func (g *Graph) printLevels() {
 
 		fmt.Println()
 	}
+}
+
+func (g *Graph) layout() {
+	for x, lvl := range g.levels {
+		for y, node := range lvl {
+			node.x = float64(x)
+			node.y = float64(y)
+		}
+	}
+}
+
+func (g *Graph) exportLayout() []byte {
+	type N struct {
+		X   float64  `json:x`
+		Y   float64  `json:y`
+		Ins []string `json:ins`
+	}
+
+	ns := make(map[string]*N)
+
+	for name, node := range g.nodes {
+		ins := make([]string, 0, 10)
+		for in := range node.critIns {
+			ins = append(ins, in)
+		}
+
+		sort.Strings(ins)
+
+		n := &N{
+			X:   node.x,
+			Y:   node.y,
+			Ins: ins,
+		}
+
+		ns[name] = n
+	}
+
+	ret, e := json.MarshalIndent(ns, "", "    ")
+	ne(e)
+	return ret
 }

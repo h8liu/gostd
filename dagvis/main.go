@@ -38,6 +38,11 @@ func main() {
 
 	g.buildDAG()
 	g.printLevels()
+	g.layout()
+
+	bs = g.exportLayout()
+	e = ioutil.WriteFile("gostd.layout", bs, 0644)
+	ne(e)
 
 	fmt.Printf("%d nodes, %d edges, %d crit edges\n",
 		nNode, nEdge, g.ncrit,

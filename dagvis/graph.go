@@ -201,6 +201,7 @@ func (g *Graph) exportLayout() []byte {
 		X   float64  `json:"x"`
 		Y   float64  `json:"y"`
 		Ins []string `json:"ins"`
+		Outs []string `json:"outs"`
 	}
 
 	ns := make(map[string]*N)
@@ -211,12 +212,19 @@ func (g *Graph) exportLayout() []byte {
 			ins = append(ins, in)
 		}
 
+		outs := make([]string, 0, 10)
+		for out := range node.critOuts {
+			outs = append(outs, out)
+		}
+
 		sort.Strings(ins)
+		sort.Strings(outs)
 
 		n := &N{
 			X:   node.x,
 			Y:   node.y,
 			Ins: ins,
+			Outs: outs,
 		}
 
 		ns[name] = n

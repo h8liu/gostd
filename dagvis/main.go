@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"flag"
 	"io/ioutil"
 )
 
@@ -13,6 +14,10 @@ func ne(e error) {
 }
 
 func main() {
+	rev := flag.Bool("rev", false, "reverse order")
+	out := flag.String("o", "gostd.layout", "output file")
+	flag.Parse()
+
 	m := make(map[string][]string)
 
 	bs, e := ioutil.ReadFile("gostd.dep")
@@ -32,7 +37,11 @@ func main() {
 	for from, tos := range m {
 		nEdge += len(tos)
 		for _, to := range tos {
-			g.addEdge(to, from)
+			if !*rev {
+				g.addEdge(to, from)
+			} else {
+				g.addEdge(from, to)
+			}
 		}
 	}
 
@@ -41,7 +50,7 @@ func main() {
 	g.layout()
 
 	bs = g.exportLayout()
-	e = ioutil.WriteFile("gostd.layout", bs, 0644)
+	e = ioutil.WriteFile(*out, bs, 0644)
 	ne(e)
 
 	fmt.Printf("%d nodes, %d edges, %d crit edges\n",

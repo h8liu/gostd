@@ -117,6 +117,14 @@ func makePkgs(withTests bool) (map[string]*pkg, *token.FileSet, map[int]*file) {
 	}
 
 	for tpkg, pinfo := range prog.AllPackages {
+		for use, obj := range pinfo.Uses {
+			defPos := obj.Pos()
+			refPos := use.NamePos
+			refFile := fset.File(refPos)
+			f := files[refFile.Base()]
+			f.refs[int(refPos)] = int(defPos)
+		}
+
 		lex := lexical.Structure(fset, tpkg, &pinfo.Info, pinfo.Files)
 		for obj, refs := range lex.Refs {
 			defPos := obj.Pos()
@@ -128,6 +136,10 @@ func makePkgs(withTests bool) (map[string]*pkg, *token.FileSet, map[int]*file) {
 					panic("file not found")
 				}
 
+				old := f.refs[int(refPos)]
+				if old > 0 && old != int(defPos) {
+					panic("result different from types")
+				}
 				f.refs[int(refPos)] = int(defPos)
 			}
 		}
@@ -138,7 +150,7 @@ func makePkgs(withTests bool) (map[string]*pkg, *token.FileSet, map[int]*file) {
 
 func main() {
 	doHtmls := flag.Bool("html", false, "create html files")
-	doLevels := flag.Bool("lvl", true, "create level mapping")
+	doLevels := flag.Bool("lvl", false, "create level mapping")
 	depOut := flag.String("dep", "gostd.dep", "output of dependency file")
 	flag.Parse()
 
@@ -148,9 +160,10 @@ func main() {
 			outRoot: "www",
 			outPath: "gostd",
 
-			pkgs:  ps,
-			fset:  fset,
-			files: files,
+			pkgs:      ps,
+			fset:      fset,
+			files:     files,
+			linkToken: true,
 		}
 
 		w.writePkgs()

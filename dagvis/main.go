@@ -2,8 +2,8 @@ package main
 
 import (
 	"encoding/json"
-	"fmt"
 	"flag"
+	"fmt"
 	"io/ioutil"
 )
 

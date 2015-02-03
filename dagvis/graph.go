@@ -198,9 +198,9 @@ func (g *Graph) layout() {
 
 func (g *Graph) exportLayout() []byte {
 	type N struct {
-		X   float64  `json:"x"`
-		Y   float64  `json:"y"`
-		Ins []string `json:"ins"`
+		X    float64  `json:"x"`
+		Y    float64  `json:"y"`
+		Ins  []string `json:"ins"`
 		Outs []string `json:"outs"`
 	}
 
@@ -221,9 +221,9 @@ func (g *Graph) exportLayout() []byte {
 		sort.Strings(outs)
 
 		n := &N{
-			X:   node.x,
-			Y:   node.y,
-			Ins: ins,
+			X:    node.x,
+			Y:    node.y,
+			Ins:  ins,
 			Outs: outs,
 		}
 

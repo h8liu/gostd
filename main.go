@@ -43,10 +43,7 @@ func loadPackages(pkgs []string, withTests bool) (*loader.Program, error) {
 
 	for _, p := range pkgs {
 		if withTests {
-			e := conf.ImportWithTests(p)
-			if e != nil {
-				return nil, e
-			}
+			conf.ImportWithTests(p)
 		} else {
 			conf.Import(p)
 		}

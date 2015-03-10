@@ -38,7 +38,6 @@ func listPackages() []string {
 func loadPackages(pkgs []string, withTests bool) (*loader.Program, error) {
 	conf := loader.Config{
 		Build:         &build.Default,
-		SourceImports: true,
 	}
 
 	for _, p := range pkgs {
